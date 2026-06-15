@@ -1,0 +1,290 @@
+[
+ {
+  "unidad": "UN02_281",
+  "linea": "02",
+  "operador_rut": "96709130",
+  "razon_social": "Transportes Hualpensan S.A.",
+  "fantasia": "Buses Hualpensan",
+  "comunas": "Talcahuano-Hualpén"
+ },
+ {
+  "unidad": "UN10_280",
+  "linea": "10",
+  "operador_rut": "96627540",
+  "razon_social": "Servicio de locomoción colectiva Vía Láctea S.A.",
+  "fantasia": "Vía Láctea",
+  "comunas": "Chiguayante-Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN11_279",
+  "linea": "11",
+  "operador_rut": "96689320",
+  "razon_social": "Sociedad de transportes Vía Futuro S.A.",
+  "fantasia": "Vía Futuro",
+  "comunas": "Chiguayante-Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN12_249",
+  "linea": "12",
+  "operador_rut": "96971790",
+  "razon_social": "Sociedad de transportes Nueva Sotrapel S.A.",
+  "fantasia": "Nueva Sotrapel",
+  "comunas": "Chiguayante-Concepción-Hualpén-Talcahuano"
+ },
+ {
+  "unidad": "UN13_247",
+  "linea": "13",
+  "operador_rut": "96770880",
+  "razon_social": "Transportes Vía Siglo XXI S.A.",
+  "fantasia": "Vía Siglo XXI",
+  "comunas": "Chiguayante-Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN14_278",
+  "linea": "14",
+  "operador_rut": "96686700",
+  "razon_social": "Soc. de transportes públicos de pasajeros Chiguayante Sur S.A.",
+  "fantasia": "Chiguayante Sur",
+  "comunas": "Chiguayante-Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN16_252",
+  "linea": "16",
+  "operador_rut": "96890370",
+  "razon_social": "Transportes Vía Universo S.A.",
+  "fantasia": "Vía Universo",
+  "comunas": "Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN17_253",
+  "linea": "17",
+  "operador_rut": "96717040",
+  "razon_social": "Expresos Plaza del Mall S.A.",
+  "fantasia": "Expresos Chiguayante",
+  "comunas": "Chiguayante-Concepción"
+ },
+ {
+  "unidad": "UN18_254",
+  "linea": "18",
+  "operador_rut": "96717360",
+  "razon_social": "Soc. de Buses Expreso Concepción-Chiguayante S.A.",
+  "fantasia": "Buses Palomares",
+  "comunas": "Chiguayante-Concepción"
+ },
+ {
+  "unidad": "UN20_255",
+  "linea": "20",
+  "operador_rut": "96899680",
+  "razon_social": "Comercializadora y serv. de loc. colectiva Nueva Llacolén S.A.",
+  "fantasia": "Nueva Llacolén",
+  "comunas": "San Pedro de la Paz-Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN21_256",
+  "linea": "21",
+  "operador_rut": "77108750",
+  "razon_social": "Sociedad Riviera Ltda.",
+  "fantasia": "Riviera Bio Bío",
+  "comunas": "San Pedro de la Paz-Concepción"
+ },
+ {
+  "unidad": "UN22_257",
+  "linea": "22",
+  "operador_rut": "96708480",
+  "razon_social": "Comercializadora y serv. de loc. colectiva San Pedro S.A.",
+  "fantasia": "San Pedro",
+  "comunas": "San Pedro de la Paz-Concepción"
+ },
+ {
+  "unidad": "UN23_258",
+  "linea": "23",
+  "operador_rut": "96662090",
+  "razon_social": "Comercial San Pedro Sur S.A.",
+  "fantasia": "Buses San Pedro del Mar",
+  "comunas": "San Pedro de la Paz-Concepción"
+ },
+ {
+  "unidad": "UN24_259",
+  "linea": "24",
+  "operador_rut": "96630800",
+  "razon_social": "Servicio locomoción colectiva San Remo S.A.",
+  "fantasia": "San Remo",
+  "comunas": "San Pedro de la Paz-Concepción"
+ },
+ {
+  "unidad": "UN30_260",
+  "linea": "30",
+  "operador_rut": "96776830",
+  "razon_social": "Transporte público de pasajeros Ruta Las Playas S.A.",
+  "fantasia": "Ruta Las Playas",
+  "comunas": "Penco-Concepción-Hualpén-Talcahuano"
+ },
+ {
+  "unidad": "UN31_284",
+  "linea": "31",
+  "operador_rut": "76444992",
+  "razon_social": "Transportes y servicios Ruta del Mar S.A.",
+  "fantasia": "Ruta del Mar",
+  "comunas": "Penco-Concepción"
+ },
+ {
+  "unidad": "UN32_285",
+  "linea": "32",
+  "operador_rut": "79622800",
+  "razon_social": "Sociedad comercial inmobiliaria Del Mar Ltda.",
+  "fantasia": "Buses Ruta del Mar",
+  "comunas": "Penco-Concepción"
+ },
+ {
+  "unidad": "UN40_261",
+  "linea": "40",
+  "operador_rut": "96620790",
+  "razon_social": "Servicio de locomoción colectiva Las Golondrinas S.A.",
+  "fantasia": "Las Golondrinas",
+  "comunas": "Concepción-Hualpén-Talcahuano"
+ },
+ {
+  "unidad": "UN41_262",
+  "linea": "41",
+  "operador_rut": "77784672",
+  "razon_social": "Servicios de movilización colectiva Mini Verde Ltda.",
+  "fantasia": "Buses Mini Verde",
+  "comunas": "Concepción-Hualpén"
+ },
+ {
+  "unidad": "UN42_263",
+  "linea": "42",
+  "operador_rut": "96623790",
+  "razon_social": "Servicio de loc. colectiva Mini Buses Hualpencillo S.A.",
+  "fantasia": "Mini Buses Hualpencillo",
+  "comunas": "Concepción-Hualpén-Talcahuano"
+ },
+ {
+  "unidad": "UN43_250",
+  "linea": "43",
+  "operador_rut": "78768420",
+  "razon_social": "Centauro Repuestos Ltda.",
+  "fantasia": "Flota Las Lilas",
+  "comunas": "Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN44_264",
+  "linea": "44",
+  "operador_rut": "79601540",
+  "razon_social": "Comercial Centauro Ltda.",
+  "fantasia": "Flota Centauro",
+  "comunas": "Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN50_286",
+  "linea": "50",
+  "operador_rut": "96776830",
+  "razon_social": "Sociedad de transportes Ruta Las Playas Campanil S.A.",
+  "fantasia": "Buses Campanil",
+  "comunas": "Penco-Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN52_265",
+  "linea": "52",
+  "operador_rut": "78578510",
+  "razon_social": "Servicios de locomoción colectiva Géminis Sur Ltda.",
+  "fantasia": "Géminis Sur",
+  "comunas": "Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN56_266",
+  "linea": "56",
+  "operador_rut": "77715130",
+  "razon_social": "Sociedad de transportes Buses Base Naval Ltda.",
+  "fantasia": "Buses Base Naval",
+  "comunas": "Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN60_268",
+  "linea": "60",
+  "operador_rut": "96696310",
+  "razon_social": "Transportes de pasajeros Buses Tucapel S.A.",
+  "fantasia": "Buses Tucapel",
+  "comunas": "Concepción-Hualpén"
+ },
+ {
+  "unidad": "UN62_269",
+  "linea": "62",
+  "operador_rut": "96896040",
+  "razon_social": "Buses Primavera S.A.",
+  "fantasia": "Mi Expreso",
+  "comunas": "Concepción-Hualpén"
+ },
+ {
+  "unidad": "UN63_270",
+  "linea": "63",
+  "operador_rut": "77773306",
+  "razon_social": "Empresa de transportes Rengo Lientur Ltda.",
+  "fantasia": "Rengo Lientur",
+  "comunas": "Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN65_271",
+  "linea": "65",
+  "operador_rut": "77780773",
+  "razon_social": "Sociedad de transportes Cóndor S.A.",
+  "fantasia": "Buses Cóndor",
+  "comunas": "Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN70_272",
+  "linea": "70",
+  "operador_rut": "96875900",
+  "razon_social": "Transporte y administración Las Bahías S.A.",
+  "fantasia": "Las Bahías",
+  "comunas": "Concepción-Hualpén-Talcahuano"
+ },
+ {
+  "unidad": "UN71_273",
+  "linea": "71",
+  "operador_rut": "96640240",
+  "razon_social": "Servicio de locomoción colectiva Puchacay S.A.",
+  "fantasia": "Buses Puchacay",
+  "comunas": "Penco-Concepción"
+ },
+ {
+  "unidad": "UN72_248",
+  "linea": "72",
+  "operador_rut": "96623970",
+  "razon_social": "Serv. de loc. colectiva y comercial Pedro de Valdivia Universidad S.A.",
+  "fantasia": "Pedro de Valdivia",
+  "comunas": "Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN80_274",
+  "linea": "80",
+  "operador_rut": "85902200",
+  "razon_social": "Sociedad Ruta Las Galaxias S.A.",
+  "fantasia": "Las Galaxias",
+  "comunas": "Hualqui-Chiguayante-Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN81_275",
+  "linea": "81",
+  "operador_rut": "96873710",
+  "razon_social": "Soc. de transportes e inversiones Vía del Sol S.A.",
+  "fantasia": "Vía del Sol",
+  "comunas": "Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UN90_276",
+  "linea": "90",
+  "operador_rut": "96722920",
+  "razon_social": "Soc. comercial de servicios y transportes Nueva Sol Yet S.A.",
+  "fantasia": "Nueva Sol Yet",
+  "comunas": "Concepción-Talcahuano"
+ },
+ {
+  "unidad": "UNB0_277",
+  "linea": "B0",
+  "operador_rut": "76478120",
+  "razon_social": "Servicio de transporte intermodal S.A.",
+  "fantasia": "Bio Bus",
+  "comunas": "Intermodal Gran Concepción"
+ }
+]

@@ -18,8 +18,12 @@ Tablero de datos del sistema de transporte público regulado del **Gran Concepci
 | **Operación diaria** | Flota operativa por hora (con banda p10–p90) y velocidad comercial por hora |
 | **Evolución temporal** | Mapa de calor flota × hora × mes, volumen mensual y tendencia de flota/velocidad |
 | **Patrón semanal** | Mapa de calor flota operativa por día de la semana × hora |
-| **Recorridos** | Servicios con mayor flota desplegada y los más lentos en punta tarde |
+| **Recorridos** | Servicios con mayor flota desplegada y los más lentos en punta tarde (con nombre de empresa) |
 | **Regularidad** | Coeficiente de variación de la oferta entre días (más y menos regulares) |
+| **Operadores** | Flota por empresa operadora (35 empresas del perímetro de exclusión) |
+| **Comunas** | Actividad, velocidad y congestión por comuna del Gran Concepción |
+| **Red vial** | Mapa de velocidad por tramo sobre la red (OpenStreetMap) y corredores más lentos con nombre |
+| **Detenciones** | Mapa de los puntos con mayor tiempo de detención (terminales, paraderos, nodos) |
 
 ## 🗂️ Origen de los datos
 

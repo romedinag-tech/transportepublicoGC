@@ -86,6 +86,38 @@
     </div>
   </section>
 
+  <!-- EMPRESAS -->
+  <section class="block">
+    <div class="sec-head"><span class="tag">06 · Operadores</span><h3>Empresas operadoras</h3></div>
+    <p class="sec-desc">Las 36 unidades de negocio son operadas por 35 empresas del perímetro de exclusión. Tamaño de flota por empresa (buses distintos detectados). Pasa el cursor para ver razón social, líneas y comunas que sirve.</p>
+    <div class="card"><h4>Flota por empresa operadora <span class="hint">buses distintos · nombre de fantasía (línea)</span></h4><div id="ch-empresas" class="chart xl"></div></div>
+  </section>
+
+  <!-- COMUNAS -->
+  <section class="block">
+    <div class="sec-head"><span class="tag">07 · Territorio</span><h3>Estadísticas por comuna</h3></div>
+    <p class="sec-desc">Distribución de la operación entre las comunas del Gran Concepción, calculada asignando cada posición GPS a su comuna mediante geometría (point-in-polygon). Concepción concentra el núcleo; Chiguayante es la más fluida.</p>
+    <div class="grid g2">
+      <div class="card"><h4>Actividad por comuna <span class="hint">millones de registros GPS</span></h4><div id="ch-comuna-pulsos" class="chart tall"></div></div>
+      <div class="card"><h4>Velocidad y congestión por comuna <span class="hint">km/h y % de tiempo detenido</span></h4><div id="ch-comuna-vel" class="chart tall"></div></div>
+    </div>
+  </section>
+
+  <!-- RED VIAL -->
+  <section class="block">
+    <div class="sec-head"><span class="tag">08 · Red vial</span><h3>Velocidad por tramos de la red</h3></div>
+    <p class="sec-desc">Velocidad comercial promedio asignada a la red vial (OpenStreetMap). Cada punto es un tramo de ~100 m coloreado por velocidad: rojo = lento, azul = rápido. Desplázate y haz zoom en el mapa.</p>
+    <div class="card"><h4>Mapa de velocidad sobre la red vial <span class="hint">km/h en movimiento · ~5.000 tramos</span></h4><div id="ch-map-vel" class="chart map"></div></div>
+    <div class="card" style="margin-top:18px"><h4>Corredores más lentos (con nombre de calle) <span class="hint">km/h en movimiento · velocidad por tramo</span></h4><div id="ch-corredores" class="chart xl"></div></div>
+  </section>
+
+  <!-- DETENCIONES -->
+  <section class="block">
+    <div class="sec-head"><span class="tag">09 · Detenciones</span><h3>Puntos con mayor tiempo de detención</h3></div>
+    <p class="sec-desc">Lugares donde los buses acumulan más tiempo detenido (velocidad &lt; 2 km/h). El tamaño del punto refleja el volumen de detenciones; el color distingue terminales (amarillo) de nodos troncales / paradas (rojo). Pasa el cursor para ver calle, comuna y tipo.</p>
+    <div class="card"><h4>Mapa de detenciones <span class="hint">terminales, paraderos y nodos congestionados</span></h4><div id="ch-map-det" class="chart map"></div></div>
+  </section>
+
   <!-- METODOLOGÍA -->
   <section class="block">
     <div class="method">
@@ -96,6 +128,10 @@
         <div><dt>Velocidad comercial</dt><dd>Velocidad media de los buses en movimiento (1–80 km/h), ponderada por número de registros. Excluye detenciones largas.</dd></div>
         <div><dt>Frecuencia / oferta</dt><dd>Aproximada por la flota operativa por hora de cada servicio. La frecuencia exacta por paradero se abordará en una etapa posterior.</dd></div>
         <div><dt>Regularidad (CV)</dt><dd>Desviación estándar dividida por la media de la flota en punta tarde entre días. Menor = más estable.</dd></div>
+        <div><dt>Empresas operadoras</dt><dd>Nombres asociados a cada unidad/línea desde fuentes públicas (Wikipedia «Buses licitados del Gran Concepción»). La clave fidedigna es el RUT presente en los datos GPS; los nombres son referenciales.</dd></div>
+        <div><dt>Estadísticas por comuna</dt><dd>Asignación de cada posición a su comuna por geometría (point-in-polygon) usando límites comunales de la Región del Biobío.</dd></div>
+        <div><dt>Red vial y corredores</dt><dd>Red vial descargada de OpenStreetMap (Overpass). La velocidad por tramo se obtiene asignando cada celda de ~100 m a la calle más cercana (≤45 m).</dd></div>
+        <div><dt>Puntos de detención</dt><dd>Agrupación de posiciones con velocidad &lt; 2 km/h en celdas de ~11 m, etiquetadas con la calle y comuna más cercanas.</dd></div>
         <div><dt>Cobertura</dt><dd>36 unidades de negocio · 101 códigos de recorrido · 396 días · 302,3 millones de registros.</dd></div>
       </dl>
       <div class="note"><span>⚠️</span><span>Junio 2025 presenta menor volumen: 11 unidades entregaron archivos vacíos ese mes (vacío real de datos en el origen). Los indicadores de ese mes están subestimados.</span></div>
