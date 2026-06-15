@@ -15,6 +15,7 @@ Tablero de datos del sistema de transporte público regulado del **Gran Concepci
 
 | Sección | Indicador |
 |---|---|
+| **En vivo** | Mapa de la posición de cada bus en tiempo real, auto-refrescado cada minuto |
 | **Operación diaria** | Flota operativa por hora (con banda p10–p90) y velocidad comercial por hora |
 | **Evolución temporal** | Mapa de calor flota × hora × mes, volumen mensual y tendencia de flota/velocidad |
 | **Patrón semanal** | Mapa de calor flota operativa por día de la semana × hora |
@@ -62,7 +63,7 @@ Los KPIs se regeneran ejecutando los scripts de [`pipeline/`](pipeline/) sobre l
 python pipeline/10_kpis.py     # recalcula data/*.json desde BigQuery
 ```
 
-El tablero es **100% estático**: se sirve con cualquier servidor de archivos (o GitHub Pages) y no requiere backend.
+El tablero es **estático** y se sirve por GitHub Pages. El panel **En vivo** es dinámico sin backend propio: un servicio serverless (Cloud Run + Cloud Scheduler) publica cada minuto un `live.json` en un bucket público de Google Cloud Storage, y la página lo consume vía `fetch` con auto-refresco. El token de la API permanece del lado del servidor.
 
 ---
 

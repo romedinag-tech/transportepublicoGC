@@ -36,6 +36,19 @@
     <p>Más de 300 millones de posiciones GPS de la flota regulada del Gran Concepción, transformadas en indicadores de oferta, frecuencia, regularidad y velocidad comercial. Período abril 2025 – abril 2026.</p>
   </div>
 
+  <!-- EN VIVO -->
+  <section class="block" style="padding-top:14px">
+    <div class="sec-head">
+      <span class="tag live"><span class="livedot"></span>En vivo</span>
+      <h3>Buses circulando ahora</h3>
+      <span id="live-age" style="font-size:13px;color:var(--color-text-tertiary);margin-left:auto">conectando…</span>
+    </div>
+    <p class="sec-desc">Posición de cada bus en tiempo real, actualizada automáticamente cada minuto desde el feed GTFS-RT. <span style="color:#34d399">●</span> en movimiento · <span style="color:#7c8aa0">●</span> detenido. Desplázate y haz zoom en el mapa.</p>
+    <div class="kpis" id="live-kpis" style="margin-bottom:16px"><div class="loading">Conectando con el feed en vivo…</div></div>
+    <div class="card"><h4>Mapa en vivo <span class="hint">posición de cada bus · auto-refresco 60 s</span></h4><div id="ch-live-map" class="chart map"></div></div>
+  </section>
+
+  <div class="sec-head" style="margin-top:10px"><span class="tag">00 · Histórico</span><h3>Resumen del período analizado</h3></div>
   <div class="kpis" id="kpis"><div class="loading">Cargando indicadores…</div></div>
 
   <!-- OPERACIÓN DIARIA -->

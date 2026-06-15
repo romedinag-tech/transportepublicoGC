@@ -213,9 +213,8 @@ async function corredores(){
 
 /* ---------- Mapas geográficos ---------- */
 async function mapas(){
-  const [geo, grid, det] = await Promise.all([
-    J("comunas_gccp.geojson"), J("speed_grid.json"), J("detenciones.json")]);
-  echarts.registerMap("gccp", geo);
+  await ensureGccp();
+  const [grid, det] = await Promise.all([J("speed_grid.json"), J("detenciones.json")]);
   const geoBase = {map:"gccp",roam:true,
     itemStyle:{areaColor:"rgba(56,189,248,.04)",borderColor:"rgba(148,161,186,.35)",borderWidth:1},
     emphasis:{itemStyle:{areaColor:"rgba(56,189,248,.10)"},label:{show:false}},
@@ -249,13 +248,58 @@ async function mapas(){
   });
 }
 
+/* ---------- EN VIVO ---------- */
+const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
+let liveSnap = null;
+async function ensureGccp(){
+  if(!window.__gccp){ const g = await J("comunas_gccp.geojson"); echarts.registerMap("gccp", g); window.__gccp = true; }
+}
+function ageTxt(iso){
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso))/1000));
+  return s < 90 ? `hace ${s} s` : `hace ${Math.round(s/60)} min`;
+}
+async function live(){
+  await ensureGccp();
+  const el = $("ch-live-map"); if(!el) return;
+  const lc = echarts.init(el); charts.push(lc);
+  if(window.ResizeObserver){ new ResizeObserver(()=>{try{lc.resize();}catch(e){}}).observe(el); }
+  lc.setOption({
+    geo:{map:"gccp",roam:true,label:{show:false},
+      itemStyle:{areaColor:"rgba(56,189,248,.04)",borderColor:"rgba(148,161,186,.30)",borderWidth:1},
+      emphasis:{label:{show:false},itemStyle:{areaColor:"rgba(56,189,248,.08)"}}},
+    tooltip:{trigger:"item",backgroundColor:"rgba(13,20,36,.96)",borderColor:"rgba(255,255,255,.14)",textStyle:{color:"#e8eef8"},
+      formatter:p=>{const d=p.data; if(!d||!d.ln&&d.ln!=="")return "";
+        return `Línea ${d.ln||"?"}${EMP[d.ln]?" · "+EMP[d.ln]:""}<br>${d.mv?"En movimiento":"Detenido"} · ${d.sp} km/h`;}},
+    series:[{type:"scatter",coordinateSystem:"geo",data:[],symbolSize:4,large:true,largeThreshold:500,progressive:4000}]
+  });
+  async function refresh(){
+    try{
+      const d = await (await fetch(LIVE_URL+"?t="+Date.now(),{cache:"no-store"})).json();
+      liveSnap = d.snapshot_utc;
+      lc.setOption({series:[{data:d.buses.map(b=>({value:[b[1],b[0]],ln:b[2],sp:b[3],mv:b[4],
+        itemStyle:{color:b[4]?"#34d399":"#7c8aa0",opacity:b[4]?0.95:0.5}}))}]});
+      const cards = [
+        ["Buses circulando", fmt(d.total), "reportando posición"],
+        ["En servicio", fmt(d.en_servicio), "con recorrido asignado"],
+        ["En movimiento", fmt(d.moviendose), "velocidad > 0"],
+        ["Velocidad media", d.vel_red+" km/h", "buses en movimiento"],
+      ];
+      $("live-kpis").innerHTML = cards.map(c=>`<div class="kpi"><div class="lab">${c[0]}</div><div class="val">${c[1]}</div><div class="sub">${c[2]}</div></div>`).join("");
+    }catch(e){ console.error("live", e); const a=$("live-age"); if(a) a.textContent="(sin conexión en vivo)"; }
+  }
+  await refresh();
+  setInterval(refresh, 60000);
+  setInterval(()=>{ const a=$("live-age"); if(a && liveSnap) a.textContent = "actualizado "+ageTxt(liveSnap); }, 5000);
+  const a=$("live-age"); if(a && liveSnap) a.textContent = "actualizado "+ageTxt(liveSnap);
+}
+
 /* ---------- run ---------- */
 (async function(){
   try{
     const emp = await J("empresas.json");
     emp.forEach(e=>EMP[e.linea]=e.fantasia);
     await kpis();
-    await Promise.allSettled([flotaHora(),velHora(),heatMes(),mensual(),heatDow(),
+    await Promise.allSettled([live(),flotaHora(),velHora(),heatMes(),mensual(),heatDow(),
       recorridos(),regularidad(),empresas(),comunas(),corredores(),mapas()]);
     // asegurar dimensiones correctas tras el layout
     const fix=()=>charts.forEach(c=>{try{c.resize();}catch(e){}});
