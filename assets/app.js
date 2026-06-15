@@ -218,6 +218,7 @@ async function mapas(){
     J("roads.geojson"), J("speed_grid_hora.json"), J("detenciones.json")]);
   const roadLines = roads.features.map(f=>({coords:f.geometry.coordinates}));
   const geoBase = {map:"gccp",roam:true,label:{show:false},
+    boundingCoords:[[-73.175,-36.69],[-72.95,-37.00]],
     itemStyle:{areaColor:"rgba(56,189,248,.04)",borderColor:"rgba(148,161,186,.32)",borderWidth:1},
     emphasis:{itemStyle:{areaColor:"rgba(56,189,248,.09)"},label:{show:false}}};
   const SPEEDRAMP = ["#d73027","#f46d43","#fdae61","#fee08b","#d9ef8b","#66bd63","#1a9850"]; // lento->rápido
@@ -277,6 +278,7 @@ async function live(){
   if(window.ResizeObserver){ new ResizeObserver(()=>{try{lc.resize();}catch(e){}}).observe(el); }
   lc.setOption({
     geo:{map:"gccp",roam:true,label:{show:false},
+      boundingCoords:[[-73.175,-36.69],[-72.95,-37.00]],
       itemStyle:{areaColor:"rgba(56,189,248,.04)",borderColor:"rgba(148,161,186,.30)",borderWidth:1},
       emphasis:{label:{show:false},itemStyle:{areaColor:"rgba(56,189,248,.08)"}}},
     tooltip:{trigger:"item",backgroundColor:"rgba(13,20,36,.96)",borderColor:"rgba(255,255,255,.14)",textStyle:{color:"#e8eef8"},
