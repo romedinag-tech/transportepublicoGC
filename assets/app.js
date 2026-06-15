@@ -261,6 +261,8 @@ function ageTxt(iso){
 async function live(){
   await ensureGccp();
   const el = $("ch-live-map"); if(!el) return;
+  const roads = await J("roads.geojson");
+  const roadLines = roads.features.map(f=>({coords:f.geometry.coordinates}));
   const lc = echarts.init(el); charts.push(lc);
   if(window.ResizeObserver){ new ResizeObserver(()=>{try{lc.resize();}catch(e){}}).observe(el); }
   lc.setOption({
@@ -268,16 +270,28 @@ async function live(){
       itemStyle:{areaColor:"rgba(56,189,248,.04)",borderColor:"rgba(148,161,186,.30)",borderWidth:1},
       emphasis:{label:{show:false},itemStyle:{areaColor:"rgba(56,189,248,.08)"}}},
     tooltip:{trigger:"item",backgroundColor:"rgba(13,20,36,.96)",borderColor:"rgba(255,255,255,.14)",textStyle:{color:"#e8eef8"},
-      formatter:p=>{const d=p.data; if(!d||!d.ln&&d.ln!=="")return "";
-        return `Línea ${d.ln||"?"}${EMP[d.ln]?" · "+EMP[d.ln]:""}<br>${d.mv?"En movimiento":"Detenido"} · ${d.sp} km/h`;}},
-    series:[{type:"scatter",coordinateSystem:"geo",data:[],symbolSize:4,large:true,largeThreshold:500,progressive:4000}]
+      formatter:p=>{const d=p.data; if(!d||d.ln===undefined)return "";
+        return `Línea ${d.ln||"?"}${EMP[d.ln]?" · "+EMP[d.ln]:""}<br>${d.mv?"En movimiento":"Detenido"} · ${d.sp} km/h${d.mv?" · rumbo "+d.br+"°":""}`;}},
+    series:[
+      {name:"red",type:"lines",coordinateSystem:"geo",data:roadLines,polyline:true,silent:true,
+        lineStyle:{color:"rgba(148,161,186,.22)",width:0.6},progressive:2000,large:true,z:1},
+      {name:"dir",type:"lines",coordinateSystem:"geo",data:[],lineStyle:{color:"#34d399",width:1.4,opacity:0.9},
+        symbol:["none","arrow"],symbolSize:6,z:3,silent:true},
+      {name:"bus",type:"scatter",coordinateSystem:"geo",data:[],symbolSize:4,large:true,largeThreshold:600,z:4}
+    ]
   });
   async function refresh(){
     try{
       const d = await (await fetch(LIVE_URL+"?t="+Date.now(),{cache:"no-store"})).json();
       liveSnap = d.snapshot_utc;
-      lc.setOption({series:[{data:d.buses.map(b=>({value:[b[1],b[0]],ln:b[2],sp:b[3],mv:b[4],
-        itemStyle:{color:b[4]?"#34d399":"#7c8aa0",opacity:b[4]?0.95:0.5}}))}]});
+      const dots=[], dirs=[], D=0.0009;
+      for(const b of d.buses){
+        const lat=b[0],lon=b[1],ln=b[2],sp=b[3],mv=b[4],br=b[5]||0;
+        dots.push({value:[lon,lat],ln,sp,mv,br,itemStyle:{color:mv?"#34d399":"#7c8aa0",opacity:mv?0.95:0.5}});
+        if(mv && sp>0){ const a=br*Math.PI/180;
+          dirs.push({coords:[[lon,lat],[lon+D*Math.sin(a)/Math.cos(lat*Math.PI/180), lat+D*Math.cos(a)]]}); }
+      }
+      lc.setOption({series:[{},{data:dirs},{data:dots}]});
       const cards = [
         ["Buses circulando", fmt(d.total), "reportando posición"],
         ["En servicio", fmt(d.en_servicio), "con recorrido asignado"],
