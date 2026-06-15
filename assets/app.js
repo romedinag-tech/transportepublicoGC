@@ -214,37 +214,47 @@ async function corredores(){
 /* ---------- Mapas geográficos ---------- */
 async function mapas(){
   await ensureGccp();
-  const [grid, det] = await Promise.all([J("speed_grid.json"), J("detenciones.json")]);
-  const geoBase = {map:"gccp",roam:true,
-    itemStyle:{areaColor:"rgba(56,189,248,.04)",borderColor:"rgba(148,161,186,.35)",borderWidth:1},
-    emphasis:{itemStyle:{areaColor:"rgba(56,189,248,.10)"},label:{show:false}},
-    label:{show:false}};
+  const [roads, gridH, det] = await Promise.all([
+    J("roads.geojson"), J("speed_grid_hora.json"), J("detenciones.json")]);
+  const roadLines = roads.features.map(f=>({coords:f.geometry.coordinates}));
+  const geoBase = {map:"gccp",roam:true,label:{show:false},
+    itemStyle:{areaColor:"rgba(56,189,248,.04)",borderColor:"rgba(148,161,186,.32)",borderWidth:1},
+    emphasis:{itemStyle:{areaColor:"rgba(56,189,248,.09)"},label:{show:false}}};
+  const SPEEDRAMP = ["#d73027","#f46d43","#fdae61","#fee08b","#d9ef8b","#66bd63","#1a9850"]; // lento->rápido
+  const roadSeries = {name:"red",type:"lines",coordinateSystem:"geo",data:roadLines,polyline:true,silent:true,
+    lineStyle:{color:"rgba(148,161,186,.18)",width:0.6},progressive:2000,large:true,z:1};
 
-  // Mapa de velocidad por la red
-  mk("ch-map-vel",{
+  // Mapa de velocidad por la red, con selector de hora
+  function hourData(h){
+    const a = gridH.vel[h] || [], out = [];
+    for(let i=0;i<gridH.cells.length;i++){ const v=a[i]; if(v!=null){ const c=gridH.cells[i]; out.push([c[1],c[0],v]); } }
+    return out;
+  }
+  const vmap = mk("ch-map-vel",{
     geo:geoBase,
     tooltip:{trigger:"item",formatter:p=>p.value?`${p.value[2]} km/h`:""},
-    visualMap:{min:8,max:42,calculable:true,left:14,bottom:14,dimension:2,
-      inRange:{color:["#b2182b","#ef8a62","#fddbc7","#abd9e9","#74add1","#4575b4"]},
-      text:["rápido","lento"],textStyle:{color:"#93a1ba"},itemHeight:120,seriesIndex:0},
-    series:[
-      {type:"scatter",coordinateSystem:"geo",data:grid.map(g=>[g.lo,g.la,g.vel]),
-        symbolSize:3.4,large:true,largeThreshold:1000,progressive:4000,itemStyle:{opacity:0.9}}
-    ]
+    visualMap:{min:8,max:42,calculable:true,left:14,bottom:14,dimension:2,inRange:{color:SPEEDRAMP},
+      text:["rápido","lento"],textStyle:{color:"#93a1ba"},itemHeight:120,seriesIndex:1},
+    series:[ roadSeries,
+      {name:"vel",type:"scatter",coordinateSystem:"geo",data:hourData("8"),
+        symbolSize:3.6,large:true,largeThreshold:1000,progressive:4000,z:2,itemStyle:{opacity:0.95}} ]
   });
+  const sl=$("vel-hora-slider"), lab=$("vel-hora-lab");
+  if(sl && vmap){ sl.addEventListener("input",()=>{ const h=sl.value;
+    if(lab) lab.textContent = String(h).padStart(2,"0")+":00";
+    vmap.setOption({series:[{},{data:hourData(h)}]}); }); }
 
-  // Mapa de detenciones
+  // Mapa de detenciones (con red vial de fondo)
   const maxDet = Math.max(...det.map(x=>x.det));
   mk("ch-map-det",{
     geo:geoBase,
     tooltip:{trigger:"item",formatter:p=>{const x=p.data.r;return `<b>${x.calle||"Terminal"}</b> · ${x.comuna||""}<br>${x.tipo}<br>Detenciones: ${fmt(x.det)}<br>Buses: ${x.buses} · ${x.dias} días`;}},
-    series:[
+    series:[ roadSeries,
       {type:"scatter",coordinateSystem:"geo",
         data:det.map(x=>({value:[x.lo,x.la],r:x,
           itemStyle:{color:x.buses>=150?"#fb7185":(x.buses<=80?"#fbbf24":"#f97316")}})),
         symbolSize:function(v,p){return 8+26*Math.sqrt(p.data.r.det/maxDet);},
-        itemStyle:{opacity:.85,borderColor:"rgba(0,0,0,.3)"}}
-    ]
+        itemStyle:{opacity:.85,borderColor:"rgba(0,0,0,.3)"},z:4} ]
   });
 }
 
