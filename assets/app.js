@@ -237,7 +237,7 @@ async function mapas(){
       text:["rápido","lento"],textStyle:{color:"#93a1ba"},itemHeight:120,seriesIndex:1},
     series:[ roadSeries,
       {name:"vel",type:"scatter",coordinateSystem:"geo",data:hourData("8"),
-        symbolSize:3.6,large:true,largeThreshold:1000,progressive:4000,z:2,itemStyle:{opacity:0.95}} ]
+        symbolSize:3.6,progressive:6000,z:2,itemStyle:{opacity:0.95}} ]
   });
   const sl=$("vel-hora-slider"), lab=$("vel-hora-lab");
   if(sl && vmap){ sl.addEventListener("input",()=>{ const h=sl.value;
