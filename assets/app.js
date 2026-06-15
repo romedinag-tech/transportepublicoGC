@@ -222,7 +222,7 @@ async function mapas(){
     emphasis:{itemStyle:{areaColor:"rgba(56,189,248,.09)"},label:{show:false}}};
   const SPEEDRAMP = ["#d73027","#f46d43","#fdae61","#fee08b","#d9ef8b","#66bd63","#1a9850"]; // lento->rápido
   const roadSeries = {name:"red",type:"lines",coordinateSystem:"geo",data:roadLines,polyline:true,silent:true,
-    lineStyle:{color:"rgba(148,161,186,.18)",width:0.6},progressive:2000,large:true,z:1};
+    lineStyle:{color:"rgba(148,161,186,.18)",width:0.6},z:1};
 
   // Mapa de velocidad por la red, con selector de hora
   function hourData(h){
@@ -237,7 +237,7 @@ async function mapas(){
       text:["rápido","lento"],textStyle:{color:"#93a1ba"},itemHeight:120,seriesIndex:1},
     series:[ roadSeries,
       {name:"vel",type:"scatter",coordinateSystem:"geo",data:hourData("8"),
-        symbolSize:3.6,progressive:6000,z:2,itemStyle:{opacity:0.95}} ]
+        symbolSize:3.6,z:2,itemStyle:{opacity:0.95}} ]
   });
   const sl=$("vel-hora-slider"), lab=$("vel-hora-lab");
   if(sl && vmap){ sl.addEventListener("input",()=>{ const h=sl.value;
@@ -284,10 +284,10 @@ async function live(){
         return `Línea ${d.ln||"?"}${EMP[d.ln]?" · "+EMP[d.ln]:""}<br>${d.mv?"En movimiento":"Detenido"} · ${d.sp} km/h${d.mv?" · rumbo "+d.br+"°":""}`;}},
     series:[
       {name:"red",type:"lines",coordinateSystem:"geo",data:roadLines,polyline:true,silent:true,
-        lineStyle:{color:"rgba(148,161,186,.22)",width:0.6},progressive:2000,large:true,z:1},
+        lineStyle:{color:"rgba(148,161,186,.22)",width:0.6},z:1},
       {name:"dir",type:"lines",coordinateSystem:"geo",data:[],lineStyle:{color:"#34d399",width:1.4,opacity:0.9},
         symbol:["none","arrow"],symbolSize:6,z:3,silent:true},
-      {name:"bus",type:"scatter",coordinateSystem:"geo",data:[],symbolSize:4,large:true,largeThreshold:600,z:4}
+      {name:"bus",type:"scatter",coordinateSystem:"geo",data:[],symbolSize:4,z:4}
     ]
   });
   async function refresh(){
