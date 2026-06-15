@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transporte Público Gran Concepción · Tablero de Datos</title>
+<meta name="description" content="Tablero analítico del transporte público regulado del Gran Concepción: flota operativa, frecuencia, regularidad y velocidad comercial a partir de 302 millones de registros GPS.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<header>
+  <div class="nav">
+    <div class="brand">
+      <div class="logo">GC</div>
+      <div>
+        <h1>Transporte Público · Gran Concepción</h1>
+        <p>Tablero analítico de operación · datos GPS</p>
+      </div>
+    </div>
+    <div class="nav-meta">
+      <span class="pill"><span class="dot"></span><span id="periodo">cargando…</span></span>
+      <span class="pill" id="pulsos-pill">— registros</span>
+      <a class="pill ghbtn" href="https://github.com/romedinag-tech/transportepublicoGC" target="_blank" rel="noopener">GitHub ↗</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow">Análisis de movilidad urbana · Región del Biobío</div>
+    <h2>La operación del sistema de buses, <span class="grad">medida pulso a pulso</span>.</h2>
+    <p>Más de 300 millones de posiciones GPS de la flota regulada del Gran Concepción, transformadas en indicadores de oferta, frecuencia, regularidad y velocidad comercial. Período abril 2025 – abril 2026.</p>
+  </div>
+
+  <div class="kpis" id="kpis"><div class="loading">Cargando indicadores…</div></div>
+
+  <!-- OPERACIÓN DIARIA -->
+  <section class="block">
+    <div class="sec-head"><span class="tag">01 · Operación diaria</span><h3>Flota operativa y velocidad por hora del día</h3></div>
+    <p class="sec-desc">Buses efectivamente en circulación (con movimiento) en cada hora, promediados sobre los días laborables del período. La banda muestra el rango habitual (percentiles 10–90) entre días.</p>
+    <div class="grid g2">
+      <div class="card"><h4>Flota operativa por hora <span class="hint">buses activos · días laborables</span></h4><div id="ch-flota-hora" class="chart"></div></div>
+      <div class="card"><h4>Velocidad comercial por hora <span class="hint">km/h · red completa</span></h4><div id="ch-vel-hora" class="chart"></div></div>
+    </div>
+  </section>
+
+  <!-- EVOLUCIÓN TEMPORAL -->
+  <section class="block">
+    <div class="sec-head"><span class="tag">02 · Evolución temporal</span><h3>Cómo ha variado la flota a lo largo de los meses</h3></div>
+    <p class="sec-desc">Mapa de calor de la flota operativa promedio por hora del día (eje horizontal) y mes (eje vertical). Permite ver estacionalidad, cambios de oferta y el efecto de los vacíos de datos de junio 2025.</p>
+    <div class="card"><h4>Flota operativa · mes × hora <span class="hint">buses activos promedio · laborables</span></h4><div id="ch-heat-mes" class="chart heat"></div></div>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card"><h4>Volumen mensual de registros <span class="hint">millones de pulsos GPS</span></h4><div id="ch-mensual-pulsos" class="chart"></div></div>
+      <div class="card"><h4>Flota en punta y velocidad por mes <span class="hint">tendencia</span></h4><div id="ch-mensual-flota" class="chart"></div></div>
+    </div>
+  </section>
+
+  <!-- PATRÓN SEMANAL -->
+  <section class="block">
+    <div class="sec-head"><span class="tag">03 · Patrón semanal</span><h3>Ritmo de la semana</h3></div>
+    <p class="sec-desc">Flota operativa promedio según día de la semana y hora. Revela la diferencia entre la operación de día laboral, el sábado y el domingo.</p>
+    <div class="card"><h4>Flota operativa · día de semana × hora <span class="hint">buses activos promedio</span></h4><div id="ch-heat-dow" class="chart heat"></div></div>
+  </section>
+
+  <!-- RECORRIDOS -->
+  <section class="block">
+    <div class="sec-head"><span class="tag">04 · Recorridos</span><h3>Oferta, demanda de flota y velocidad por servicio</h3></div>
+    <p class="sec-desc">Los servicios con mayor flota desplegada concentran la operación; los más lentos en punta tarde señalan los corredores más congestionados.</p>
+    <div class="grid g2">
+      <div class="card"><h4>Mayor flota desplegada <span class="hint">buses pico promedio por día · top 15</span></h4><div id="ch-top-rec" class="chart tall"></div></div>
+      <div class="card"><h4>Más lentos en punta tarde <span class="hint">km/h en movimiento · 17–19 h</span></h4><div id="ch-lentos" class="chart tall"></div></div>
+    </div>
+  </section>
+
+  <!-- REGULARIDAD -->
+  <section class="block">
+    <div class="sec-head"><span class="tag">05 · Regularidad</span><h3>Consistencia del servicio</h3></div>
+    <p class="sec-desc">Coeficiente de variación (CV) de la flota desplegada en punta entre días laborables. Un CV bajo indica una oferta estable y predecible; uno alto, un servicio irregular día a día. Se muestran los 12 más regulares y los 12 más irregulares.</p>
+    <div class="grid g2">
+      <div class="card"><h4>Más regulares <span class="hint">menor variación día a día</span></h4><div id="ch-reg-best" class="chart tall"></div></div>
+      <div class="card"><h4>Más irregulares <span class="hint">mayor variación día a día</span></h4><div id="ch-reg-worst" class="chart tall"></div></div>
+    </div>
+  </section>
+
+  <!-- METODOLOGÍA -->
+  <section class="block">
+    <div class="method">
+      <h3>Metodología y diccionario de indicadores</h3>
+      <dl>
+        <div><dt>Fuente</dt><dd>Tracking GPS de la flota regulada del Gran Concepción (DTPR / MTT), obtenido por solicitud de transparencia SAIP AN001T0026331. Procesado en Google BigQuery.</dd></div>
+        <div><dt>Flota operativa</dt><dd>Número de buses distintos con posición en movimiento (velocidad &gt; 0) en una hora dada. Promediado sobre días laborables salvo indicación.</dd></div>
+        <div><dt>Velocidad comercial</dt><dd>Velocidad media de los buses en movimiento (1–80 km/h), ponderada por número de registros. Excluye detenciones largas.</dd></div>
+        <div><dt>Frecuencia / oferta</dt><dd>Aproximada por la flota operativa por hora de cada servicio. La frecuencia exacta por paradero se abordará en una etapa posterior.</dd></div>
+        <div><dt>Regularidad (CV)</dt><dd>Desviación estándar dividida por la media de la flota en punta tarde entre días. Menor = más estable.</dd></div>
+        <div><dt>Cobertura</dt><dd>36 unidades de negocio · 101 códigos de recorrido · 396 días · 302,3 millones de registros.</dd></div>
+      </dl>
+      <div class="note"><span>⚠️</span><span>Junio 2025 presenta menor volumen: 11 unidades entregaron archivos vacíos ese mes (vacío real de datos en el origen). Los indicadores de ese mes están subestimados.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  <p>Tablero generado a partir de datos abiertos · Proyecto de análisis de transporte público del Gran Concepción.<br>
+  Última actualización de datos: <span id="generado">—</span> · Construido con BigQuery + ECharts · <a href="https://github.com/romedinag-tech/transportepublicoGC">Código y datos</a></p>
+</footer>
+
+<script src="assets/echarts.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
