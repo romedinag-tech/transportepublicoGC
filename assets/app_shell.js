@@ -4,7 +4,7 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=9`).then(r=>r.json());
 
 let T, GEOM, GEO, CUMP, EMPL={};
 let state = {comuna:"TODAS", linea:"TODAS"};
@@ -125,7 +125,8 @@ function renderMapa(){
       L.polyline(seg.p,{color:seg.s===0?"#38bdf8":"#c084fc",weight:3,opacity:0.9}).addTo(routeLayer);
       bounds.push(...seg.p);
     });
-    $("map-title").textContent = `Recorrido · Línea ${state.linea}`;
+    const nrec = new Set(GEOM[state.linea].map(s=>s.rec)).size;
+    $("map-title").textContent = `Línea ${state.linea} · ${nrec} recorrido${nrec>1?"s":""} (subrutas)`;
   } else if(state.comuna!=="TODAS"){
     const f = feats.find(x=>x.properties.name===state.comuna);
     if(f){ const gl=L.geoJSON(f); bounds = gl.getBounds(); }
