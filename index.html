@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="assets/styles.css?v=4">
+<link rel="stylesheet" href="assets/styles.css?v=5">
 </head>
 <body>
 <header>
@@ -139,6 +139,21 @@
     <div class="card"><h4>Mapa de detenciones <span class="hint">terminales, paraderos y nodos congestionados</span></h4><div id="ch-map-det" class="chart map"></div></div>
   </section>
 
+  <!-- CUMPLIMIENTO -->
+  <section class="block">
+    <div class="sec-head"><span class="tag">10 · Fiscalización</span><h3>Cumplimiento del Programa de Operación</h3><span style="font-size:12px;color:var(--color-text-tertiary);margin-left:auto">piloto · 18 servicios</span></div>
+    <p class="sec-desc">Frecuencia <b>comprometida</b> en el Programa de Operación del perímetro de exclusión (Res. Afecta N°29) vs. <b>oferta observada</b> en los datos GPS, por hora (días laborables). Las barras en <span style="color:#fb7185">rojo</span> son horas con oferta bajo el 80% de lo comprometido. El recorrido se deriva del propio GPS (azul = ida, violeta = regreso).</p>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--color-text-secondary)">Servicio</label>
+      <select id="cump-serv" style="min-width:320px;max-width:100%"></select>
+    </div>
+    <div class="grid g2">
+      <div class="card"><h4>Recorrido <span class="hint">trazado real (GPS) · ida y regreso</span></h4><div id="ch-cump-map" class="chart map"></div></div>
+      <div class="card"><h4>Frecuencia comprometida vs. observada <span class="hint">buses/hora · laborables</span></h4><div id="ch-cump-bar" class="chart map"></div></div>
+    </div>
+    <div class="note" style="background:rgba(56,189,248,.08);border-color:rgba(56,189,248,.25);color:#9fd4f5"><span>ℹ️</span><span>Piloto con 18 servicios (líneas 30, 31, 32, 41, 50, 63, 65), las únicas con Programa de Operación en formato legible (Rex 5214/2023). El resto de las 36 unidades requiere OCR del anexo escaneado o solicitud de transparencia. "Oferta observada" = buses distintos operando por hora; la frecuencia exacta de expediciones es un refinamiento posterior.</span></div>
+  </section>
+
   <!-- METODOLOGÍA -->
   <section class="block">
     <div class="method">
@@ -167,6 +182,6 @@
 </footer>
 
 <script src="assets/echarts.min.js"></script>
-<script src="assets/app.js?v=4"></script>
+<script src="assets/app.js?v=5"></script>
 </body>
 </html>

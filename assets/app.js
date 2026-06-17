@@ -319,6 +319,49 @@ async function live(){
   const a=$("live-age"); if(a && liveSnap) a.textContent = "actualizado "+ageTxt(liveSnap);
 }
 
+/* ---------- Cumplimiento del Programa de Operación ---------- */
+async function cumplimiento(){
+  const sel = $("cump-serv"); if(!sel) return;
+  await ensureGccp();
+  const data = await J("cumplimiento.json");
+  const servs = Object.keys(data).sort((a,b)=>data[b].pct_incumple-data[a].pct_incumple);
+  sel.innerHTML = servs.map(s=>`<option value="${s}">${s} · ${data[s].empresa} (L${data[s].linea}) — ${data[s].pct_incumple}% incumple</option>`).join("");
+  const mapc = echarts.init($("ch-cump-map")), barc = echarts.init($("ch-cump-bar"));
+  charts.push(mapc, barc);
+  [[mapc,$("ch-cump-map")],[barc,$("ch-cump-bar")]].forEach(([c,el])=>{
+    if(window.ResizeObserver) new ResizeObserver(()=>{try{c.resize();}catch(e){}}).observe(el); });
+  function draw(s){
+    const d = data[s];
+    const lines = [];
+    for(const sent in d.geom) lines.push({coords:d.geom[sent].map(p=>[p[1],p[0]]),
+      lineStyle:{color: sent==="0"?"#38bdf8":"#a78bfa", width:2.6, opacity:0.9}});
+    mapc.setOption({
+      geo:{map:"gccp",roam:true,boundingCoords:[[-73.175,-36.69],[-72.95,-37.00]],label:{show:false},
+        itemStyle:{areaColor:"rgba(56,189,248,.04)",borderColor:"rgba(148,161,186,.28)",borderWidth:1}},
+      tooltip:{show:false},
+      series:[{type:"lines",coordinateSystem:"geo",data:lines,polyline:true,z:3,
+        effect:{show:true,period:6,trailLength:0.4,symbolSize:3,color:"#fff"}}]
+    }, true);
+    const hrs = d.horas.map(x=>String(x.h).padStart(2,"0")+"h");
+    barc.setOption({
+      legend:{data:["Comprometido","Observado"],textStyle:{color:"#93a1ba"},top:0,right:0},
+      tooltip:{trigger:"axis",formatter:p=>{const i=p[0].dataIndex,h=d.horas[i];
+        return `${hrs[i]}<br>Comprometido: <b>${h.c}</b> buses/hr<br>Observado: <b>${fmt1(h.o)}</b>${h.x?' <span style="color:#fb7185">· incumple</span>':''}`;}},
+      grid:{left:40,right:18,top:38,bottom:28,containLabel:true},
+      xAxis:Object.assign({type:"category",data:hrs},axBase),
+      yAxis:Object.assign({type:"value",name:"buses/hr"},axBase),
+      series:[
+        {name:"Comprometido",type:"bar",data:d.horas.map(x=>x.c),barGap:"-100%",barWidth:"62%",
+          itemStyle:{color:"rgba(148,161,186,.40)",borderRadius:[3,3,0,0]},z:1},
+        {name:"Observado",type:"bar",barWidth:"38%",z:2,
+          data:d.horas.map(x=>({value:x.o,itemStyle:{color:x.x?"#fb7185":"#34d399",borderRadius:[3,3,0,0]}}))}
+      ]
+    }, true);
+  }
+  sel.addEventListener("change",()=>draw(sel.value));
+  draw(servs[0]);
+}
+
 /* ---------- run ---------- */
 (async function(){
   try{
@@ -326,7 +369,7 @@ async function live(){
     emp.forEach(e=>EMP[e.linea]=e.fantasia);
     await kpis();
     await Promise.allSettled([live(),flotaHora(),velHora(),heatMes(),mensual(),heatDow(),
-      recorridos(),regularidad(),empresas(),comunas(),corredores(),mapas()]);
+      recorridos(),regularidad(),empresas(),comunas(),corredores(),mapas(),cumplimiento()]);
     // asegurar dimensiones correctas tras el layout
     const fix=()=>charts.forEach(c=>{try{c.resize();}catch(e){}});
     requestAnimationFrame(fix); setTimeout(fix,300); setTimeout(fix,900);
