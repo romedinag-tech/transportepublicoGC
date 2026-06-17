@@ -4,7 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=10`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=11`).then(r=>r.json());
+const BUILD = "2026-06-17 18:46";
 
 let T, GEOM, GEO, CUMP, EMPL={};
 let state = {comuna:"TODAS", linea:"TODAS"};
@@ -186,6 +187,12 @@ function renderCump(){
     [T, GEOM, GEO, CUMP] = await Promise.all([
       loadT, J("lineas_geom.json"), J("comunas_gccp.geojson"), J("cumplimiento.json")]);
     if(T.hasta){ const pe=$("periodo-pill"); if(pe) pe.textContent = "datos hasta "+T.hasta; }
+    const vd=$("vfoot-data"); if(vd) vd.textContent = "Datos hasta: "+(T.hasta||"—");
+    fetch("data/version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.json()).then(v=>{
+      const vb=$("vfoot-build"); if(!vb) return;
+      vb.textContent = "Visor actualizado: "+BUILD+" (hora Chile)";
+      if(v.build && v.build!==BUILD) vb.innerHTML += ' · <span class="nueva" onclick="location.reload(true)">⚠ hay una versión más nueva — recargar</span>';
+    }).catch(()=>{ const vb=$("vfoot-build"); if(vb) vb.textContent="Visor actualizado: "+BUILD; });
     buildComunaTabs();
     buildLineaList();
     $("linea-search").addEventListener("input", e=>buildLineaList(e.target.value));

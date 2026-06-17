@@ -41,4 +41,8 @@
 .cump-row{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:12.5px}
 .cump-row .pct{font-family:var(--mono);min-width:42px;text-align:right}
 .empty{color:var(--dim);font-size:12.5px;padding:24px;text-align:center}
+.vfoot{padding:16px 22px 34px;text-align:center;font-size:12px;color:var(--dim);border-top:1px solid var(--line);margin-top:12px}
+.vfoot span{margin:0 4px}
+.vfoot .nueva{color:var(--warn);cursor:pointer;text-decoration:underline}
+.vfoot .vfoot-dim{color:var(--dim)}
 @media(max-width:920px){.grid2{grid-template-columns:1fr}.sidebar{position:static;width:100%;height:auto;border-right:none;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px}.app{flex-direction:column}}
