@@ -322,26 +322,35 @@ async function live(){
 /* ---------- Cumplimiento del Programa de Operación ---------- */
 async function cumplimiento(){
   const sel = $("cump-serv"); if(!sel) return;
-  await ensureGccp();
   const data = await J("cumplimiento.json");
   const servs = Object.keys(data).sort((a,b)=>data[b].pct_incumple-data[a].pct_incumple);
   sel.innerHTML = servs.map(s=>`<option value="${s}">${s} · ${data[s].empresa} (L${data[s].linea}) — ${data[s].pct_incumple}% incumple</option>`).join("");
-  const mapc = echarts.init($("ch-cump-map")), barc = echarts.init($("ch-cump-bar"));
-  charts.push(mapc, barc);
-  [[mapc,$("ch-cump-map")],[barc,$("ch-cump-bar")]].forEach(([c,el])=>{
-    if(window.ResizeObserver) new ResizeObserver(()=>{try{c.resize();}catch(e){}}).observe(el); });
+  const barc = echarts.init($("ch-cump-bar")); charts.push(barc);
+  if(window.ResizeObserver) new ResizeObserver(()=>{try{barc.resize();}catch(e){}}).observe($("ch-cump-bar"));
+  // --- mapa Leaflet: fotografía aérea + calles ---
+  const lmap = L.map("ch-cump-map",{center:[-36.82,-73.05],zoom:12,zoomControl:true});
+  const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    {maxZoom:19,attribution:"Imagery © Esri"}).addTo(lmap);
+  const calles = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    {maxZoom:20,subdomains:"abcd",attribution:"© OpenStreetMap © CARTO"});
+  const etiquetas = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+    {maxZoom:19,opacity:0.9}).addTo(lmap);
+  L.control.layers({"Satélite":sat,"Calles":calles},{"Vías y etiquetas":etiquetas},{collapsed:true,position:"topright"}).addTo(lmap);
+  let routeLayer = L.layerGroup().addTo(lmap);
+  setTimeout(()=>lmap.invalidateSize(),250);
+  if(window.ResizeObserver) new ResizeObserver(()=>lmap.invalidateSize()).observe($("ch-cump-map"));
+  function drawMap(d){
+    routeLayer.clearLayers(); const all=[];
+    for(const sent in d.geom){ const ll=d.geom[sent];
+      L.polyline(ll,{color: sent==="0"?"#38bdf8":"#c084fc",weight:4,opacity:0.95}).addTo(routeLayer);
+      L.circleMarker(ll[0],{radius:5,color:"#fff",weight:1,fillColor:"#34d399",fillOpacity:1}).addTo(routeLayer);
+      all.push(...ll);
+    }
+    if(all.length){ lmap.invalidateSize(); lmap.fitBounds(all,{padding:[25,25]}); }
+  }
   function draw(s){
     const d = data[s];
-    const lines = [];
-    for(const sent in d.geom) lines.push({coords:d.geom[sent].map(p=>[p[1],p[0]]),
-      lineStyle:{color: sent==="0"?"#38bdf8":"#a78bfa", width:2.6, opacity:0.9}});
-    mapc.setOption({
-      geo:{map:"gccp",roam:true,boundingCoords:[[-73.175,-36.69],[-72.95,-37.00]],label:{show:false},
-        itemStyle:{areaColor:"rgba(56,189,248,.04)",borderColor:"rgba(148,161,186,.28)",borderWidth:1}},
-      tooltip:{show:false},
-      series:[{type:"lines",coordinateSystem:"geo",data:lines,polyline:true,z:3,
-        effect:{show:true,period:6,trailLength:0.4,symbolSize:3,color:"#fff"}}]
-    }, true);
+    drawMap(d);
     const hrs = d.horas.map(x=>String(x.h).padStart(2,"0")+"h");
     barc.setOption({
       legend:{data:["Comprometido","Observado"],textStyle:{color:"#93a1ba"},top:0,right:0},
