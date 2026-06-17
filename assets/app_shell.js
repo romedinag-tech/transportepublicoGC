@@ -4,7 +4,7 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=9`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=10`).then(r=>r.json());
 
 let T, GEOM, GEO, CUMP, EMPL={};
 let state = {comuna:"TODAS", linea:"TODAS"};
