@@ -180,8 +180,11 @@ function renderCump(){
 /* ---------- init ---------- */
 (async function(){
   try{
+    const HIST = "https://storage.googleapis.com/gccp-transporte-live/hist/territorio.json";
+    const loadT = fetch(HIST+"?t="+Date.now(),{cache:"no-store"}).then(r=>{if(!r.ok)throw 0;return r.json();}).catch(()=>J("territorio.json"));
     [T, GEOM, GEO, CUMP] = await Promise.all([
-      J("territorio.json"), J("lineas_geom.json"), J("comunas_gccp.geojson"), J("cumplimiento.json")]);
+      loadT, J("lineas_geom.json"), J("comunas_gccp.geojson"), J("cumplimiento.json")]);
+    if(T.hasta){ const pe=$("periodo-pill"); if(pe) pe.textContent = "datos hasta "+T.hasta; }
     buildComunaTabs();
     buildLineaList();
     $("linea-search").addEventListener("input", e=>buildLineaList(e.target.value));
