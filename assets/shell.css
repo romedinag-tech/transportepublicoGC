@@ -45,4 +45,10 @@
 .vfoot span{margin:0 4px}
 .vfoot .nueva{color:var(--warn);cursor:pointer;text-decoration:underline}
 .vfoot .vfoot-dim{color:var(--dim)}
+.speedleg{background:rgba(10,14,26,.9);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:10.5px;color:var(--muted);line-height:1.5}
+.speedleg b{display:block;color:var(--tx);font-size:10.5px;margin-bottom:4px;font-weight:600}
+.speedleg .grad{display:block;height:8px;width:130px;border-radius:4px;background:linear-gradient(90deg,hsl(0,72%,50%),hsl(60,72%,50%),hsl(120,72%,50%))}
+.speedleg .lbls{display:flex;justify-content:space-between;width:130px}
+.speedleg .lbls i{font-style:normal}
+.speedleg .par{display:block;margin-top:3px;color:#e2e8f0}
 @media(max-width:920px){.grid2{grid-template-columns:1fr}.sidebar{position:static;width:100%;height:auto;border-right:none;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px}.app{flex-direction:column}}

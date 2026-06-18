@@ -4,12 +4,20 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=14`).then(r=>r.json());
-const BUILD = "2026-06-18 12:40";
+const J = n => fetch(`data/${n}?v=15`).then(r=>r.json());
+const BUILD = "2026-06-18 13:10";
 
-let T, GEOM, GEO, CUMP, EMPL={};
+let T, GEOM, GEO, CUMP, PAR={}, EMPL={};
 let state = {comuna:"TODAS", linea:"TODAS"};
-let chart, lmap, baseLayers, routeLayer, comunaLayer;
+let chart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, speedLegend;
+
+/* velocidad -> color rojo→amarillo→verde (8..28 km/h) */
+function speedColor(v){
+  if(v==null) return "#64748b";
+  const t = Math.max(0, Math.min(1, (v-8)/20));   // 8 km/h rojo, 28 verde
+  const hue = t*120;                               // 0=rojo 60=amarillo 120=verde
+  return `hsl(${hue},72%,50%)`;
+}
 
 const cellOf = () => (T.cells[`${state.comuna}|${state.linea}`] || {kpi:null, horas:[]});
 const empresaDe = ln => { const x=(T.lineas||[]).find(l=>l.linea===ln); return x?x.empresa:""; };
@@ -108,11 +116,22 @@ function ensureMap(){
   L.control.layers({"Satélite":sat,"Calles":calles},{"Vías y etiquetas":etiquetas},{collapsed:true,position:"topright"}).addTo(lmap);
   comunaLayer = L.layerGroup().addTo(lmap);
   routeLayer = L.layerGroup().addTo(lmap);
+  stopLayer = L.layerGroup().addTo(lmap);
   if(window.ResizeObserver) new ResizeObserver(()=>lmap.invalidateSize()).observe($("lmap"));
+}
+function setSpeedLegend(on){
+  if(on && !speedLegend){
+    speedLegend = L.control({position:"bottomleft"});
+    speedLegend.onAdd = ()=>{ const d=L.DomUtil.create("div","speedleg");
+      d.innerHTML = `<b>Velocidad km/h</b><span class="grad"></span>`+
+        `<span class="lbls"><i>8</i><i>18</i><i>28+</i></span><span class="par">● paradero</span>`;
+      return d; };
+    speedLegend.addTo(lmap);
+  } else if(!on && speedLegend){ lmap.removeControl(speedLegend); speedLegend=null; }
 }
 function renderMapa(){
   ensureMap();
-  comunaLayer.clearLayers(); routeLayer.clearLayers();
+  comunaLayer.clearLayers(); routeLayer.clearLayers(); stopLayer.clearLayers();
   setTimeout(()=>lmap.invalidateSize(),120);
   // límites comunales
   const feats = (GEO.features||[]);
@@ -121,13 +140,26 @@ function renderMapa(){
     L.geoJSON(f,{style:{color:sel?"#38bdf8":"rgba(148,161,186,.45)",weight:sel?2.5:1,fill:sel,fillColor:"#38bdf8",fillOpacity:sel?0.08:0}}).addTo(comunaLayer);
   });
   let bounds=[];
+  setSpeedLegend(state.linea!=="TODAS" && !!GEOM[state.linea]);
   if(state.linea!=="TODAS" && GEOM[state.linea]){
     GEOM[state.linea].forEach(seg=>{
-      L.polyline(seg.p,{color:seg.s===0?"#38bdf8":"#c084fc",weight:3,opacity:0.9}).addTo(routeLayer);
-      bounds.push(...seg.p);
+      const p=seg.p, v=seg.v||[];
+      // colorear por velocidad map-matched, segmento a segmento
+      for(let i=0;i<p.length-1;i++){
+        const a=v[i], b=v[i+1];
+        const sv = (a!=null&&b!=null)?(a+b)/2 : (a!=null?a:b);
+        L.polyline([p[i],p[i+1]],{color:speedColor(sv),weight:4,opacity:0.92}).addTo(routeLayer);
+      }
+      bounds.push(...p);
+    });
+    // paraderos oficiales de la línea
+    const ps = PAR[state.linea]||[];
+    ps.forEach(s=>{
+      L.circleMarker([s[0],s[1]],{radius:3.2,color:"#0b1220",weight:1,fillColor:"#e2e8f0",fillOpacity:0.95})
+        .bindTooltip(s[2],{direction:"top"}).addTo(stopLayer);
     });
     const nrec = new Set(GEOM[state.linea].map(s=>s.rec)).size;
-    $("map-title").textContent = `Línea ${state.linea} · ${nrec} recorrido${nrec>1?"s":""} (subrutas)`;
+    $("map-title").textContent = `Línea ${state.linea} · ${nrec} recorrido${nrec>1?"s":""} · ${ps.length} paraderos · color = velocidad`;
   } else if(state.comuna!=="TODAS"){
     const f = feats.find(x=>x.properties.name===state.comuna);
     if(f){ const gl=L.geoJSON(f); bounds = gl.getBounds(); }
@@ -199,8 +231,8 @@ function renderCump(){
   try{
     const HIST = "https://storage.googleapis.com/gccp-transporte-live/hist/territorio.json";
     const loadT = fetch(HIST+"?t="+Date.now(),{cache:"no-store"}).then(r=>{if(!r.ok)throw 0;return r.json();}).catch(()=>J("territorio.json"));
-    [T, GEOM, GEO, CUMP] = await Promise.all([
-      loadT, J("lineas_geom.json"), J("comunas_gccp.geojson"), J("cumplimiento.json")]);
+    [T, GEOM, GEO, CUMP, PAR] = await Promise.all([
+      loadT, J("lineas_geom.json"), J("comunas_gccp.geojson"), J("cumplimiento.json"), J("paraderos.json").catch(()=>({}))]);
     if(T.hasta){ const pe=$("periodo-pill"); if(pe) pe.textContent = "datos hasta "+T.hasta; }
     const vd=$("vfoot-data"); if(vd) vd.textContent = "Datos hasta: "+(T.hasta||"—");
     fetch("data/version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.json()).then(v=>{
