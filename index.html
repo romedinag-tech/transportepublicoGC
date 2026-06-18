@@ -9,8 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="assets/styles.css?v=16">
-<link rel="stylesheet" href="assets/shell.css?v=16">
+<link rel="stylesheet" href="assets/styles.css?v=17">
+<link rel="stylesheet" href="assets/shell.css?v=17">
 </head>
 <body>
 <header class="topbar">
@@ -54,6 +54,18 @@
       <div class="card"><h4 id="rank-title">Ranking de líneas</h4><div class="hint" id="rank-hint"></div><div id="rank-box" style="margin-top:8px"></div></div>
       <div class="card"><h4>Cumplimiento de frecuencia <span class="hint">programado (GTFS) vs observado (GPS)</span></h4><div id="cump-box" style="margin-top:8px"></div></div>
     </div>
+
+    <div class="card cump-sem" id="cump-sem-card" style="display:none">
+      <div class="cs-head">
+        <h4>Cumplimiento semanal por variable exigida <span class="hint">evolución semana a semana</span></h4>
+        <div class="cs-controls">
+          <div class="seg" id="cs-dia"></div>
+          <div class="seg" id="cs-var"></div>
+        </div>
+      </div>
+      <div id="cs-chart" class="chart" style="height:320px"></div>
+      <div class="hint" id="cs-foot" style="margin-top:6px"></div>
+    </div>
   </main>
 </div>
 
@@ -62,6 +74,6 @@
 </footer>
 
 <script src="assets/echarts.min.js"></script>
-<script src="assets/app_shell.js?v=16"></script>
+<script src="assets/app_shell.js?v=17"></script>
 </body>
 </html>

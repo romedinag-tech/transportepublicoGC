@@ -4,12 +4,20 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=16`).then(r=>r.json());
-const BUILD = "2026-06-18 13:25";
+const J = n => fetch(`data/${n}?v=17`).then(r=>r.json());
+const BUILD = "2026-06-18 14:05";
 
-let T, GEOM, GEO, CUMP, PAR={}, EMPL={};
-let state = {comuna:"TODAS", linea:"TODAS"};
-let chart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, speedLegend;
+let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, EMPL={};
+let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq"};
+let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, speedLegend;
+
+const CS_DIAS = [["L","Laboral"],["S","Sábado"],["D","Domingo"]];
+const CS_VARS = [
+  {k:"freq", lbl:"Frecuencia", suf:"%", ref:[80,100], pct:true, desc:"expediciones/día observadas ÷ programadas (GTFS)"},
+  {k:"cob",  lbl:"Cobertura horaria", suf:"%", ref:[80,100], pct:true, desc:"horas con servicio ÷ horas de operación programadas"},
+  {k:"reg",  lbl:"Regularidad", suf:"", ref:[], pct:false, desc:"consistencia de los intervalos (headways) observados, índice 0–100"},
+  {k:"flota",lbl:"Flota operativa", suf:" buses", ref:[], pct:false, desc:"buses operativos por día (nivel observado)"},
+];
 
 /* velocidad -> color rojo→amarillo→verde (8..28 km/h) */
 function speedColor(v){
@@ -68,6 +76,7 @@ function render(){
   renderMapa();
   renderRanking();
   renderCump();
+  renderCumpSem();
 }
 
 function kpiCard(l,v,s){ return `<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`; }
@@ -226,13 +235,57 @@ function renderCump(){
   }
 }
 
+function renderCumpSem(){
+  const card = $("cump-sem-card");
+  if(state.linea==="TODAS" || !CSEM.lineas[state.linea]){ card.style.display="none"; return; }
+  card.style.display="";
+  const L = CSEM.lineas[state.linea];
+  // toggles
+  $("cs-dia").innerHTML = CS_DIAS.map(([k,l])=>`<b data-d="${k}" class="${state.csDia===k?"on":""}">${l}</b>`).join("");
+  $("cs-var").innerHTML = CS_VARS.map(v=>`<b data-v="${v.k}" class="${state.csVar===v.k?"on":""}">${v.lbl}</b>`).join("");
+  $("cs-dia").querySelectorAll("b").forEach(el=>el.onclick=()=>{state.csDia=el.dataset.d;renderCumpSem();});
+  $("cs-var").querySelectorAll("b").forEach(el=>el.onclick=()=>{state.csVar=el.dataset.v;renderCumpSem();});
+
+  const vc = CS_VARS.find(v=>v.k===state.csVar);
+  const serie = (L.series[state.csDia]||[]);
+  const xs = serie.map(p=>p.wk.slice(5));          // MM-DD
+  const ys = serie.map(p=>p[state.csVar]);
+  const pr = (L.prog||{})[state.csDia]||{};
+  // color por cumplimiento si es %
+  const colorOf = y => !vc.pct||y==null ? "#38bdf8" : y>=120?"#22d3ee":y>=95?"#34d399":y>=80?"#fbbf24":"#fb7185";
+  const pts = ys.map((y,i)=>({value:y, itemStyle:{color:colorOf(y)}}));
+  if(!csChart) csChart = echarts.init($("cs-chart"));
+  const markLines = vc.ref.length ? {silent:true,symbol:"none",lineStyle:{type:"dashed"},data:[
+      {yAxis:80,lineStyle:{color:"rgba(251,113,133,.6)"},label:{formatter:"80% mínimo",color:"#fb7185",position:"insideEndTop",fontSize:10}},
+      {yAxis:100,lineStyle:{color:"rgba(52,211,153,.5)"},label:{formatter:"100%",color:"#34d399",position:"insideEndTop",fontSize:10}}
+    ]} : undefined;
+  csChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:"#cdd7e6"},
+    grid:{left:46,right:20,top:18,bottom:54,containLabel:true},
+    tooltip:{trigger:"axis",backgroundColor:"rgba(13,20,36,.96)",borderColor:"rgba(255,255,255,.14)",textStyle:{color:"#e8eef8"},
+      formatter:p=>{const i=p[0].dataIndex,d=serie[i];return `Semana ${d.wk}<br>${vc.lbl}: <b>${d[state.csVar]??"—"}${vc.suf}</b><br>`+
+        `<span style="color:#93a1ba">exp/día ${d.exp} · flota ${d.flota} · ${d.dias} días</span>`;}},
+    xAxis:{type:"category",data:xs,axisLabel:{color:"#93a1ba",fontSize:9,rotate:90,interval:2},axisLine:{lineStyle:{color:"rgba(255,255,255,.16)"}}},
+    yAxis:{type:"value",name:vc.pct?"%":vc.lbl,min:0,max:vc.pct?(Math.max(120,Math.ceil((Math.max(...ys.filter(v=>v!=null))||100)/20)*20)):null,
+      axisLabel:{color:"#93a1ba"},splitLine:{lineStyle:{color:"rgba(255,255,255,.05)"}}},
+    series:[{type:"line",data:pts,smooth:false,symbol:"circle",symbolSize:5,
+      lineStyle:{width:2,color:"rgba(56,189,248,.5)"},
+      areaStyle:vc.pct?{color:"rgba(56,189,248,.06)"}:undefined,
+      markLine:markLines}]
+  }, true);
+  setTimeout(()=>csChart.resize(),60);
+  const progTxt = pr.exp ? ` · Programado: ${pr.exp} exp/día, ${pr.horas} h de operación (${pr.span?pr.span[0]+"–"+pr.span[1]+"h":""})` : "";
+  $("cs-foot").innerHTML = `<b style="color:var(--muted)">${vc.lbl}:</b> ${vc.desc}.${vc.pct?progTxt:""} Tipo de día: <b>${CS_DIAS.find(d=>d[0]===state.csDia)[1]}</b>.`;
+}
+
 /* ---------- init ---------- */
 (async function(){
   try{
     const HIST = "https://storage.googleapis.com/gccp-transporte-live/hist/territorio.json";
     const loadT = fetch(HIST+"?t="+Date.now(),{cache:"no-store"}).then(r=>{if(!r.ok)throw 0;return r.json();}).catch(()=>J("territorio.json"));
-    [T, GEOM, GEO, CUMP, PAR] = await Promise.all([
-      loadT, J("lineas_geom.json"), J("comunas_gccp.geojson"), J("cumplimiento.json"), J("paraderos.json").catch(()=>({}))]);
+    [T, GEOM, GEO, CUMP, PAR, CSEM] = await Promise.all([
+      loadT, J("lineas_geom.json"), J("comunas_gccp.geojson"), J("cumplimiento.json"),
+      J("paraderos.json").catch(()=>({})), J("cumplimiento_semanal.json").catch(()=>({lineas:{}}))]);
     if(T.hasta){ const pe=$("periodo-pill"); if(pe) pe.textContent = "datos hasta "+T.hasta; }
     const vd=$("vfoot-data"); if(vd) vd.textContent = "Datos hasta: "+(T.hasta||"—");
     fetch("data/version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.json()).then(v=>{
@@ -245,6 +298,6 @@ function renderCump(){
     $("linea-search").addEventListener("input", e=>buildLineaList(e.target.value));
     $("reset-btn").onclick = ()=>{ state={comuna:"TODAS",linea:"TODAS"}; $("linea-search").value=""; buildLineaList(); render(); };
     render();
-    addEventListener("resize", ()=>{ if(chart) chart.resize(); if(lmap) lmap.invalidateSize(); });
+    addEventListener("resize", ()=>{ if(chart) chart.resize(); if(csChart) csChart.resize(); if(lmap) lmap.invalidateSize(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();

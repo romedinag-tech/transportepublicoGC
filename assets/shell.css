@@ -51,4 +51,10 @@
 .speedleg .lbls{display:flex;justify-content:space-between;width:130px}
 .speedleg .lbls i{font-style:normal}
 .speedleg .par{display:block;margin-top:3px;color:#e2e8f0}
+.cs-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.cs-controls{display:flex;gap:10px;flex-wrap:wrap}
+.seg{display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:2px;gap:2px}
+.seg b{font-size:11.5px;font-weight:500;padding:4px 10px;border-radius:7px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.seg b:hover{color:var(--tx)}
+.seg b.on{background:rgba(56,189,248,.16);color:var(--acc)}
 @media(max-width:920px){.grid2{grid-template-columns:1fr}.sidebar{position:static;width:100%;height:auto;border-right:none;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px}.app{flex-direction:column}}
