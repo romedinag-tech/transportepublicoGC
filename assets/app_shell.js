@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=15`).then(r=>r.json());
-const BUILD = "2026-06-18 13:10";
+const J = n => fetch(`data/${n}?v=16`).then(r=>r.json());
+const BUILD = "2026-06-18 13:25";
 
 let T, GEOM, GEO, CUMP, PAR={}, EMPL={};
 let state = {comuna:"TODAS", linea:"TODAS"};
@@ -193,7 +193,7 @@ function renderRanking(){
 }
 
 const DIAS = {L:"Laborable", S:"Sábado", D:"Domingo"};
-const cumpCol = c => c==null ? "#64748b" : c>=95 ? "#34d399" : c>=80 ? "#fbbf24" : "#fb7185";
+const cumpCol = c => c==null ? "#64748b" : c>=120 ? "#22d3ee" : c>=95 ? "#34d399" : c>=80 ? "#fbbf24" : "#fb7185";
 function cumpBar(c){
   const col = cumpCol(c), w = c==null?0:Math.min(c,120)/120*100;
   return `<span class="bar" style="flex:0 0 84px;height:7px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;position:relative">
