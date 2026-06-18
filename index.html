@@ -10,8 +10,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Componentes y variables de tema existentes (kpi, ctab, litem, rank-row, cump-row, seg…) -->
-<link rel="stylesheet" href="assets/styles.css?v=20">
-<link rel="stylesheet" href="assets/shell.css?v=20">
+<link rel="stylesheet" href="assets/styles.css?v=21">
+<link rel="stylesheet" href="assets/shell.css?v=21">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <!-- Tailwind (Play CDN, sin build). preflight off para no pisar los componentes existentes. -->
@@ -107,10 +107,80 @@ tailwind.config = {
   .vfoot{border-top:1px solid var(--line)}
   /* Charts a alto/ancho completo de su widget */
   #ch-hora,#cs-chart{width:100%}
+
+  /* ===== HERO intro: red neuronal animada ===== */
+  #hero-splash{position:fixed;inset:0;z-index:9999;background:radial-gradient(120% 120% at 50% 40%,#0e1730,#070b16 70%);
+    display:grid;place-items:center;overflow:hidden;transition:opacity .85s ease}
+  #hero-splash.gone{opacity:0;pointer-events:none}
+  #hero-canvas{position:absolute;inset:0;width:100%;height:100%;opacity:.9}
+  .hero-content{position:relative;z-index:2;text-align:center;padding:20px;animation:heroIn 1s ease both}
+  @keyframes heroIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .hero-logo{width:62px;height:62px;border-radius:16px;margin:0 auto 22px;display:grid;place-items:center;
+    color:#06121f;font-weight:800;font-size:24px;background:linear-gradient(135deg,#22d3ee,#34d399);
+    box-shadow:0 0 40px rgba(34,211,238,.5)}
+  .hero-content h1{font-family:var(--sans);font-size:clamp(24px,4.6vw,50px);font-weight:800;line-height:1.08;letter-spacing:.02em;
+    background:linear-gradient(120deg,#e8eef8,#7dd3fc 55%,#34d399);-webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 2px 40px rgba(34,211,238,.15)}
+  .hero-content p{margin-top:14px;font-family:var(--mono);font-size:clamp(10px,1.4vw,13px);letter-spacing:.32em;color:#7dd3fc;text-transform:uppercase}
+  .hero-load{width:190px;height:3px;margin:26px auto 0;border-radius:3px;background:rgba(125,211,252,.14);overflow:hidden}
+  .hero-load span{display:block;height:100%;width:38%;border-radius:3px;background:linear-gradient(90deg,#22d3ee,#34d399);animation:heroSweep 1.15s cubic-bezier(.5,0,.5,1) infinite}
+  @keyframes heroSweep{0%{transform:translateX(-130%)}100%{transform:translateX(360%)}}
+  .hero-skip{margin-top:18px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);opacity:.7}
 </style>
 </head>
 
 <body class="font-sans">
+
+<!-- ============ HERO INTRO: red neuronal animada ============ -->
+<div id="hero-splash">
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-content">
+    <div class="hero-logo">GC</div>
+    <h1>TRANSPORTE PÚBLICO<br>GRAN CONCEPCIÓN</h1>
+    <p>CENTRO DE MANDO · ANALÍTICA GPS</p>
+    <div class="hero-load"><span></span></div>
+    <div class="hero-skip">toca para entrar</div>
+  </div>
+</div>
+<script>
+(function(){
+  var sp=document.getElementById('hero-splash'), cv=document.getElementById('hero-canvas');
+  if(!cv||!cv.getContext){ if(sp) sp.style.display='none'; return; }
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var ctx=cv.getContext('2d'), DPR=Math.min(window.devicePixelRatio||1,2);
+  var W=0,H=0,nodes=[],pulses=[],timer=null,tick=0,DIST=160;
+  function resize(){ W=cv.clientWidth||window.innerWidth; H=cv.clientHeight||window.innerHeight;
+    cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  function build(){ resize(); var n=Math.max(30,Math.min(95,Math.round(W*H/15000))); nodes=[];
+    for(var i=0;i<n;i++) nodes.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.34,vy:(Math.random()-.5)*.34}); }
+  function frame(){
+    tick++;
+    ctx.clearRect(0,0,W,H);
+    for(var i=0;i<nodes.length;i++){ var a=nodes[i]; a.x+=a.vx; a.y+=a.vy;
+      if(a.x<0){a.x=0;a.vx*=-1;} if(a.x>W){a.x=W;a.vx*=-1;} if(a.y<0){a.y=0;a.vy*=-1;} if(a.y>H){a.y=H;a.vy*=-1;}
+      for(var j=i+1;j<nodes.length;j++){ var b=nodes[j],dx=a.x-b.x,dy=a.y-b.y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<DIST){ var o=(1-d/DIST); ctx.strokeStyle='rgba(56,189,248,'+(o*0.5)+')'; ctx.lineWidth=o*1.1+0.2;
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } } }
+    ctx.shadowBlur=8; ctx.shadowColor='#22d3ee';
+    for(var k=0;k<nodes.length;k++){ var p=nodes[k]; ctx.beginPath(); ctx.fillStyle='rgba(34,211,238,.92)'; ctx.arc(p.x,p.y,1.7,0,6.283); ctx.fill(); }
+    ctx.shadowBlur=0;
+    if(!reduce && tick%11===0 && nodes.length>2){
+      var a2=nodes[(Math.random()*nodes.length)|0], near=null, best=DIST;
+      for(var m=0;m<nodes.length;m++){ var c=nodes[m]; if(c===a2)continue; var dd=Math.hypot(a2.x-c.x,a2.y-c.y); if(dd<best){best=dd;near=c;} }
+      if(near) pulses.push({a:a2,b:near,t:0}); }
+    for(var q=pulses.length-1;q>=0;q--){ var pu=pulses[q]; pu.t+=0.05; if(pu.t>=1){pulses.splice(q,1);continue;}
+      var x=pu.a.x+(pu.b.x-pu.a.x)*pu.t, y=pu.a.y+(pu.b.y-pu.a.y)*pu.t;
+      ctx.beginPath(); ctx.fillStyle='rgba(52,211,153,'+(1-pu.t)+')'; ctx.shadowBlur=10; ctx.shadowColor='#34d399'; ctx.arc(x,y,2.6,0,6.283); ctx.fill(); ctx.shadowBlur=0; }
+  }
+  function dismiss(){ if(sp.classList.contains('gone'))return; sp.classList.add('gone');
+    setTimeout(function(){ if(timer)clearInterval(timer); sp.style.display='none'; },850); }
+  build(); frame(); timer=setInterval(frame, 1000/45);
+  addEventListener('resize', build);
+  sp.addEventListener('click', dismiss);
+  setTimeout(dismiss, reduce?500:2800);
+})();
+</script>
+
 <div class="flex flex-col h-screen overflow-hidden">
 
   <!-- ============ BARRA DE COMANDO (ultra-delgada) ============ -->
@@ -181,7 +251,7 @@ tailwind.config = {
         <!-- MAPA HÉROE (2/3) -->
         <section class="widget xl:col-span-2 flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=20" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=21" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -200,7 +270,7 @@ tailwind.config = {
         <div class="flex flex-col gap-4">
           <section class="widget">
             <div class="widget-h">
-              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=20" alt="" width="22" height="22"></span>
+              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=21" alt="" width="22" height="22"></span>
               <div><h3>Flota y velocidad</h3><span class="sub">por hora · días laborables</span></div>
             </div>
             <div class="widget-b"><div id="ch-hora" style="height:236px"></div></div>
@@ -219,7 +289,7 @@ tailwind.config = {
       <!-- Cumplimiento de frecuencia -->
       <section class="widget">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=20" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=21" alt="" width="22" height="22"></span>
           <div><h3>Cumplimiento de frecuencia</h3><span class="sub">programado (GTFS) vs observado (GPS)</span></div>
         </div>
         <div class="widget-b"><div id="cump-box"></div></div>
@@ -228,7 +298,7 @@ tailwind.config = {
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=20" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=21" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -254,7 +324,7 @@ tailwind.config = {
 </div>
 
 <script src="assets/echarts.min.js"></script>
-<script src="assets/app_shell.js?v=20"></script>
+<script src="assets/app_shell.js?v=21"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
