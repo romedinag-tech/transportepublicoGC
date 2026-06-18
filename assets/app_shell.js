@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=18`).then(r=>r.json());
-const BUILD = "2026-06-18 14:30";
+const J = n => fetch(`data/${n}?v=19`).then(r=>r.json());
+const BUILD = "2026-06-18 15:00";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, EMPL={};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq"};
@@ -133,10 +133,13 @@ function renderHora(cell){
 function ensureMap(){
   if(lmap) return;
   lmap = L.map("lmap",{center:[-36.83,-73.05],zoom:11,zoomControl:true});
-  const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"Imagery © Esri"}).addTo(lmap);
+  // Base OSCURA (centro de mando) por defecto: CARTO Dark Matter. Sobre ella resaltan
+  // el recorrido coloreado por velocidad y los paraderos (datos "neón").
+  const oscuro = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:20,subdomains:"abcd",attribution:"© OSM © CARTO"}).addTo(lmap);
+  const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"Imagery © Esri"});
   const calles = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{maxZoom:20,subdomains:"abcd",attribution:"© OSM © CARTO"});
-  const etiquetas = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",{maxZoom:19}).addTo(lmap);
-  L.control.layers({"Satélite":sat,"Calles":calles},{"Vías y etiquetas":etiquetas},{collapsed:true,position:"topright"}).addTo(lmap);
+  const etiquetas = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",{maxZoom:19});
+  L.control.layers({"Oscuro":oscuro,"Satélite":sat,"Calles":calles},{"Vías y etiquetas":etiquetas},{collapsed:true,position:"topright"}).addTo(lmap);
   comunaLayer = L.layerGroup().addTo(lmap);
   routeLayer = L.layerGroup().addTo(lmap);
   stopLayer = L.layerGroup().addTo(lmap);

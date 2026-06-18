@@ -3,79 +3,265 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Transporte Público Gran Concepción · Visor</title>
-<meta name="description" content="Visor analítico del transporte público del Gran Concepción: navegación por comuna (territorio) y por línea (operador), sobre 302 millones de registros GPS.">
+<title>GCCP · Centro de Mando · Transporte Gran Concepción</title>
+<meta name="description" content="Centro de mando analítico del transporte público del Gran Concepción: flota, velocidad, cumplimiento GTFS vs GPS y geometría oficial sobre 302 millones de registros.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="assets/styles.css?v=18">
-<link rel="stylesheet" href="assets/shell.css?v=18">
-<script>try{var t=localStorage.getItem("gccp-theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<!-- Componentes y variables de tema existentes (kpi, ctab, litem, rank-row, cump-row, seg…) -->
+<link rel="stylesheet" href="assets/styles.css?v=19">
+<link rel="stylesheet" href="assets/shell.css?v=19">
+<!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
+<script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
+<!-- Tailwind (Play CDN, sin build). preflight off para no pisar los componentes existentes. -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  corePlugins: { preflight: false },
+  theme: { extend: {
+    fontFamily: {
+      sans: ['Inter','-apple-system','Segoe UI','Roboto','sans-serif'],
+      mono: ['JetBrains Mono','ui-monospace','SFMono-Regular','Menlo','monospace'],
+    },
+    colors: { neon: { cyan:'#22d3ee', sky:'#38bdf8', emerald:'#34d399', amber:'#fbbf24', orange:'#fb923c', rose:'#fb7185' } },
+    keyframes: {
+      pulsering: { '0%':{boxShadow:'0 0 0 0 rgba(52,211,153,.55)'}, '70%':{boxShadow:'0 0 0 7px rgba(52,211,153,0)'}, '100%':{boxShadow:'0 0 0 0 rgba(52,211,153,0)'} },
+    },
+    animation: { pulsering: 'pulsering 2s infinite' },
+  }},
+};
+</script>
+<style>
+  /* ===== Chrome del centro de mando (usa las variables de tema -> respeta claro/oscuro) ===== */
+  html,body{height:100%}
+  .thin-scroll::-webkit-scrollbar{width:9px;height:9px}
+  .thin-scroll::-webkit-scrollbar-thumb{background:var(--line2);border-radius:5px}
+  .thin-scroll::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+  .thin-scroll::-webkit-scrollbar-track{background:transparent}
+
+  /* Widget modular: panel con borde sutil de 1px y profundidad por sombra difuminada */
+  .widget{position:relative;border:1px solid var(--line);border-radius:18px;
+    background:linear-gradient(180deg,var(--panel),var(--panel2));
+    box-shadow:0 18px 40px -24px rgba(0,0,0,.55);overflow:hidden}
+  .widget::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(56,189,248,.5),transparent);opacity:.5}
+  .widget-h{display:flex;align-items:center;gap:9px;padding:12px 15px;border-bottom:1px solid var(--line)}
+  .widget-h .ico{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;
+    background:rgba(56,189,248,.12);color:var(--acc);flex:none}
+  .widget-h h3{font-size:12.5px;font-weight:600;letter-spacing:.01em}
+  .widget-h .sub{font-size:11px;color:var(--dim)}
+  .widget-b{padding:13px 15px}
+
+  /* Indicador "en vivo": punto verde parpadeante */
+  .dot-live{width:8px;height:8px;border-radius:50%;background:var(--acc2);animation:pulsering 2s infinite}
+  .status{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
+
+  /* Badge de tendencia (▲/▼) */
+  .trend{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;font-family:var(--mono);
+    padding:2px 7px;border-radius:999px}
+  .trend.up{color:var(--acc2);background:rgba(52,211,153,.12)}
+  .trend.down{color:var(--danger);background:rgba(251,113,133,.12)}
+
+  /* El MAPA como héroe: marco con esquinas tipo HUD y glow interior */
+  .map-hero{position:relative;border-radius:14px;overflow:hidden;
+    box-shadow:inset 0 0 0 1px var(--line),inset 0 0 70px -30px rgba(34,211,238,.35)}
+  .map-hero .corner{position:absolute;width:18px;height:18px;border-color:rgba(34,211,238,.7);z-index:500;pointer-events:none}
+  .map-hero .c-tl{top:9px;left:9px;border-top:2px solid;border-left:2px solid;border-top-left-radius:5px}
+  .map-hero .c-tr{top:9px;right:9px;border-top:2px solid;border-right:2px solid;border-top-right-radius:5px}
+  .map-hero .c-bl{bottom:9px;left:9px;border-bottom:2px solid;border-left:2px solid;border-bottom-left-radius:5px}
+  .map-hero .c-br{bottom:9px;right:9px;border-bottom:2px solid;border-right:2px solid;border-bottom-right-radius:5px}
+
+  /* ===== Mapa base oscuro + datos neón =====
+     app_shell.js arranca con CARTO Dark Matter (tiles oscuras). Sobre ese lienzo:
+       · recorrido coloreado por velocidad (rojo→amarillo→verde, ya implementado)
+       · paraderos en blanco, comuna activa en cyan (#38bdf8)
+     Para que los buses/rutas "neón" resalten más, los puntos GPS van en cyan/naranja.
+     Aquí estilizamos los controles y tooltips de Leaflet a modo HUD oscuro: */
+  .leaflet-container{background:#0a0f1c}
+  .leaflet-tooltip,.leaflet-popup-content-wrapper{background:var(--topbar)!important;color:var(--tx)!important;
+    border:1px solid var(--line2)!important;border-radius:9px!important;backdrop-filter:blur(10px);
+    box-shadow:0 10px 30px -8px rgba(0,0,0,.6)!important;font-family:var(--sans);font-size:11.5px;font-weight:500}
+  .leaflet-tooltip-top:before{border-top-color:var(--line2)!important}
+  .leaflet-popup-tip{background:var(--topbar)!important;border:1px solid var(--line2)!important}
+  .leaflet-bar a,.leaflet-control-layers{background:var(--panel)!important;color:var(--tx)!important;border-color:var(--line)!important}
+  .leaflet-bar a:hover{background:var(--panel2)!important;color:var(--acc)!important}
+  .leaflet-control-attribution{background:rgba(10,15,28,.6)!important;color:var(--dim)!important}
+  .leaflet-control-attribution a{color:var(--muted)!important}
+
+  /* Maqueta de tooltip de mapa (referencia de estilo para popups de bus/ruta) */
+  .map-tip{font-family:var(--sans)}
+  .map-tip .l{font-family:var(--mono);font-weight:700;color:var(--acc)}
+  .map-tip .v{font-family:var(--mono);color:var(--tx)}
+
+  /* Sidebar colapsable con transición suave */
+  #sidebar{transition:width .26s cubic-bezier(.4,0,.2,1),opacity .2s,padding .26s}
+  #sidebar.side-collapsed{width:0!important;min-width:0;padding-left:0;padding-right:0;opacity:0;border:none;overflow:hidden}
+
+  /* Microinteracciones */
+  .hovo{transition:transform .18s ease,border-color .18s ease,color .18s ease}
+  .hovo:hover{transform:translateY(-2px)}
+  a,button{transition:color .16s ease,background .16s ease,border-color .16s ease}
+  .vfoot{border-top:1px solid var(--line)}
+  /* Charts a alto/ancho completo de su widget */
+  #ch-hora,#cs-chart{width:100%}
+</style>
 </head>
-<body>
-<header class="topbar">
-  <div class="topbar-in">
-    <div class="tb-brand">
-      <div class="logo">GC</div>
-      <div><b>Transporte · Gran Concepción</b><span>visor analítico GPS</span></div>
-    </div>
-    <span class="axis-lbl">comunas</span>
-    <nav class="comuna-tabs" id="comuna-tabs"></nav>
-    <div class="tb-right">
-      <span class="pill" id="periodo-pill" style="font-size:11.5px;color:var(--muted)">abr 2025 – abr 2026</span>
-      <button id="theme-btn" class="themebtn" onclick="toggleTheme()" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema">☀</button>
-      <a href="clasico.html">Vista clásica ↗</a>
-      <a href="https://github.com/romedinag-tech/transportepublicoGC" target="_blank" rel="noopener">GitHub ↗</a>
-    </div>
-  </div>
-</header>
 
-<div class="app">
-  <aside class="sidebar">
-    <div class="side-h"><i class="ti ti-bus" aria-hidden="true"></i> líneas</div>
-    <input class="side-search" id="linea-search" placeholder="Buscar línea o empresa…" autocomplete="off">
-    <div id="linea-list"></div>
-  </aside>
+<body class="font-sans">
+<div class="flex flex-col h-screen overflow-hidden">
 
-  <main class="main2">
-    <div class="scope">
-      <h2 id="scope-title">Sistema completo</h2>
-      <span class="chip" id="scope-sub"></span>
-      <span class="reset" id="reset-btn" style="display:none"><i class="ti ti-x" style="font-size:13px;vertical-align:-2px" aria-hidden="true"></i> volver al sistema</span>
+  <!-- ============ BARRA DE COMANDO (ultra-delgada) ============ -->
+  <header class="flex items-center gap-3 px-3 sm:px-4 h-12 shrink-0 z-50 border-b border-[var(--line)] bg-[var(--topbar)] backdrop-blur-xl">
+    <button id="side-toggle" class="grid place-items-center w-8 h-8 rounded-lg border border-[var(--line2)] text-[var(--muted)] hover:text-[var(--acc)] hover:border-[var(--acc)]" title="Mostrar/ocultar filtros" aria-label="Filtros">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="flex items-center gap-2.5 min-w-0">
+      <div class="grid place-items-center w-8 h-8 rounded-[10px] text-[#06121f] font-extrabold text-[13px]" style="background:linear-gradient(135deg,#22d3ee,#34d399);box-shadow:0 4px 16px rgba(34,211,238,.35)">GC</div>
+      <div class="leading-tight min-w-0 hidden xs:block sm:block">
+        <b class="text-[13px] font-semibold block truncate">Transporte · Gran Concepción</b>
+        <span class="text-[10.5px] text-[var(--dim)] tracking-wide">CENTRO DE MANDO · ANALÍTICA GPS</span>
+      </div>
     </div>
 
-    <div class="kpis" id="kpis2"><div class="loading">Cargando…</div></div>
+    <span class="status ml-3 hidden md:inline-flex"><span class="dot-live"></span> Sistema operativo</span>
 
-    <div class="grid2">
-      <div class="card"><h4>Flota y velocidad por hora <span class="hint">días laborables</span></h4><div id="ch-hora" class="chart"></div></div>
-      <div class="card"><h4 id="map-title">Mapa</h4><div id="lmap" class="chart map"></div></div>
+    <div class="ml-auto flex items-center gap-2">
+      <span id="periodo-pill" class="hidden sm:inline-flex items-center gap-1.5 text-[11.5px] font-mono px-2.5 py-1.5 rounded-lg border border-[var(--line2)] text-[var(--muted)] bg-[var(--chip)]">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        abr 2025 – abr 2026
+      </span>
+      <button id="theme-btn" class="themebtn" onclick="toggleTheme()" title="Tema claro/oscuro" aria-label="Tema">☀</button>
+      <a href="clasico.html" class="text-[11.5px] px-2.5 py-1.5 rounded-lg border border-[var(--line2)] text-[var(--muted)] hover:text-[var(--acc)] hover:border-[var(--acc)] hidden sm:inline-block">Vista clásica ↗</a>
+      <a href="https://github.com/romedinag-tech/transportepublicoGC" target="_blank" rel="noopener" class="grid place-items-center w-8 h-8 rounded-lg border border-[var(--line2)] text-[var(--muted)] hover:text-[var(--acc)] hover:border-[var(--acc)]" title="GitHub" aria-label="GitHub">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 8.84 21.5c.5.08.66-.22.66-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.57.67.48A10 10 0 0 0 12 2Z"/></svg>
+      </a>
     </div>
+  </header>
 
-    <div class="grid2">
-      <div class="card"><h4 id="rank-title">Ranking de líneas</h4><div class="hint" id="rank-hint"></div><div id="rank-box" style="margin-top:8px"></div></div>
-      <div class="card"><h4>Cumplimiento de frecuencia <span class="hint">programado (GTFS) vs observado (GPS)</span></h4><div id="cump-box" style="margin-top:8px"></div></div>
-    </div>
+  <!-- ============ ESPACIO DE TRABAJO ============ -->
+  <div class="flex flex-1 overflow-hidden">
 
-    <div class="card cump-sem" id="cump-sem-card" style="display:none">
-      <div class="cs-head">
-        <h4>Cumplimiento semanal por variable exigida <span class="hint">evolución semana a semana</span></h4>
-        <div class="cs-controls">
-          <div class="seg" id="cs-dia"></div>
-          <div class="seg" id="cs-var"></div>
+    <!-- ===== SIDEBAR DE FILTROS (colapsable) ===== -->
+    <aside id="sidebar" class="thin-scroll w-[272px] shrink-0 overflow-y-auto border-r border-[var(--line)] bg-[var(--bg2)] px-3 py-4">
+      <!-- Territorio / Comunas -->
+      <div class="flex items-center gap-2 px-1 mb-2">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[var(--dim)]"><path d="M9 20l-5.5 2V6L9 4l6 2 5.5-2v16L15 22l-6-2Z"/><path d="M9 4v16M15 6v16"/></svg>
+        <span class="text-[10.5px] font-semibold tracking-[.12em] text-[var(--dim)] uppercase">Territorio · Comunas</span>
+      </div>
+      <nav class="comuna-tabs mb-5" id="comuna-tabs"></nav>
+
+      <!-- Operador / Líneas -->
+      <div class="flex items-center gap-2 px-1 mb-2">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[var(--dim)]"><rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 11h16M8 21l1-3M16 21l-1-3"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg>
+        <span class="text-[10.5px] font-semibold tracking-[.12em] text-[var(--dim)] uppercase">Operador · Líneas</span>
+      </div>
+      <input class="side-search" id="linea-search" placeholder="Buscar línea o empresa…" autocomplete="off">
+      <div id="linea-list"></div>
+    </aside>
+
+    <!-- ===== ÁREA PRINCIPAL ===== -->
+    <main class="thin-scroll flex-1 overflow-y-auto p-3 sm:p-4 space-y-4">
+
+      <!-- Cabecera de ámbito -->
+      <div class="flex items-center gap-3 flex-wrap">
+        <h2 id="scope-title" class="text-[21px] font-semibold tracking-tight">Sistema completo</h2>
+        <span class="chip" id="scope-sub"></span>
+        <button class="reset hovo" id="reset-btn" style="display:none">✕ volver al sistema</button>
+      </div>
+
+      <!-- Tira de KPIs -->
+      <div id="kpis2" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3"><div class="loading">Cargando datos…</div></div>
+
+      <!-- HERO: mapa + columna de widgets -->
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+
+        <!-- MAPA HÉROE (2/3) -->
+        <section class="widget xl:col-span-2 flex flex-col">
+          <div class="widget-h">
+            <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-5.5 2V6L9 4l6 2 5.5-2v16L15 22l-6-2Z"/><path d="M9 4v16M15 6v16"/></svg></span>
+            <div class="min-w-0">
+              <h3 id="map-title" class="truncate">Mapa del sistema</h3>
+              <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
+            </div>
+            <span class="status ml-auto"><span class="dot-live"></span> geo en línea</span>
+          </div>
+          <div class="widget-b !p-2.5 flex-1">
+            <div class="map-hero h-[58vh] xl:h-[600px]">
+              <span class="corner c-tl"></span><span class="corner c-tr"></span><span class="corner c-bl"></span><span class="corner c-br"></span>
+              <div id="lmap" class="w-full h-full"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- COLUMNA DERECHA: flota/velocidad + ranking -->
+        <div class="flex flex-col gap-4">
+          <section class="widget">
+            <div class="widget-h">
+              <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 14l3-3"/><path d="M3 14a9 9 0 1 1 18 0"/><circle cx="12" cy="14" r="1.5"/></svg></span>
+              <div><h3>Flota y velocidad</h3><span class="sub">por hora · días laborables</span></div>
+            </div>
+            <div class="widget-b"><div id="ch-hora" style="height:236px"></div></div>
+          </section>
+
+          <section class="widget flex-1">
+            <div class="widget-h">
+              <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+              <div><h3 id="rank-title">Ranking de líneas</h3><span class="sub" id="rank-hint"></span></div>
+            </div>
+            <div class="widget-b"><div id="rank-box"></div></div>
+          </section>
         </div>
       </div>
-      <div id="cs-chart" class="chart" style="height:320px"></div>
-      <div class="hint" id="cs-foot" style="margin-top:6px"></div>
-    </div>
-  </main>
+
+      <!-- Cumplimiento de frecuencia -->
+      <section class="widget">
+        <div class="widget-h">
+          <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4Z"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <div><h3>Cumplimiento de frecuencia</h3><span class="sub">programado (GTFS) vs observado (GPS)</span></div>
+        </div>
+        <div class="widget-b"><div id="cump-box"></div></div>
+      </section>
+
+      <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
+      <section class="widget cump-sem" id="cump-sem-card" style="display:none">
+        <div class="widget-h">
+          <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 3 4-6"/></svg></span>
+          <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
+          <div class="cs-controls ml-auto">
+            <div class="seg" id="cs-dia"></div>
+            <div class="seg" id="cs-var"></div>
+          </div>
+        </div>
+        <div class="widget-b">
+          <div id="cs-chart" style="height:320px"></div>
+          <div class="hint" id="cs-foot" style="margin-top:6px"></div>
+        </div>
+      </section>
+
+      <!-- Maqueta de tooltip de mapa (referencia de estilo, oculta) -->
+      <template id="tip-mockup">
+        <div class="map-tip"><div><span class="l">Línea 20</span></div><div>Velocidad: <span class="v">45 km/h</span></div><div>Estado: <span class="v" style="color:var(--neon-orange,#fb923c)">Atrasado</span></div></div>
+      </template>
+
+      <footer class="vfoot !border-0 !mt-2">
+        <span id="vfoot-build">Visor actualizado: —</span> · <span id="vfoot-data">Datos hasta: —</span> · <span class="vfoot-dim">histórico refrescado semanalmente · 302 M registros GPS</span>
+      </footer>
+    </main>
+  </div>
 </div>
 
-<footer class="vfoot">
-  <span id="vfoot-build">Visor actualizado: —</span> · <span id="vfoot-data">Datos hasta: —</span> · <span class="vfoot-dim">en vivo cada 60 s · histórico refrescado semanalmente</span>
-</footer>
-
 <script src="assets/echarts.min.js"></script>
-<script src="assets/app_shell.js?v=18"></script>
+<script src="assets/app_shell.js?v=19"></script>
+<script>
+  /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
+  (function(){
+    var btn=document.getElementById("side-toggle"), sb=document.getElementById("sidebar");
+    btn.addEventListener("click", function(){
+      sb.classList.toggle("side-collapsed");
+      setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 280);
+    });
+  })();
+</script>
 </body>
 </html>
