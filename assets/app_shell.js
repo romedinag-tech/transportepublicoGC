@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=17`).then(r=>r.json());
-const BUILD = "2026-06-18 14:05";
+const J = n => fetch(`data/${n}?v=18`).then(r=>r.json());
+const BUILD = "2026-06-18 14:30";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, EMPL={};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq"};
@@ -25,6 +25,19 @@ function speedColor(v){
   const t = Math.max(0, Math.min(1, (v-8)/20));   // 8 km/h rojo, 28 verde
   const hue = t*120;                               // 0=rojo 60=amarillo 120=verde
   return `hsl(${hue},72%,50%)`;
+}
+
+/* tema (claro/oscuro): lee variables CSS para que los charts ECharts sigan el tema */
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const TH = () => ({tx:cssv("--tx"), mut:cssv("--muted"), axis:cssv("--ch-axis"), grid:cssv("--ch-grid"), tip:cssv("--ch-tip"), tipB:cssv("--line2")});
+function applyTheme(t){
+  document.documentElement.dataset.theme = t;
+  try{ localStorage.setItem("gccp-theme", t); }catch(e){}
+  const btn=$("theme-btn"); if(btn) btn.textContent = t==="light" ? "☾" : "☀";
+}
+function toggleTheme(){
+  applyTheme(document.documentElement.dataset.theme==="light" ? "dark" : "light");
+  if(typeof render==="function") render();   // redibuja charts con los colores nuevos
 }
 
 const cellOf = () => (T.cells[`${state.comuna}|${state.linea}`] || {kpi:null, horas:[]});
@@ -99,15 +112,16 @@ function renderHora(cell){
   if(!chart) chart = echarts.init($("ch-hora"));
   const h = cell.horas||[];
   const flota = h.map(x=>x?x.b:0), vel = h.map(x=>x?x.v:null);
+  const th = TH();
   chart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:"#cdd7e6"},
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
     grid:{left:42,right:46,top:34,bottom:28,containLabel:true},
-    legend:{data:["Flota (buses)","Velocidad"],textStyle:{color:"#93a1ba"},top:0,right:0},
-    tooltip:{trigger:"axis",backgroundColor:"rgba(13,20,36,.96)",borderColor:"rgba(255,255,255,.14)",textStyle:{color:"#e8eef8"},
+    legend:{data:["Flota (buses)","Velocidad"],textStyle:{color:th.mut},top:0,right:0},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>{const i=p[0].dataIndex,x=h[i]||{};return `${HORAS[i]}<br>Flota: <b>${fmt1(x.b)}</b> buses<br>Velocidad: <b>${fmt1(x.v)}</b> km/h<br>Detenido: ${fmt1(x.d)}%`;}},
-    xAxis:{type:"category",data:HORAS,axisLabel:{color:"#93a1ba",fontSize:10},axisLine:{lineStyle:{color:"rgba(255,255,255,.16)"}}},
-    yAxis:[{type:"value",name:"buses",axisLabel:{color:"#93a1ba"},splitLine:{lineStyle:{color:"rgba(255,255,255,.05)"}}},
-           {type:"value",name:"km/h",position:"right",max:60,axisLabel:{color:"#93a1ba"},splitLine:{show:false}}],
+    xAxis:{type:"category",data:HORAS,axisLabel:{color:th.mut,fontSize:10},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:[{type:"value",name:"buses",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+           {type:"value",name:"km/h",position:"right",max:60,axisLabel:{color:th.mut},splitLine:{show:false}}],
     series:[
       {name:"Flota (buses)",type:"bar",data:flota,itemStyle:{color:"rgba(56,189,248,.55)",borderRadius:[3,3,0,0]},barWidth:"58%"},
       {name:"Velocidad",type:"line",yAxisIndex:1,data:vel,smooth:true,symbol:"none",lineStyle:{width:2.5,color:"#34d399"},itemStyle:{color:"#34d399"}}
@@ -205,9 +219,9 @@ const DIAS = {L:"Laborable", S:"Sábado", D:"Domingo"};
 const cumpCol = c => c==null ? "#64748b" : c>=120 ? "#22d3ee" : c>=95 ? "#34d399" : c>=80 ? "#fbbf24" : "#fb7185";
 function cumpBar(c){
   const col = cumpCol(c), w = c==null?0:Math.min(c,120)/120*100;
-  return `<span class="bar" style="flex:0 0 84px;height:7px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;position:relative">
+  return `<span class="bar" style="flex:0 0 84px;height:7px;border-radius:4px;background:var(--track);overflow:hidden;position:relative">
      <i style="display:block;height:100%;width:${w}%;background:${col}"></i>
-     <i style="position:absolute;left:${100/120*100}%;top:0;width:1px;height:100%;background:rgba(255,255,255,.35)"></i></span>`;
+     <i style="position:absolute;left:${100/120*100}%;top:0;width:1px;height:100%;background:var(--line2)"></i></span>`;
 }
 function renderCump(){
   const box = $("cump-box");
@@ -255,19 +269,20 @@ function renderCumpSem(){
   const colorOf = y => !vc.pct||y==null ? "#38bdf8" : y>=120?"#22d3ee":y>=95?"#34d399":y>=80?"#fbbf24":"#fb7185";
   const pts = ys.map((y,i)=>({value:y, itemStyle:{color:colorOf(y)}}));
   if(!csChart) csChart = echarts.init($("cs-chart"));
+  const th = TH();
   const markLines = vc.ref.length ? {silent:true,symbol:"none",lineStyle:{type:"dashed"},data:[
       {yAxis:80,lineStyle:{color:"rgba(251,113,133,.6)"},label:{formatter:"80% mínimo",color:"#fb7185",position:"insideEndTop",fontSize:10}},
       {yAxis:100,lineStyle:{color:"rgba(52,211,153,.5)"},label:{formatter:"100%",color:"#34d399",position:"insideEndTop",fontSize:10}}
     ]} : undefined;
   csChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:"#cdd7e6"},
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
     grid:{left:46,right:20,top:18,bottom:54,containLabel:true},
-    tooltip:{trigger:"axis",backgroundColor:"rgba(13,20,36,.96)",borderColor:"rgba(255,255,255,.14)",textStyle:{color:"#e8eef8"},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>{const i=p[0].dataIndex,d=serie[i];return `Semana ${d.wk}<br>${vc.lbl}: <b>${d[state.csVar]??"—"}${vc.suf}</b><br>`+
-        `<span style="color:#93a1ba">exp/día ${d.exp} · flota ${d.flota} · ${d.dias} días</span>`;}},
-    xAxis:{type:"category",data:xs,axisLabel:{color:"#93a1ba",fontSize:9,rotate:90,interval:2},axisLine:{lineStyle:{color:"rgba(255,255,255,.16)"}}},
+        `<span style="color:${th.mut}">exp/día ${d.exp} · flota ${d.flota} · ${d.dias} días</span>`;}},
+    xAxis:{type:"category",data:xs,axisLabel:{color:th.mut,fontSize:9,rotate:90,interval:2},axisLine:{lineStyle:{color:th.axis}}},
     yAxis:{type:"value",name:vc.pct?"%":vc.lbl,min:0,max:vc.pct?(Math.max(120,Math.ceil((Math.max(...ys.filter(v=>v!=null))||100)/20)*20)):null,
-      axisLabel:{color:"#93a1ba"},splitLine:{lineStyle:{color:"rgba(255,255,255,.05)"}}},
+      axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
     series:[{type:"line",data:pts,smooth:false,symbol:"circle",symbolSize:5,
       lineStyle:{width:2,color:"rgba(56,189,248,.5)"},
       areaStyle:vc.pct?{color:"rgba(56,189,248,.06)"}:undefined,
@@ -293,6 +308,7 @@ function renderCumpSem(){
       vb.textContent = "Visor actualizado: "+BUILD+" (hora Chile)";
       if(v.build && v.build!==BUILD) vb.innerHTML += ' · <span class="nueva" onclick="location.reload(true)">⚠ hay una versión más nueva — recargar</span>';
     }).catch(()=>{ const vb=$("vfoot-build"); if(vb) vb.textContent="Visor actualizado: "+BUILD; });
+    applyTheme(document.documentElement.dataset.theme==="light" ? "light" : "dark");
     buildComunaTabs();
     buildLineaList();
     $("linea-search").addEventListener("input", e=>buildLineaList(e.target.value));

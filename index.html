@@ -9,8 +9,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="assets/styles.css?v=17">
-<link rel="stylesheet" href="assets/shell.css?v=17">
+<link rel="stylesheet" href="assets/styles.css?v=18">
+<link rel="stylesheet" href="assets/shell.css?v=18">
+<script>try{var t=localStorage.getItem("gccp-theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
 <header class="topbar">
@@ -23,6 +24,7 @@
     <nav class="comuna-tabs" id="comuna-tabs"></nav>
     <div class="tb-right">
       <span class="pill" id="periodo-pill" style="font-size:11.5px;color:var(--muted)">abr 2025 – abr 2026</span>
+      <button id="theme-btn" class="themebtn" onclick="toggleTheme()" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema">☀</button>
       <a href="clasico.html">Vista clásica ↗</a>
       <a href="https://github.com/romedinag-tech/transportepublicoGC" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
@@ -74,6 +76,6 @@
 </footer>
 
 <script src="assets/echarts.min.js"></script>
-<script src="assets/app_shell.js?v=17"></script>
+<script src="assets/app_shell.js?v=18"></script>
 </body>
 </html>
