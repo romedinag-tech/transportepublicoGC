@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=13`).then(r=>r.json());
-const BUILD = "2026-06-18 08:25";
+const J = n => fetch(`data/${n}?v=14`).then(r=>r.json());
+const BUILD = "2026-06-18 12:40";
 
 let T, GEOM, GEO, CUMP, EMPL={};
 let state = {comuna:"TODAS", linea:"TODAS"};
@@ -160,23 +160,38 @@ function renderRanking(){
   if(state.linea==="TODAS") box.querySelectorAll(".rank-row").forEach(el=>el.onclick=()=>{state.linea=el.dataset.l;render();});
 }
 
+const DIAS = {L:"Laborable", S:"Sábado", D:"Domingo"};
+const cumpCol = c => c==null ? "#64748b" : c>=95 ? "#34d399" : c>=80 ? "#fbbf24" : "#fb7185";
+function cumpBar(c){
+  const col = cumpCol(c), w = c==null?0:Math.min(c,120)/120*100;
+  return `<span class="bar" style="flex:0 0 84px;height:7px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;position:relative">
+     <i style="display:block;height:100%;width:${w}%;background:${col}"></i>
+     <i style="position:absolute;left:${100/120*100}%;top:0;width:1px;height:100%;background:rgba(255,255,255,.35)"></i></span>`;
+}
 function renderCump(){
   const box = $("cump-box");
-  let servs;
+  const L = (CUMP.lineas)||{};
   if(state.linea!=="TODAS"){
-    servs = Object.keys(CUMP).filter(s=>s.slice(0,2)===state.linea).map(s=>({s,...CUMP[s]}));
-    if(!servs.length){ box.innerHTML=`<div class="empty">Esta línea aún no tiene Programa de Operación en el dataset (piloto de 18 servicios: líneas 30,31,32,41,50,63,65).</div>`; return; }
+    const d = L[state.linea];
+    if(!d){ box.innerHTML=`<div class="empty">Sin frecuencia programada (GTFS) para esta línea.</div>`; return; }
+    box.innerHTML = ["L","S","D"].map(s=>{
+      const c=d.cumpl[s];
+      return `<div class="cump-row"><b style="min-width:78px">${DIAS[s]}</b>
+        ${cumpBar(c)}
+        <span class="pct" style="color:${cumpCol(c)};min-width:46px">${c==null?"—":c+"%"}</span>
+        <span class="hint" style="flex:1;text-align:right">${d.obs_dia[s]} obs / ${d.prog_dia[s]} prog</span></div>`;
+    }).join("") + `<div class="hint" style="margin-top:8px">Despachos/día observados (GPS) vs programados (GTFS). 100% = línea blanca; &lt;80% = incumplimiento de frecuencia.</div>`;
   } else {
-    servs = Object.keys(CUMP).map(s=>({s,...CUMP[s]})).sort((a,b)=>b.pct_incumple-a.pct_incumple).slice(0,10);
+    const rows = Object.keys(L).map(ln=>({ln, c:L[ln].cumpl.L, emp:empresaDe(ln)}))
+                  .filter(r=>r.c!=null).sort((a,b)=>a.c-b.c).slice(0,12);
+    box.innerHTML = rows.map(r=>`<div class="cump-row" data-l="${r.ln}" style="cursor:pointer">
+      <b style="font-family:var(--mono);min-width:34px">${r.ln}</b>
+      <span style="flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.emp||""}</span>
+      ${cumpBar(r.c)}
+      <span class="pct" style="color:${cumpCol(r.c)};min-width:46px">${r.c}%</span></div>`).join("")
+      + `<div class="hint" style="margin-top:8px">Cumplimiento de frecuencia día laborable (despachos observados / programados). Menor = peor. Clic para ver la línea.</div>`;
+    box.querySelectorAll(".cump-row").forEach(el=>el.onclick=()=>{state.linea=el.dataset.l;render();});
   }
-  servs.sort((a,b)=>b.pct_incumple-a.pct_incumple);
-  box.innerHTML = servs.map(x=>{
-    const col = x.pct_incumple>=40?"#fb7185":x.pct_incumple>=20?"#fbbf24":"#34d399";
-    return `<div class="cump-row"><b style="font-family:var(--mono);min-width:44px">${x.s}</b>
-      <span style="flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.empresa}</span>
-      <span class="bar" style="flex:0 0 90px;height:7px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden"><i style="display:block;height:100%;width:${x.pct_incumple}%;background:${col}"></i></span>
-      <span class="pct" style="color:${col}">${x.pct_incumple}%</span></div>`;
-  }).join("") + `<div class="hint" style="margin-top:8px">% de franjas horarias con oferta bajo el 80% de lo comprometido.</div>`;
 }
 
 /* ---------- init ---------- */
