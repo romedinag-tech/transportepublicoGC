@@ -4,12 +4,13 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=21`).then(r=>r.json());
-const BUILD = "2026-06-18 16:20";
+const J = n => fetch(`data/${n}?v=22`).then(r=>r.json());
+const BUILD = "2026-06-18 17:05";
 
-let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, EMPL={};
+let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, EMPL={};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq"};
-let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, speedLegend;
+let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, speedLegend;
+const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 
 const CS_DIAS = [["L","Laboral"],["S","Sábado"],["D","Domingo"]];
 const CS_VARS = [
@@ -52,7 +53,8 @@ function buildComunaTabs(){
     return `<span class="ctab" data-c="${c}">${lbl}</span>`;
   }).join("");
   $("comuna-tabs").querySelectorAll(".ctab").forEach(el=>{
-    el.onclick = ()=>{ state.comuna = el.dataset.c; render(); };
+    // territorial y operador son vistas EXCLUYENTES: elegir comuna limpia la línea
+    el.onclick = ()=>{ state.comuna = el.dataset.c; state.linea = "TODAS"; render(); };
   });
 }
 function buildLineaList(filter=""){
@@ -61,7 +63,9 @@ function buildLineaList(filter=""){
   $("linea-list").innerHTML = items.map(l =>
     `<div class="litem" data-l="${l.linea}"><span class="ln">${l.linea}</span><span class="nm">${l.empresa||""}</span></div>`).join("");
   $("linea-list").querySelectorAll(".litem").forEach(el=>{
-    el.onclick = ()=>{ state.linea = state.linea===el.dataset.l ? "TODAS" : el.dataset.l; render(); };
+    el.onclick = ()=>{ state.linea = state.linea===el.dataset.l ? "TODAS" : el.dataset.l;
+      if(state.linea!=="TODAS") state.comuna = "TODAS";   // elegir línea limpia la comuna
+      render(); };
   });
 }
 
@@ -143,7 +147,32 @@ function ensureMap(){
   comunaLayer = L.layerGroup().addTo(lmap);
   routeLayer = L.layerGroup().addTo(lmap);
   stopLayer = L.layerGroup().addTo(lmap);
+  liveCanvas = L.canvas({padding:0.5});
+  liveLayer = L.layerGroup().addTo(lmap);
   if(window.ResizeObserver) new ResizeObserver(()=>lmap.invalidateSize()).observe($("lmap"));
+}
+/* buses operando AHORA (GTFS-RT vía live.json, posiciones ya snapeadas a la ruta) */
+function loadLive(){
+  fetch(LIVE_URL+"?t="+Date.now(),{cache:"no-store"}).then(r=>r.json())
+    .then(d=>{ LIVE=d; drawLiveBuses(); }).catch(()=>{});
+}
+function drawLiveBuses(){
+  if(!liveLayer) return;
+  liveLayer.clearLayers();
+  const badge=$("live-count");
+  // se muestran cuando NO hay comuna marcada (home o vista de línea); en vista comuna no.
+  if(!LIVE || !LIVE.buses || state.comuna!=="TODAS"){ if(badge) badge.textContent="geo en línea"; return; }
+  let n=0;
+  LIVE.buses.forEach(b=>{
+    const lat=b[0], lon=b[1], ln=b[2], spd=b[3], mv=b[4];
+    if(!ln) return;                                      // sin línea = fuera de servicio -> no es "operando"
+    if(state.linea!=="TODAS" && ln!==state.linea) return;
+    n++;
+    L.circleMarker([lat,lon],{renderer:liveCanvas, radius: mv?3.2:2.5, weight:0,
+      fillColor: mv?"#22d3ee":"#f59e0b", fillOpacity: mv?0.95:0.65})
+      .bindTooltip(`Línea ${ln||"—"} · ${spd} km/h${mv?"":" · detenido"}`,{direction:"top"}).addTo(liveLayer);
+  });
+  if(badge) badge.textContent = n>0 ? (NF.format(n)+" buses operando ahora") : "sin buses en vivo";
 }
 function setSpeedLegend(on){
   if(on && !speedLegend){
@@ -195,6 +224,7 @@ function renderMapa(){
     $("map-title").textContent = "Mapa del sistema";
   }
   try{ if(bounds && (bounds.length||bounds.isValid&&bounds.isValid())) lmap.fitBounds(bounds,{padding:[20,20]}); }catch(e){}
+  drawLiveBuses();
 }
 
 function renderRanking(){
@@ -315,8 +345,9 @@ function renderCumpSem(){
     buildComunaTabs();
     buildLineaList();
     $("linea-search").addEventListener("input", e=>buildLineaList(e.target.value));
-    $("reset-btn").onclick = ()=>{ state={comuna:"TODAS",linea:"TODAS"}; $("linea-search").value=""; buildLineaList(); render(); };
+    $("reset-btn").onclick = ()=>{ state={comuna:"TODAS",linea:"TODAS",csDia:state.csDia,csVar:state.csVar}; $("linea-search").value=""; buildLineaList(); render(); };
     render();
+    loadLive(); setInterval(loadLive, 60000);   // buses operando ahora, refresco 60 s
     addEventListener("resize", ()=>{ if(chart) chart.resize(); if(csChart) csChart.resize(); if(lmap) lmap.invalidateSize(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();
