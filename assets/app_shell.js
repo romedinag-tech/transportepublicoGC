@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=11`).then(r=>r.json());
-const BUILD = "2026-06-17 18:46";
+const J = n => fetch(`data/${n}?v=12`).then(r=>r.json());
+const BUILD = "2026-06-18 08:23";
 
 let T, GEOM, GEO, CUMP, EMPL={};
 let state = {comuna:"TODAS", linea:"TODAS"};
