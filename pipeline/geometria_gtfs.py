@@ -31,7 +31,15 @@ for sid, pts in byshape.items():
     info = shape_info.get(sid)
     if not info or len(pts) < 2:
         continue
-    sn, d = info
+    sn, d = info; sn = str(sn)
+    # nuestro perímetro: B-line (Bio Bus) o "2 dígitos + letra" (30M, 02A).
+    # Otros perímetros (Tomé 401, Lota 302, Sta Juana 201/201AU) tienen 3er dígito -> excluir.
+    if sn[0].isalpha():
+        pass
+    elif len(sn) >= 3 and sn[:2].isdigit() and not sn[2].isdigit():
+        pass
+    else:
+        continue
     linea = sn[:2]
     s = int(d) if d is not None else (1 if str(sid).endswith("_R") else 0)
     step = max(1, len(pts)//160)
