@@ -4,10 +4,11 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=23`).then(r=>r.json());
-const BUILD = "2026-06-18 18:10";
+const J = n => fetch(`data/${n}?v=24`).then(r=>r.json());
+const BUILD = "2026-06-18 18:35";
 
-let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EMPL={};
+let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, EMPL={};
+let eqChart, nseChart;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live"};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
@@ -95,6 +96,8 @@ function render(){
   renderRanking();
   renderCump();
   renderCumpSem();
+  renderEquidad();
+  renderNseGap();
 }
 
 function kpiCard(l,v,s){ return `<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`; }
@@ -391,6 +394,82 @@ function renderCumpSem(){
   $("cs-foot").innerHTML = `<b style="color:var(--muted)">${vc.lbl}:</b> ${vc.desc}.${vc.pct?progTxt:""} Tipo de día: <b>${CS_DIAS.find(d=>d[0]===state.csDia)[1]}</b>.`;
 }
 
+/* ---------- KPI línea: equidad de uso de flota (Lorenz + Gini) ---------- */
+function renderEquidad(){
+  const card=$("eq-flota-card");
+  const d = (EQ.lineas||{})[state.linea];
+  if(state.linea==="TODAS" || !d){ card.style.display="none"; return; }
+  card.style.display="";
+  const g=d.gini, col = g>=0.4?"#fb7185":g>=0.25?"#fbbf24":"#34d399";
+  $("eq-gini").textContent = `Gini ${g.toFixed(2)}`;
+  $("eq-gini").style.cssText = `margin-left:auto;background:${col}22;color:${col}`;
+  const th=TH();
+  if(!eqChart) eqChart=echarts.init($("eq-chart"));
+  eqChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    grid:{left:44,right:16,top:18,bottom:34,containLabel:true},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      formatter:p=>`${Math.round(p[0].value[0]*100)}% de los buses<br>concentra el <b>${Math.round((p[0].value[1])*100)}%</b> del trabajo`},
+    xAxis:{type:"value",min:0,max:1,name:"% buses (menos→más usados)",nameLocation:"middle",nameGap:22,
+      axisLabel:{color:th.mut,formatter:v=>Math.round(v*100)+"%"},axisLine:{lineStyle:{color:th.axis}},splitLine:{show:false}},
+    yAxis:{type:"value",min:0,max:1,name:"% del trabajo",axisLabel:{color:th.mut,formatter:v=>Math.round(v*100)+"%"},splitLine:{lineStyle:{color:th.grid}}},
+    series:[
+      {type:"line",data:[[0,0],[1,1]],symbol:"none",lineStyle:{type:"dashed",color:th.mut,width:1},silent:true},
+      {type:"line",data:d.lorenz,smooth:false,symbol:"none",lineStyle:{width:2.5,color:col},
+       areaStyle:{color:col+"22"}}
+    ]
+  }, true);
+  setTimeout(()=>eqChart.resize(),60);
+  const interp = g>=0.4?"muy desigual — pocos buses cargan la operación":g>=0.25?"desigualdad moderada":"uso parejo de la flota";
+  $("eq-stats").innerHTML = `
+    <div style="font-size:13px;line-height:1.9">
+      <div><b style="font-family:var(--mono);font-size:22px;color:${col}">${g.toFixed(2)}</b> <span class="hint">Gini de uso (0 = parejo · 1 = concentrado)</span></div>
+      <div style="color:${col}">${interp}</div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:8px 0">
+      <div><b>${d.buses}</b> buses · mediana <b>${d.exp_med}</b> exp · <b>${d.dias_med}</b> días operados</div>
+      <div>El <b>20% más usado</b> hace el <b style="color:${col}">${d.top20}%</b> del trabajo; el 20% menos usado, solo <b>${d.bot20}%</b>.</div>
+      <div class="hint">Rango por bus: ${d.exp_min}–${d.exp_max} expediciones en el período.</div>
+    </div>`;
+}
+
+/* ---------- KPI territorial: brecha de cobertura por NSE (vista sistema) ---------- */
+function renderNseGap(){
+  const card=$("nse-gap-card");
+  const sys = state.comuna==="TODAS" && state.linea==="TODAS";
+  if(!sys || !COB){ card.style.display="none"; return; }
+  card.style.display="";
+  // quintiles de NSE ponderados por viviendas
+  const cells = COB.features.map(f=>f.properties).filter(p=>p.nse>0 && p.n>0).sort((a,b)=>a.nse-b.nse);
+  const totN = cells.reduce((s,c)=>s+c.n,0);
+  const Q=[[],[],[],[],[]]; let acc=0,qi=0;
+  cells.forEach(c=>{ acc+=c.n; Q[Math.min(4,Math.floor(acc/totN*5-1e-9))].push(c); });
+  const labels=["NSE bajo","","NSE medio","","NSE alto"];
+  const desierto=[], acceso=[];
+  Q.forEach(q=>{ const n=q.reduce((s,c)=>s+c.n,0)||1;
+    desierto.push(Math.round(1000*q.filter(c=>c.cov===0).reduce((s,c)=>s+c.n,0)/n)/10);
+    acceso.push(Math.round(10*q.reduce((s,c)=>s+c.acc*c.n,0)/n)/10);
+  });
+  const th=TH();
+  if(!nseChart) nseChart=echarts.init($("nse-chart"));
+  nseChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    grid:{left:42,right:46,top:30,bottom:24,containLabel:true},
+    legend:{data:["% en desierto","Acceso medio"],textStyle:{color:th.mut},top:0,right:0},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx}},
+    xAxis:{type:"category",data:["Q1","Q2","Q3","Q4","Q5"],axisLabel:{color:th.mut,
+      formatter:(v,i)=>["Q1 ·\nmás vulnerable","Q2","Q3","Q4","Q5 ·\nmás acomodado"][i]},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:[{type:"value",name:"% desierto",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+           {type:"value",name:"min",position:"right",axisLabel:{color:th.mut},splitLine:{show:false}}],
+    series:[
+      {name:"% en desierto",type:"bar",data:desierto,barWidth:"46%",itemStyle:{color:"#fb7185",borderRadius:[4,4,0,0]}},
+      {name:"Acceso medio",type:"line",yAxisIndex:1,data:acceso,smooth:true,symbol:"circle",symbolSize:7,lineStyle:{width:2.5,color:"#38bdf8"},itemStyle:{color:"#38bdf8"}}
+    ]
+  }, true);
+  setTimeout(()=>nseChart.resize(),60);
+  const gap = (desierto[0]-desierto[4]).toFixed(1);
+  $("nse-foot").innerHTML = `Quintiles de viviendas por NSE (avalúo m²). Brecha Q1–Q5 en desierto de transporte: <b style="color:${gap>0?'#fb7185':'#34d399'}">${gap>0?'+':''}${gap} pts</b> ${gap>0?'(las zonas vulnerables están peor cubiertas)':'(sin penalización a las vulnerables)'}.`;
+}
+
 /* ---------- init ---------- */
 (async function(){
   try{
@@ -407,7 +486,8 @@ function renderCumpSem(){
       if(v.build && v.build!==BUILD) vb.innerHTML += ' · <span class="nueva" onclick="location.reload(true)">⚠ hay una versión más nueva — recargar</span>';
     }).catch(()=>{ const vb=$("vfoot-build"); if(vb) vb.textContent="Visor actualizado: "+BUILD; });
     applyTheme(document.documentElement.dataset.theme==="light" ? "light" : "dark");
-    J("cobertura.json").then(d=>{ COB=d; if(state.mapMode!=="live") renderMapa(); }).catch(()=>{});
+    J("cobertura.json").then(d=>{ COB=d; renderNseGap(); if(state.mapMode!=="live") renderMapa(); }).catch(()=>{});
+    J("flota_equidad.json").then(d=>{ EQ=d; renderEquidad(); }).catch(()=>{});
     buildMapModes();
     buildComunaTabs();
     buildLineaList();
@@ -415,6 +495,6 @@ function renderCumpSem(){
     $("reset-btn").onclick = ()=>{ state={comuna:"TODAS",linea:"TODAS",csDia:state.csDia,csVar:state.csVar}; $("linea-search").value=""; buildLineaList(); render(); };
     render();
     loadLive(); setInterval(loadLive, 60000);   // buses operando ahora, refresco 60 s
-    addEventListener("resize", ()=>{ if(chart) chart.resize(); if(csChart) csChart.resize(); if(lmap) lmap.invalidateSize(); });
+    addEventListener("resize", ()=>{ if(chart) chart.resize(); if(csChart) csChart.resize(); if(eqChart) eqChart.resize(); if(nseChart) nseChart.resize(); if(lmap) lmap.invalidateSize(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();
