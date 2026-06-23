@@ -4,15 +4,15 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=24`).then(r=>r.json());
-const BUILD = "2026-06-18 18:35";
+const J = n => fetch(`data/${n}?v=25`).then(r=>r.json());
+const BUILD = "2026-06-18 19:05";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, EMPL={};
 let eqChart, nseChart;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live"};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
-const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["wait","Espera"],["nse","NSE"]];
+const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["wait","Espera"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
 
 const CS_DIAS = [["L","Laboral"],["S","Sábado"],["D","Domingo"]];
 const CS_VARS = [
@@ -192,6 +192,7 @@ function nseColor(v){
   const t=Math.min(Math.max((Math.log(v)-NSE_LO)/(NSE_HI-NSE_LO),0),1);
   return `hsl(${205-175*t},68%,52%)`;                                      // azul (bajo) -> ámbar (alto)
 }
+const accSColor = m => m==null ? "#555b6b" : `hsl(${120-120*Math.min(m/25,1)},72%,50%)`;  // 0min verde -> 25+ rojo
 function drawCoverage(mode){
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!COB) return;
@@ -199,17 +200,22 @@ function drawCoverage(mode){
     const p=f.properties; let col;
     if(mode==="cover") col = p.cov===0 ? "#ef4444" : accColor(p.acc);     // desierto = rojo fuerte
     else if(mode==="wait") col = waitColor(p.wait);
+    else if(mode==="salud") col = accSColor(p.salud);
+    else if(mode==="edu") col = accSColor(p.edu);
     else col = nseColor(p.nse);
     const ll=f.geometry.coordinates[0].map(c=>[c[1],c[0]]);
     L.polygon(ll,{renderer:coverCanvas,stroke:false,fillColor:col,fillOpacity:.55})
-      .bindTooltip(`${NF.format(p.n)} viviendas · acceso ${p.acc} min · espera ${p.wait==null?"sin servicio":p.wait+" min"} · ${p.nl} líneas`,{sticky:true})
+      .bindTooltip(`${NF.format(p.n)} viviendas · acceso ${p.acc} min · espera ${p.wait==null?"sin servicio":p.wait+" min"}<br>a salud ${p.salud??"—"} min · a educación ${p.edu??"—"} min`,{sticky:true})
       .addTo(coverLayer);
   });
-  if(mode==="cover" && COB.sensibles){
+  // equipamiento sensible visible en cobertura / salud / educación
+  if(COB.sensibles && (mode==="cover"||mode==="salud"||mode==="edu")){
     COB.sensibles.forEach(s=>{
-      L.circleMarker([s[0],s[1]],{renderer:coverCanvas,radius:3,weight:1,color:"#fff",
-        fillColor:s[2]==="SALUD"?"#f43f5e":"#a78bfa",fillOpacity:.95})
-        .bindTooltip(s[2]==="SALUD"?"Salud":"Educación",{direction:"top"}).addTo(coverLayer);
+      const isS=s[2]==="SALUD";
+      if(mode==="salud"&&!isS) return; if(mode==="edu"&&isS) return;
+      L.circleMarker([s[0],s[1]],{renderer:coverCanvas,radius:3.4,weight:1,color:"#fff",
+        fillColor:isS?"#f43f5e":"#a78bfa",fillOpacity:.95})
+        .bindTooltip(isS?"Salud":"Educación",{direction:"top"}).addTo(coverLayer);
     });
   }
   setCoverLegend(mode);
@@ -217,8 +223,11 @@ function drawCoverage(mode){
 function setCoverLegend(mode){
   if(coverLegend){ lmap.removeControl(coverLegend); coverLegend=null; }
   if(!mode) return;
-  const txt = mode==="cover" ? ["Acceso al paradero (min) · rojo = desierto",`<span class="grad" style="background:linear-gradient(90deg,hsl(120,72%,50%),hsl(60,72%,50%),hsl(0,72%,50%))"></span>`,"<span class='lbls'><i>0</i><i>6</i><i>12+</i></span><span class='par' style='color:#ef4444'>● desierto</span> <span class='par' style='color:#f43f5e'>● salud</span> <span class='par' style='color:#a78bfa'>● educación</span>"]
-    : mode==="wait" ? ["Tiempo de espera (½ frecuencia, min)",`<span class="grad" style="background:linear-gradient(90deg,hsl(120,72%,50%),hsl(60,72%,50%),hsl(0,72%,50%))"></span>`,"<span class='lbls'><i>3</i><i>12</i><i>20+</i></span><span class='par' style='color:#7f1d1d'>● sin servicio</span>"]
+  const RYG = `<span class="grad" style="background:linear-gradient(90deg,hsl(120,72%,50%),hsl(60,72%,50%),hsl(0,72%,50%))"></span>`;
+  const txt = mode==="cover" ? ["Acceso al paradero (min) · rojo = desierto",RYG,"<span class='lbls'><i>0</i><i>6</i><i>12+</i></span><span class='par' style='color:#ef4444'>● desierto</span> <span class='par' style='color:#f43f5e'>● salud</span> <span class='par' style='color:#a78bfa'>● educación</span>"]
+    : mode==="wait" ? ["Tiempo de espera (½ frecuencia, min)",RYG,"<span class='lbls'><i>3</i><i>12</i><i>20+</i></span><span class='par' style='color:#7f1d1d'>● sin servicio</span>"]
+    : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
+    : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#a78bfa'>● colegio</span>"]
     : ["NSE (avalúo CLP/m²)",`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
   coverLegend = L.control({position:"bottomleft"});
   coverLegend.onAdd = ()=>{ const d=L.DomUtil.create("div","speedleg"); d.innerHTML=`<b>${txt[0]}</b>${txt[1]}${txt[2]}`; return d; };
@@ -286,9 +295,16 @@ function renderMapa(){
   if(fullsys && state.mapMode!=="live"){
     liveLayer.clearLayers();
     drawCoverage(state.mapMode);
-    const b=$("live-count");
-    if(b && COB&&COB.resumen) b.textContent = `${COB.resumen.pct_cubierto}% cubierto · ${COB.resumen.pct_desierto}% en desierto · acceso ${COB.resumen.acc_mediana} min`;
-    $("map-title").textContent = "Cobertura territorial del transporte";
+    const b=$("live-count"), R=(COB&&COB.resumen)||{};
+    const M=state.mapMode;
+    const titulo = {cover:"Cobertura territorial del transporte",wait:"Tiempo de espera del transporte",
+      salud:"Accesibilidad a salud en transporte",edu:"Accesibilidad a educación en transporte",nse:"Nivel socioeconómico (avalúo)"}[M];
+    const badge = {cover:`${R.pct_cubierto}% cubierto · ${R.pct_desierto}% en desierto · acceso ${R.acc_mediana} min`,
+      wait:"½ frecuencia de las líneas que sirven cada zona",
+      salud:`tiempo mediano a salud: ${R.salud_med} min`, edu:`tiempo mediano a educación: ${R.edu_med} min`,
+      nse:"avalúo m² · azul bajo → ámbar alto"}[M];
+    if(b) b.textContent = badge||"";
+    $("map-title").textContent = titulo||"Mapa territorial";
   } else {
     if(coverLayer) coverLayer.clearLayers(); setCoverLegend(null);
     drawLiveBuses();
@@ -426,9 +442,9 @@ function renderEquidad(){
       <div><b style="font-family:var(--mono);font-size:22px;color:${col}">${g.toFixed(2)}</b> <span class="hint">Gini de uso (0 = parejo · 1 = concentrado)</span></div>
       <div style="color:${col}">${interp}</div>
       <hr style="border:none;border-top:1px solid var(--line);margin:8px 0">
-      <div><b>${d.buses}</b> buses · mediana <b>${d.exp_med}</b> exp · <b>${d.dias_med}</b> días operados</div>
+      <div><b>${d.buses}</b> buses · mediana <b>${d.exp_med}</b> exp · <b>${d.dias_med}</b> días operados${d.km_med!=null?` · <b>${fmt1(d.km_med)} km/día</b> por bus`:""}</div>
       <div>El <b>20% más usado</b> hace el <b style="color:${col}">${d.top20}%</b> del trabajo; el 20% menos usado, solo <b>${d.bot20}%</b>.</div>
-      <div class="hint">Rango por bus: ${d.exp_min}–${d.exp_max} expediciones en el período.</div>
+      <div class="hint">Rango por bus: ${d.exp_min}–${d.exp_max} expediciones${d.km_max!=null?` · hasta ${fmt1(d.km_max)} km/día`:""} en el período.</div>
     </div>`;
 }
 
