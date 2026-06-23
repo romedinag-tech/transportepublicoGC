@@ -4,13 +4,14 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=22`).then(r=>r.json());
-const BUILD = "2026-06-18 17:05";
+const J = n => fetch(`data/${n}?v=23`).then(r=>r.json());
+const BUILD = "2026-06-18 18:10";
 
-let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, EMPL={};
-let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq"};
-let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, speedLegend;
+let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EMPL={};
+let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live"};
+let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
+const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["wait","Espera"],["nse","NSE"]];
 
 const CS_DIAS = [["L","Laboral"],["S","Sábado"],["D","Domingo"]];
 const CS_VARS = [
@@ -147,6 +148,8 @@ function ensureMap(){
   comunaLayer = L.layerGroup().addTo(lmap);
   routeLayer = L.layerGroup().addTo(lmap);
   stopLayer = L.layerGroup().addTo(lmap);
+  coverCanvas = L.canvas({padding:0.5});
+  coverLayer = L.layerGroup().addTo(lmap);
   liveCanvas = L.canvas({padding:0.5});
   liveLayer = L.layerGroup().addTo(lmap);
   if(window.ResizeObserver) new ResizeObserver(()=>lmap.invalidateSize()).observe($("lmap"));
@@ -173,6 +176,56 @@ function drawLiveBuses(){
       .bindTooltip(`Línea ${ln||"—"} · ${spd} km/h${mv?"":" · detenido"}`,{direction:"top"}).addTo(liveLayer);
   });
   if(badge) badge.textContent = n>0 ? (NF.format(n)+" buses operando ahora") : "sin buses en vivo";
+}
+
+/* ---------- KPI territorial: cobertura / acceso / espera / NSE (choropleth) ---------- */
+const accColor  = m => `hsl(${120-120*Math.min(m/12,1)},72%,50%)`;        // verde 0min -> rojo 12+
+const waitColor = m => m==null ? "#7f1d1d" : `hsl(${120-120*Math.min(Math.max((m-3)/17,0),1)},72%,50%)`;
+let NSE_LO=null, NSE_HI=null;
+function nseColor(v){
+  if(v==null) return "#475569";
+  if(NSE_LO==null){ const a=COB.features.map(f=>f.properties.nse).filter(x=>x>0).sort((x,y)=>x-y);
+    NSE_LO=Math.log(a[Math.floor(a.length*.05)]); NSE_HI=Math.log(a[Math.floor(a.length*.95)]); }
+  const t=Math.min(Math.max((Math.log(v)-NSE_LO)/(NSE_HI-NSE_LO),0),1);
+  return `hsl(${205-175*t},68%,52%)`;                                      // azul (bajo) -> ámbar (alto)
+}
+function drawCoverage(mode){
+  if(!coverLayer) return; coverLayer.clearLayers();
+  if(!COB) return;
+  COB.features.forEach(f=>{
+    const p=f.properties; let col;
+    if(mode==="cover") col = p.cov===0 ? "#ef4444" : accColor(p.acc);     // desierto = rojo fuerte
+    else if(mode==="wait") col = waitColor(p.wait);
+    else col = nseColor(p.nse);
+    const ll=f.geometry.coordinates[0].map(c=>[c[1],c[0]]);
+    L.polygon(ll,{renderer:coverCanvas,stroke:false,fillColor:col,fillOpacity:.55})
+      .bindTooltip(`${NF.format(p.n)} viviendas · acceso ${p.acc} min · espera ${p.wait==null?"sin servicio":p.wait+" min"} · ${p.nl} líneas`,{sticky:true})
+      .addTo(coverLayer);
+  });
+  if(mode==="cover" && COB.sensibles){
+    COB.sensibles.forEach(s=>{
+      L.circleMarker([s[0],s[1]],{renderer:coverCanvas,radius:3,weight:1,color:"#fff",
+        fillColor:s[2]==="SALUD"?"#f43f5e":"#a78bfa",fillOpacity:.95})
+        .bindTooltip(s[2]==="SALUD"?"Salud":"Educación",{direction:"top"}).addTo(coverLayer);
+    });
+  }
+  setCoverLegend(mode);
+}
+function setCoverLegend(mode){
+  if(coverLegend){ lmap.removeControl(coverLegend); coverLegend=null; }
+  if(!mode) return;
+  const txt = mode==="cover" ? ["Acceso al paradero (min) · rojo = desierto",`<span class="grad" style="background:linear-gradient(90deg,hsl(120,72%,50%),hsl(60,72%,50%),hsl(0,72%,50%))"></span>`,"<span class='lbls'><i>0</i><i>6</i><i>12+</i></span><span class='par' style='color:#ef4444'>● desierto</span> <span class='par' style='color:#f43f5e'>● salud</span> <span class='par' style='color:#a78bfa'>● educación</span>"]
+    : mode==="wait" ? ["Tiempo de espera (½ frecuencia, min)",`<span class="grad" style="background:linear-gradient(90deg,hsl(120,72%,50%),hsl(60,72%,50%),hsl(0,72%,50%))"></span>`,"<span class='lbls'><i>3</i><i>12</i><i>20+</i></span><span class='par' style='color:#7f1d1d'>● sin servicio</span>"]
+    : ["NSE (avalúo CLP/m²)",`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
+  coverLegend = L.control({position:"bottomleft"});
+  coverLegend.onAdd = ()=>{ const d=L.DomUtil.create("div","speedleg"); d.innerHTML=`<b>${txt[0]}</b>${txt[1]}${txt[2]}`; return d; };
+  coverLegend.addTo(lmap);
+}
+function buildMapModes(){
+  const box=$("map-mode"); if(!box) return;
+  box.innerHTML = MAP_MODES.map(([k,l])=>`<b data-m="${k}" class="${state.mapMode===k?"on":""}">${l}</b>`).join("");
+  box.querySelectorAll("b").forEach(el=>el.onclick=()=>{ state.mapMode=el.dataset.m;
+    box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.m===state.mapMode)); renderMapa(); });
 }
 function setSpeedLegend(on){
   if(on && !speedLegend){
@@ -224,7 +277,19 @@ function renderMapa(){
     $("map-title").textContent = "Mapa del sistema";
   }
   try{ if(bounds && (bounds.length||bounds.isValid&&bounds.isValid())) lmap.fitBounds(bounds,{padding:[20,20]}); }catch(e){}
-  drawLiveBuses();
+  // capas territoriales (cobertura/espera/NSE) solo en SISTEMA COMPLETO; si no, buses en vivo
+  const fullsys = state.comuna==="TODAS" && state.linea==="TODAS";
+  const seg = $("map-mode"); if(seg) seg.style.display = fullsys ? "" : "none";
+  if(fullsys && state.mapMode!=="live"){
+    liveLayer.clearLayers();
+    drawCoverage(state.mapMode);
+    const b=$("live-count");
+    if(b && COB&&COB.resumen) b.textContent = `${COB.resumen.pct_cubierto}% cubierto · ${COB.resumen.pct_desierto}% en desierto · acceso ${COB.resumen.acc_mediana} min`;
+    $("map-title").textContent = "Cobertura territorial del transporte";
+  } else {
+    if(coverLayer) coverLayer.clearLayers(); setCoverLegend(null);
+    drawLiveBuses();
+  }
 }
 
 function renderRanking(){
@@ -342,6 +407,8 @@ function renderCumpSem(){
       if(v.build && v.build!==BUILD) vb.innerHTML += ' · <span class="nueva" onclick="location.reload(true)">⚠ hay una versión más nueva — recargar</span>';
     }).catch(()=>{ const vb=$("vfoot-build"); if(vb) vb.textContent="Visor actualizado: "+BUILD; });
     applyTheme(document.documentElement.dataset.theme==="light" ? "light" : "dark");
+    J("cobertura.json").then(d=>{ COB=d; if(state.mapMode!=="live") renderMapa(); }).catch(()=>{});
+    buildMapModes();
     buildComunaTabs();
     buildLineaList();
     $("linea-search").addEventListener("input", e=>buildLineaList(e.target.value));
