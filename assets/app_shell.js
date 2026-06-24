@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=44`).then(r=>r.json());
-const BUILD = "2026-06-24 18:40";
+const J = n => fetch(`data/${n}?v=45`).then(r=>r.json());
+const BUILD = "2026-06-24 19:20";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
@@ -170,7 +170,7 @@ function renderKPIs(cell){
     kpiCard("Registros GPS", (k.pulsos/1e6).toFixed(1)+" M", "pulsos en el ámbito"),
     kpiCard("Flota en punta", fmt(k.flota_pico), "buses activos máx/hora"),
     kpiCard("Velocidad media", fmt1(k.vel)+" km/h", "en movimiento"),
-    kpiCard("Tiempo detenido", fmt1(k.pct_det)+" %", "de los registros"),
+    kpiCard("Tiempo detenido", fmt1(k.pct_det)+" %", "en ruta · excl. terminales"),
     ctx,
   ].join("");
 }
@@ -584,9 +584,9 @@ function renderNarrative(){
     if(tl && tl.puntos){
       const nt=tl.puntos.filter(p=>p.tipo==="terminal").length, d=tl.dist||{};
       const dist = (d.share_terminal>=8)
-        ? ` <b style="color:#fbbf24">El ${d.share_terminal}% de su tiempo detenido es dwell de terminal</b>, no demora en marcha: al excluirlo, el tiempo detenido en ruta baja de <b>${d.det_raw}%</b> a <b>${d.det_corr}%</b>.`
-        : ` Su dwell de terminal es bajo (${d.share_terminal??0}% del detenido): las demoras que ves son mayormente en ruta.`;
-      el.innerHTML = `<b>Terminales de la línea ${state.linea}</b>: ${nt} terminal${nt===1?"":"es"} de alto reposo (▣) y sus cabeceras de ruta (◇), detectados desde el GPS.${dist} La velocidad media no se distorsiona (ya excluye los buses parados); el <b>% de tiempo detenido</b> sí, por eso se reporta la versión <b>en ruta</b>.`;
+        ? ` El <b>% de tiempo detenido que muestra la página ya está corregido</b> (en ruta): <b>${d.det_corr}%</b>. Sin excluir el dwell de terminal sería <b>${d.det_raw}%</b> — es decir, el <b style="color:#fbbf24">${d.share_terminal}%</b> de su "detenido" era estar parado en cabecera, no demora en marcha.`
+        : ` Su dwell de terminal es bajo (${d.share_terminal??0}% del detenido): su tiempo detenido (${d.det_corr}%) es casi todo demora en ruta.`;
+      el.innerHTML = `<b>Terminales de la línea ${state.linea}</b>: ${nt} terminal${nt===1?"":"es"} de alto reposo (▣) y sus cabeceras de ruta (◇), detectados desde el GPS.${dist} La velocidad media no se afecta (ya excluye los buses parados); toda la página reporta el <b>% detenido en ruta</b>.`;
     } else el.innerHTML="";
     return;
   }
