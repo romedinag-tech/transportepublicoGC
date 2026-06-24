@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=42`).then(r=>r.json());
-const BUILD = "2026-06-24 17:30";
+const J = n => fetch(`data/${n}?v=43`).then(r=>r.json());
+const BUILD = "2026-06-24 18:00";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
@@ -195,6 +195,16 @@ function renderHora(cell){
     ]
   }, true);
   setTimeout(()=>chart.resize(),60);
+  const el=$("hora-narr");
+  if(el){
+    const hb=h.map((x,i)=>[i,x?x.b:0]).filter(x=>x[1]>0);
+    const pkF=hb.length?Math.max(...hb.map(x=>x[1])):0;
+    const hv=h.map((x,i)=>[i,x?x.v:null,x?x.b:0]).filter(x=>x[1]!=null && x[2]>=pkF*0.25);   // solo horas con operación real
+    let t=`Cuántos <b>buses operan cada hora</b> (barras) y la <b>velocidad media</b> (línea), en días laborables. Muestra la punta de servicio y dónde se cae la velocidad por congestión.`;
+    if(hb.length&&hv.length){ const pk=hb.reduce((a,b)=>b[1]>a[1]?b:a), mn=hv.reduce((a,b)=>b[1]<a[1]?b:a);
+      t+=` Punta: <b>${fmt1(pk[1])}</b> buses a las ${HORAS[pk[0]]}; velocidad mínima <b>${fmt1(mn[1])} km/h</b> a las ${HORAS[mn[0]]}.`; }
+    el.innerHTML=t;
+  }
 }
 
 function ensureMap(){
@@ -605,6 +615,10 @@ function renderRanking(){
     <span class="bar"><i style="width:${Math.round(100*r.v/mx)}%"></i></span>
     <span class="val">${(r.v/1e6).toFixed(1)}M</span></div>`).join("");
   if(state.linea==="TODAS") box.querySelectorAll(".rank-row").forEach(el=>el.onclick=()=>{state.linea=el.dataset.l;render();});
+  const el=$("rank-narr");
+  if(el) el.innerHTML = state.linea==="TODAS"
+    ? `Líneas ordenadas por <b>actividad</b> (millones de registros GPS) en ${state.comuna==="TODAS"?"el sistema":state.comuna}. Aproxima qué líneas mueven más servicio aquí; clic en una para abrirla.`
+    : `Comunas donde la línea <b>${state.linea}</b> registra más actividad — dónde concentra su operación.`;
 }
 
 const DIAS = {L:"Laborable", S:"Sábado", D:"Domingo"};
@@ -642,6 +656,16 @@ function renderCump(){
       <span class="pct" style="color:${cumpCol(r.c)};min-width:46px">${r.c}%</span></div>`).join("")
       + `<div class="hint" style="margin-top:8px">Cumplimiento de frecuencia día laborable (despachos observados / programados). Menor = peor. Clic para ver la línea.</div>`;
     box.querySelectorAll(".cump-row").forEach(el=>el.onclick=()=>{state.linea=el.dataset.l;render();});
+  }
+  const el=$("cump-narr");
+  if(el){
+    if(state.linea!=="TODAS"){
+      el.innerHTML=`Mide si la línea <b>despacha los buses que promete</b>: compara los despachos <b>programados</b> (GTFS) con los <b>observados</b> (GPS), por tipo de día. 100% = cumple; &lt;80% = subprestación de frecuencia (la espera real sube).`;
+    } else {
+      const cs=Object.keys(L).map(ln=>L[ln].cumpl&&L[ln].cumpl.L).filter(c=>c!=null);
+      const bajo=cs.filter(c=>c<80).length, prom=cs.length?cs.reduce((a,b)=>a+b,0)/cs.length:null;
+      el.innerHTML=`Compara los despachos <b>programados (GTFS)</b> con los <b>observados (GPS)</b> por línea: detecta dónde no se cumple la frecuencia comprometida. ${prom!=null?`Promedio del sistema <b>${prom.toFixed(0)}%</b>; <b>${bajo}</b> líneas bajo 80%.`:""}`;
+    }
   }
 }
 
@@ -725,6 +749,8 @@ function renderEquidad(){
       <div>El <b>20% más usado</b> hace el <b style="color:${col}">${d.top20}%</b> del trabajo; el 20% menos usado, solo <b>${d.bot20}%</b>.</div>
       <div class="hint">Rango por bus: ${d.exp_min}–${d.exp_max} expediciones${d.km_max!=null?` · hasta ${fmt1(d.km_max)} km/día`:""} en el período.</div>
     </div>`;
+  const en=$("eq-narr");
+  if(en) en.innerHTML=`¿Se reparte el trabajo de forma <b>pareja entre los buses</b> de la línea, o unos pocos cargan la operación? La curva de Lorenz y el <b>Gini</b> (${g.toFixed(2)}) lo cuantifican: un Gini alto sugiere flota mal balanceada o vehículos subutilizados.`;
 }
 
 /* ---------- KPI territorial: brecha de cobertura por NSE (vista sistema) ---------- */
@@ -973,6 +999,8 @@ function renderEmpresas(){
       label:{show:true,position:"right",color:th.mut,fontSize:10.5,formatter:o=>o.value}}]
   },true);
   setTimeout(()=>empresasChart.resize(),60);
+  const en=$("emp-narr");
+  if(en) en.innerHTML=`Tamaño de flota por <b>empresa operadora</b> (una por línea)${state.comuna==="TODAS"?" en el sistema":" en "+state.comuna}. Sirve para dimensionar quién mueve el servicio y comparar escala entre operadores del perímetro regulado.`;
 }
 function renderHeat(){
   const card=$("heat-card");
