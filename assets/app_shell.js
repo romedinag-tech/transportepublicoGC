@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=39`).then(r=>r.json());
-const BUILD = "2026-06-24 15:55";
+const J = n => fetch(`data/${n}?v=40`).then(r=>r.json());
+const BUILD = "2026-06-24 16:30";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
@@ -400,22 +400,26 @@ function drawCoverage(mode){
       .bindTooltip(tip,{sticky:true})
       .addTo(coverLayer);
   });
-  // destinos EOD (capa sobre cobertura/transbordo): tamaño=demanda del propósito, color=exigencia de transbordo
+  // destinos EOD: SOLO en Transbordo van coloreados por exigencia (es su métrica). En Cobertura
+  // van como anillos neutros (solo ubicación + tamaño=demanda) para no competir con el coropleto.
   if(DEST && DEST.destinos && (mode==="cover"||mode==="trans")){
     const pu = state.purpose||"all", fld = PURP_FIELD[pu];
     const ds = DEST.destinos.filter(d=>(d[fld]||0)>0);
     const mxv = Math.max(1, ...ds.map(d=>d[fld]||0));
     ds.forEach(d=>{
       if(!inComuna(d.lat,d.lon)) return;
-      const r = 5+13*Math.sqrt((d[fld]||0)/mxv);
-      L.circleMarker([d.lat,d.lon],{renderer:coverCanvas,radius:r,weight:1.5,color:"#0b1220",
-        fillColor:tbiColor(d.pct_trans),fillOpacity:.92})
-        .bindTooltip(`<b>Destino · ${d.voc}</b> · ${d.comuna}<br>${NF.format(d[fld]||0)} viajes de ${purposeLbl(pu)} (EOD 2015)<br>exige transbordo al <b>${d.pct_trans??0}%</b> del territorio · ${d.nlineas_dir} líneas directas`,
+      const r = 5+12*Math.sqrt((d[fld]||0)/mxv);
+      const st = mode==="trans"
+        ? {radius:r,weight:1.5,color:"#0b1220",fillColor:tbiColor(d.pct_trans),fillOpacity:.92}
+        : {radius:r,weight:2,color:"#dbe6ff",fillColor:"#0b1220",fillOpacity:.25};   // neutro en cobertura
+      const extra = mode==="trans" ? `<br>exige transbordo al <b>${d.pct_trans??0}%</b> del territorio · ${d.nlineas_dir} líneas directas` : "";
+      L.circleMarker([d.lat,d.lon],{renderer:coverCanvas,...st})
+        .bindTooltip(`<b>Destino · ${d.voc}</b> · ${d.comuna}<br>${NF.format(d[fld]||0)} viajes de ${purposeLbl(pu)} (EOD 2015)${extra}`,
         {sticky:true,direction:"top"}).addTo(coverLayer);
     });
   }
-  // equipamiento sensible visible en cobertura / salud / educación
-  if(COB.sensibles && (mode==="cover"||mode==="salud"||mode==="edu")){
+  // equipamiento sensible (salud/educación) SOLO en sus propios modos
+  if(COB.sensibles && (mode==="salud"||mode==="edu")){
     COB.sensibles.forEach(s=>{
       const isS=s[2]==="SALUD";
       if(mode==="salud"&&!isS) return; if(mode==="edu"&&isS) return;
@@ -432,7 +436,7 @@ function setCoverLegend(mode){
   if(!mode) return;
   const RYG = `<span class="grad" style="background:linear-gradient(90deg,hsl(120,72%,50%),hsl(60,72%,50%),hsl(0,72%,50%))"></span>`;
   const GYR = `<span class="grad" style="background:linear-gradient(90deg,hsl(0,70%,50%),hsl(60,70%,50%),hsl(120,70%,50%))"></span>`;
-  const txt = mode==="cover" ? ["Destinos EOD alcanzables (≤1 transbordo)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>● destino · tamaño = viajes · color = exige transbordo</span>"]
+  const txt = mode==="cover" ? ["% de destinos EOD alcanzables (≤1 transbordo)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>color de la manzana = accesibilidad · ○ destino (tamaño = demanda)</span>"]
     : mode==="trans" ? ["Intensidad de transbordo (% de lo alcanzable)",RYG,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>verde = directo · rojo = exige transbordo</span>"]
     : mode==="wait" ? [`Espera hacia destinos · ${periodoLbl(state.periodo)} (min)`,RYG,"<span class='lbls'><i>0</i><i>1.5</i><i>3+</i></span><span class='par'>frecuencia real observada · <span style='color:#7f1d1d'>● sin servicio</span></span>"]
     : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
