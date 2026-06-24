@@ -4,15 +4,16 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=25`).then(r=>r.json());
-const BUILD = "2026-06-18 19:05";
+const J = n => fetch(`data/${n}?v=26`).then(r=>r.json());
+const BUILD = "2026-06-18 19:50";
 
-let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, EMPL={};
+let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={};
 let eqChart, nseChart;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live"};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
-const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["wait","Espera"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
+const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["wait","Espera"],["conges","Congestión"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
+const PEAK_H = [7,8,9,17,18,19];
 
 const CS_DIAS = [["L","Laboral"],["S","Sábado"],["D","Domingo"]];
 const CS_VARS = [
@@ -98,6 +99,8 @@ function render(){
   renderCumpSem();
   renderEquidad();
   renderNseGap();
+  renderOperacion();
+  renderCalidad();
 }
 
 function kpiCard(l,v,s){ return `<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`; }
@@ -193,7 +196,24 @@ function nseColor(v){
   return `hsl(${205-175*t},68%,52%)`;                                      // azul (bajo) -> ámbar (alto)
 }
 const accSColor = m => m==null ? "#555b6b" : `hsl(${120-120*Math.min(m/25,1)},72%,50%)`;  // 0min verde -> 25+ rojo
+const congColor = d => `hsl(${120-120*Math.min(Math.max(d,0)/0.6,1)},72%,50%)`;            // caída 0 verde -> 60%+ rojo
+function drawCongestion(){
+  if(!coverLayer) return; coverLayer.clearLayers();
+  if(!GRID){ setCoverLegend("conges"); return; }
+  GRID.cells.forEach((c,i)=>{
+    const sp = GRID.horas.map(h=>GRID.vel[String(h)][i]).filter(v=>v>0);
+    if(sp.length<4) return;
+    const free = Math.max(...sp);
+    const peak = Math.min(...PEAK_H.map(h=>(GRID.vel[String(h)]||[])[i]).filter(v=>v>0));
+    if(!isFinite(peak)||free<=0) return;
+    const drop = 1 - peak/free;
+    L.circleMarker([c[0],c[1]],{renderer:coverCanvas,radius:4.2,weight:0,fillColor:congColor(drop),fillOpacity:.6})
+      .bindTooltip(`libre ${free} km/h · punta ${peak} km/h · caída <b>${Math.round(drop*100)}%</b>`,{sticky:true}).addTo(coverLayer);
+  });
+  setCoverLegend("conges");
+}
 function drawCoverage(mode){
+  if(mode==="conges"){ drawCongestion(); return; }
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!COB) return;
   COB.features.forEach(f=>{
@@ -228,6 +248,7 @@ function setCoverLegend(mode){
     : mode==="wait" ? ["Tiempo de espera (½ frecuencia, min)",RYG,"<span class='lbls'><i>3</i><i>12</i><i>20+</i></span><span class='par' style='color:#7f1d1d'>● sin servicio</span>"]
     : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
     : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#a78bfa'>● colegio</span>"]
+    : mode==="conges" ? ["Congestión: caída de velocidad en punta",RYG,"<span class='lbls'><i>0%</i><i>30%</i><i>60%+</i></span>"]
     : ["NSE (avalúo CLP/m²)",`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
   coverLegend = L.control({position:"bottomleft"});
   coverLegend.onAdd = ()=>{ const d=L.DomUtil.create("div","speedleg"); d.innerHTML=`<b>${txt[0]}</b>${txt[1]}${txt[2]}`; return d; };
@@ -298,9 +319,11 @@ function renderMapa(){
     const b=$("live-count"), R=(COB&&COB.resumen)||{};
     const M=state.mapMode;
     const titulo = {cover:"Cobertura territorial del transporte",wait:"Tiempo de espera del transporte",
+      conges:"Congestión vial · caída de velocidad en punta",
       salud:"Accesibilidad a salud en transporte",edu:"Accesibilidad a educación en transporte",nse:"Nivel socioeconómico (avalúo)"}[M];
     const badge = {cover:`${R.pct_cubierto}% cubierto · ${R.pct_desierto}% en desierto · acceso ${R.acc_mediana} min`,
       wait:"½ frecuencia de las líneas que sirven cada zona",
+      conges:"rojo = ejes críticos (mayor caída de velocidad en hora punta)",
       salud:`tiempo mediano a salud: ${R.salud_med} min`, edu:`tiempo mediano a educación: ${R.edu_med} min`,
       nse:"avalúo m² · azul bajo → ámbar alto"}[M];
     if(b) b.textContent = badge||"";
@@ -486,6 +509,56 @@ function renderNseGap(){
   $("nse-foot").innerHTML = `Quintiles de viviendas por NSE (avalúo m²). Brecha Q1–Q5 en desierto de transporte: <b style="color:${gap>0?'#fb7185':'#34d399'}">${gap>0?'+':''}${gap} pts</b> ${gap>0?'(las zonas vulnerables están peor cubiertas)':'(sin penalización a las vulnerables)'}.`;
 }
 
+/* ---------- KPI línea: operación (ciclo/headway/bunching/regularidad) ---------- */
+function renderOperacion(){
+  const card=$("op-card"); const o=(OP.lineas||{})[state.linea];
+  if(state.linea==="TODAS" || !o){ card.style.display="none"; return; }
+  card.style.display="";
+  const q=calcCalidad(state.linea);
+  const opcard=(l,v,s)=>`<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
+  const bunCol = o.bunching>=12?"#fb7185":o.bunching>=7?"#fbbf24":"#34d399";
+  $("op-stats").innerHTML = [
+    opcard("Tiempo de ciclo", fmt(o.ciclo_med)+" min", "ida + vuelta (aprox)"),
+    opcard("Intervalo (headway)", (o.hw_med??"—")+" min", "entre salidas / recorrido"),
+    opcard("Bunching", `<span style="color:${bunCol}">${o.bunching??"—"}%</span>`, "buses pegados (&lt;0.4× headway)"),
+    opcard("Regularidad", (o.reg??"—"), "índice 0–100 de intervalos"),
+  ].join("");
+  $("op-foot").innerHTML = `Viaje de extremo a extremo: <b>${fmt(o.tt_med)} min</b>.${q?` Índice de calidad de la línea: <b style="color:${calCol(q.score)}">${q.score}/100</b>.`:""}`;
+}
+
+/* ---------- KPI: índice sintético de calidad por línea ---------- */
+const calCol = s => s>=70?"#34d399":s>=50?"#fbbf24":"#fb7185";
+function calcCalidad(l){
+  const c=(CUMP.lineas||{})[l], o=(OP.lineas||{})[l], tc=(T.cells||{})[`TODAS|${l}`];
+  const freq = c&&c.cumpl&&c.cumpl.L!=null ? Math.min(c.cumpl.L,100) : null;
+  const reg  = o&&o.reg!=null ? o.reg : null;
+  const vel  = tc&&tc.kpi&&tc.kpi.vel!=null ? Math.min(tc.kpi.vel/24*100,100) : null;
+  const ab   = o&&o.bunching!=null ? Math.max(0,100-o.bunching*5) : null;
+  const parts=[[freq,.30],[reg,.30],[vel,.20],[ab,.20]].filter(p=>p[0]!=null);
+  if(!parts.length) return null;
+  const ws=parts.reduce((s,p)=>s+p[1],0);
+  return {score:Math.round(parts.reduce((s,p)=>s+p[0]*p[1],0)/ws),
+          freq:freq==null?null:Math.round(freq), reg, vel:vel==null?null:Math.round(vel), ab:ab==null?null:Math.round(ab)};
+}
+function renderCalidad(){
+  const card=$("calidad-card");
+  const sys = state.comuna==="TODAS" && state.linea==="TODAS";
+  if(!sys || !T){ card.style.display="none"; return; }
+  const rows=(T.lineas||[]).map(l=>{const q=calcCalidad(l.linea);return q?{ln:l.linea,emp:l.empresa,...q}:null;}).filter(Boolean);
+  if(!rows.length){ card.style.display="none"; return; }
+  card.style.display="";
+  rows.sort((a,b)=>b.score-a.score);
+  $("calidad-box").innerHTML = rows.slice(0,14).map((r,i)=>`<div class="cump-row" data-l="${r.ln}" style="cursor:pointer">
+    <span class="rk" style="color:var(--dim);font-family:var(--mono);min-width:20px">${i+1}</span>
+    <b style="font-family:var(--mono);min-width:30px">${r.ln}</b>
+    <span style="flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.emp||""}</span>
+    <span class="bar" style="flex:0 0 90px;height:7px;border-radius:4px;background:var(--track);overflow:hidden"><i style="display:block;height:100%;width:${r.score}%;background:${calCol(r.score)}"></i></span>
+    <span class="pct" style="color:${calCol(r.score)};min-width:38px;font-family:var(--mono)">${r.score}</span></div>`).join("");
+  $("calidad-box").querySelectorAll(".cump-row").forEach(el=>el.onclick=()=>{state.linea=el.dataset.l;state.comuna="TODAS";render();});
+  const best=rows[0], worst=rows[rows.length-1];
+  $("calidad-foot").innerHTML = `Índice 0–100 = 30% frecuencia + 30% regularidad + 20% velocidad + 20% anti-bunching. Mejor: <b style="color:#34d399">${best.ln}</b> (${best.score}) · peor: <b style="color:#fb7185">${worst.ln}</b> (${worst.score}).`;
+}
+
 /* ---------- init ---------- */
 (async function(){
   try{
@@ -504,6 +577,8 @@ function renderNseGap(){
     applyTheme(document.documentElement.dataset.theme==="light" ? "light" : "dark");
     J("cobertura.json").then(d=>{ COB=d; renderNseGap(); if(state.mapMode!=="live") renderMapa(); }).catch(()=>{});
     J("flota_equidad.json").then(d=>{ EQ=d; renderEquidad(); }).catch(()=>{});
+    J("operacion_linea.json").then(d=>{ OP=d; renderOperacion(); renderCalidad(); }).catch(()=>{});
+    J("speed_grid_hora.json").then(d=>{ GRID=d; if(state.mapMode==="conges") renderMapa(); }).catch(()=>{});
     buildMapModes();
     buildComunaTabs();
     buildLineaList();
