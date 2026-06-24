@@ -4,12 +4,12 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=26`).then(r=>r.json());
-const BUILD = "2026-06-18 19:50";
+const J = n => fetch(`data/${n}?v=27`).then(r=>r.json());
+const BUILD = "2026-06-18 20:40";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={};
-let eqChart, nseChart;
-let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live"};
+let eqChart, nseChart, rankChart, cmpChart;
+let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", cmpA:null, cmpB:null};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["wait","Espera"],["conges","Congestión"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
@@ -48,17 +48,30 @@ const cellOf = () => (T.cells[`${state.comuna}|${state.linea}`] || {kpi:null, ho
 const empresaDe = ln => { const x=(T.lineas||[]).find(l=>l.linea===ln); return x?x.empresa:""; };
 
 /* ---------- menús ---------- */
+const PERIODOS = [["agg","Agregado"],["am","Punta AM"],["md","Mediodía"],["pm","Punta PM"],["off","Fuera punta"]];
+const PERIODO_H = {agg:[6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22], am:[7,8,9], md:[12,13,14], pm:[17,18,19], off:[10,11,15,16,20,21,22]};
+const periodoLbl = p => (PERIODOS.find(x=>x[0]===p)||["","Agregado"])[1];
+
 function buildComunaTabs(){
   const order = (GEO.features||[]).map(f=>f.properties.name);
-  const tabs = ["TODAS", ...order];
-  $("comuna-tabs").innerHTML = tabs.map(c=>{
-    const lbl = c==="TODAS" ? "Sistema" : c;
-    return `<span class="ctab" data-c="${c}">${lbl}</span>`;
-  }).join("");
+  let html = `<span class="ctab" data-c="TODAS" data-v="normal">Gran Concepción</span>`;
+  order.forEach(c=> html += `<span class="ctab" data-c="${c}" data-v="normal">${c}</span>`);
+  html += `<span class="vsep"></span><span class="ctab special" data-v="ranking">▦ Ranking</span><span class="ctab special" data-v="comparador">⇄ Comparador</span>`;
+  $("comuna-tabs").innerHTML = html;
   $("comuna-tabs").querySelectorAll(".ctab").forEach(el=>{
-    // territorial y operador son vistas EXCLUYENTES: elegir comuna limpia la línea
-    el.onclick = ()=>{ state.comuna = el.dataset.c; state.linea = "TODAS"; render(); };
+    el.onclick = ()=>{ const v=el.dataset.v;
+      if(v==="normal"){ state.vista="normal"; state.comuna=el.dataset.c; state.linea="TODAS"; }
+      else { state.vista=v; state.comuna="TODAS"; state.linea="TODAS"; }
+      render(); };
   });
+}
+function buildPeriodo(){
+  const box=$("periodo-sel"); if(!box) return;
+  box.innerHTML = `<span class="lbl">Período</span><div class="seg">`+
+    PERIODOS.map(([k,l])=>`<b data-p="${k}" class="${state.periodo===k?"on":""}">${l}</b>`).join("")+`</div>`;
+  box.querySelectorAll("b").forEach(el=>el.onclick=()=>{ state.periodo=el.dataset.p;
+    box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.p===state.periodo));
+    if(state.mapMode==="conges" || state.vista==="ranking") render(); });
 }
 function buildLineaList(filter=""){
   const f = filter.trim().toLowerCase();
@@ -67,6 +80,7 @@ function buildLineaList(filter=""){
     `<div class="litem" data-l="${l.linea}"><span class="ln">${l.linea}</span><span class="nm">${l.empresa||""}</span></div>`).join("");
   $("linea-list").querySelectorAll(".litem").forEach(el=>{
     el.onclick = ()=>{ state.linea = state.linea===el.dataset.l ? "TODAS" : el.dataset.l;
+      state.vista = "normal";
       if(state.linea!=="TODAS") state.comuna = "TODAS";   // elegir línea limpia la comuna
       render(); };
   });
@@ -74,16 +88,33 @@ function buildLineaList(filter=""){
 
 /* ---------- render ---------- */
 function render(){
-  // resaltar menús
-  document.querySelectorAll(".ctab").forEach(e=>e.classList.toggle("active", e.dataset.c===state.comuna));
-  document.querySelectorAll(".litem").forEach(e=>e.classList.toggle("active", e.dataset.l===state.linea));
+  // resaltar menús: comuna-bar (territorio + vistas especiales) y líneas (sidebar)
+  document.querySelectorAll("#comuna-tabs .ctab").forEach(e=>{
+    const on = state.vista==="normal" ? (e.dataset.v==="normal" && e.dataset.c===state.comuna) : (e.dataset.v===state.vista);
+    e.classList.toggle("active", on);
+  });
+  document.querySelectorAll(".litem").forEach(e=>e.classList.toggle("active", e.dataset.l===state.linea && state.vista==="normal"));
+  const periodoRelevante = state.vista==="ranking" || (state.vista==="normal" && state.comuna==="TODAS" && state.linea==="TODAS" && state.mapMode==="conges");
+  $("periodo-sel").style.display = periodoRelevante ? "flex" : "none";
+
+  // VISTAS ESPECIALES (territorio): ranking / comparador de comunas
+  if(state.vista==="ranking" || state.vista==="comparador"){
+    $("normal-view").style.display="none"; $("special-view").style.display="";
+    $("reset-btn").style.display="";
+    $("scope-title").textContent = state.vista==="ranking" ? "Ranking de comunas" : "Comparador de comunas";
+    $("scope-sub").textContent = "Gran Concepción";
+    if(state.vista==="ranking") renderRankingView(); else renderComparador();
+    return;
+  }
+  $("normal-view").style.display=""; $("special-view").style.display="none";
+
   const hasFilter = state.comuna!=="TODAS" || state.linea!=="TODAS";
   $("reset-btn").style.display = hasFilter ? "" : "none";
 
   // título de ámbito
   let title, sub;
   const emp = state.linea!=="TODAS" ? empresaDe(state.linea) : "";
-  if(state.linea==="TODAS" && state.comuna==="TODAS"){ title="Sistema completo"; sub="36 líneas · 12 comunas"; }
+  if(state.linea==="TODAS" && state.comuna==="TODAS"){ title="Gran Concepción"; sub="36 líneas · 12 comunas"; }
   else if(state.linea==="TODAS"){ title=state.comuna; sub="todas las líneas que operan aquí"; }
   else if(state.comuna==="TODAS"){ title=`Línea ${state.linea} · ${emp}`; sub="en todo el Gran Concepción"; }
   else { title=`Línea ${state.linea} · ${emp}`; sub=`en ${state.comuna}`; }
@@ -196,19 +227,20 @@ function nseColor(v){
   return `hsl(${205-175*t},68%,52%)`;                                      // azul (bajo) -> ámbar (alto)
 }
 const accSColor = m => m==null ? "#555b6b" : `hsl(${120-120*Math.min(m/25,1)},72%,50%)`;  // 0min verde -> 25+ rojo
-const congColor = d => `hsl(${120-120*Math.min(Math.max(d,0)/0.6,1)},72%,50%)`;            // caída 0 verde -> 60%+ rojo
+const congSpeedColor = v => `hsl(${Math.min(v/40,1)*120},75%,50%)`;   // 0 km/h rojo -> 40+ verde
 function drawCongestion(){
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!GRID){ setCoverLegend("conges"); return; }
+  const hrs = PERIODO_H[state.periodo] || GRID.horas;
+  const lbl = periodoLbl(state.periodo);
   GRID.cells.forEach((c,i)=>{
-    const sp = GRID.horas.map(h=>GRID.vel[String(h)][i]).filter(v=>v>0);
-    if(sp.length<4) return;
-    const free = Math.max(...sp);
-    const peak = Math.min(...PEAK_H.map(h=>(GRID.vel[String(h)]||[])[i]).filter(v=>v>0));
-    if(!isFinite(peak)||free<=0) return;
-    const drop = 1 - peak/free;
-    L.circleMarker([c[0],c[1]],{renderer:coverCanvas,radius:4.2,weight:0,fillColor:congColor(drop),fillOpacity:.6})
-      .bindTooltip(`libre ${free} km/h · punta ${peak} km/h · caída <b>${Math.round(drop*100)}%</b>`,{sticky:true}).addTo(coverLayer);
+    const sp = hrs.map(h=>(GRID.vel[String(h)]||[])[i]).filter(v=>v>0);
+    if(sp.length<1) return;
+    const mean = sp.reduce((a,b)=>a+b,0)/sp.length;
+    const free = Math.max(...GRID.horas.map(h=>(GRID.vel[String(h)]||[])[i]).filter(v=>v>0));
+    const drop = free>0 ? Math.round(100*(1-mean/free)) : 0;
+    L.circleMarker([c[0],c[1]],{renderer:coverCanvas,radius:4.2,weight:0,fillColor:congSpeedColor(mean),fillOpacity:.62})
+      .bindTooltip(`velocidad ${Math.round(mean)} km/h (${lbl})${drop>0?` · ${drop}% bajo el flujo libre`:""}`,{sticky:true}).addTo(coverLayer);
   });
   setCoverLegend("conges");
 }
@@ -248,7 +280,7 @@ function setCoverLegend(mode){
     : mode==="wait" ? ["Tiempo de espera (½ frecuencia, min)",RYG,"<span class='lbls'><i>3</i><i>12</i><i>20+</i></span><span class='par' style='color:#7f1d1d'>● sin servicio</span>"]
     : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
     : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#a78bfa'>● colegio</span>"]
-    : mode==="conges" ? ["Congestión: caída de velocidad en punta",RYG,"<span class='lbls'><i>0%</i><i>30%</i><i>60%+</i></span>"]
+    : mode==="conges" ? [`Velocidad media · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>0</i><i>20</i><i>40+</i></span>"]
     : ["NSE (avalúo CLP/m²)",`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
   coverLegend = L.control({position:"bottomleft"});
   coverLegend.onAdd = ()=>{ const d=L.DomUtil.create("div","speedleg"); d.innerHTML=`<b>${txt[0]}</b>${txt[1]}${txt[2]}`; return d; };
@@ -319,11 +351,11 @@ function renderMapa(){
     const b=$("live-count"), R=(COB&&COB.resumen)||{};
     const M=state.mapMode;
     const titulo = {cover:"Cobertura territorial del transporte",wait:"Tiempo de espera del transporte",
-      conges:"Congestión vial · caída de velocidad en punta",
+      conges:`Velocidad por arco · ${periodoLbl(state.periodo)}`,
       salud:"Accesibilidad a salud en transporte",edu:"Accesibilidad a educación en transporte",nse:"Nivel socioeconómico (avalúo)"}[M];
     const badge = {cover:`${R.pct_cubierto}% cubierto · ${R.pct_desierto}% en desierto · acceso ${R.acc_mediana} min`,
       wait:"½ frecuencia de las líneas que sirven cada zona",
-      conges:"rojo = ejes críticos (mayor caída de velocidad en hora punta)",
+      conges:`velocidad media en ${periodoLbl(state.periodo)} · rojo = ejes lentos/congestionados`,
       salud:`tiempo mediano a salud: ${R.salud_med} min`, edu:`tiempo mediano a educación: ${R.edu_med} min`,
       nse:"avalúo m² · azul bajo → ámbar alto"}[M];
     if(b) b.textContent = badge||"";
@@ -559,6 +591,87 @@ function renderCalidad(){
   $("calidad-foot").innerHTML = `Índice 0–100 = 30% frecuencia + 30% regularidad + 20% velocidad + 20% anti-bunching. Mejor: <b style="color:#34d399">${best.ln}</b> (${best.score}) · peor: <b style="color:#fb7185">${worst.ln}</b> (${worst.score}).`;
 }
 
+/* ---------- VISTAS ESPECIALES DEL TERRITORIO: Ranking / Comparador de comunas ---------- */
+const RANK_VARS = [["vel","Velocidad","km/h"],["pct_det","Tiempo detenido","%"],["flota_pico","Flota en punta","buses"],["pulsos","Registros GPS","M"],["n_lineas","Líneas","#"]];
+function velPeriodo(comuna){
+  const c=(T.cells||{})[`${comuna}|TODAS`]; if(!c||!c.horas) return null;
+  const vs=(PERIODO_H[state.periodo]||[]).map(h=>c.horas[h]&&c.horas[h].v).filter(v=>v>0);
+  return vs.length ? vs.reduce((a,b)=>a+b,0)/vs.length : null;
+}
+function comunaVal(comuna,vk){
+  if(vk==="vel") return velPeriodo(comuna);
+  const k=(T.cells||{})[`${comuna}|TODAS`]; if(!k||!k.kpi) return null;
+  return vk==="pulsos" ? k.kpi.pulsos/1e6 : k.kpi[vk];
+}
+function renderRankingView(){
+  const vk=state.rankVar||"vel", vdef=RANK_VARS.find(v=>v[0]===vk);
+  const vsel=RANK_VARS.map(v=>`<b data-rv="${v[0]}" class="${vk===v[0]?"on":""}">${v[1]}</b>`).join("");
+  $("special-view").innerHTML=`<section class="widget"><div class="widget-h">
+     <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+     <div class="min-w-0"><h3>Ranking de comunas · ${vdef[1]}</h3><span class="sub">ordena el Gran Concepción por la variable elegida${vk==="vel"?` · ${periodoLbl(state.periodo)}`:""}</span></div>
+     <div class="seg" id="rank-var" style="margin-left:auto;flex-wrap:wrap">${vsel}</div></div>
+     <div class="widget-b"><div id="rankview-chart" style="height:440px"></div><div class="hint" id="rankview-foot" style="margin-top:6px"></div></div></section>`;
+  $("rank-var").querySelectorAll("b").forEach(el=>el.onclick=()=>{state.rankVar=el.dataset.rv;render();});
+  const comunas=(GEO.features||[]).map(f=>f.properties.name);
+  let rows=comunas.map(c=>({c,v:comunaVal(c,vk)})).filter(r=>r.v!=null);
+  rows.sort((a,b)=> vk==="pct_det" ? b.v-a.v : a.v-b.v);   // barra horizontal: mayor arriba
+  const th=TH(); if(rankChart) rankChart.dispose(); rankChart=echarts.init($("rankview-chart"));
+  const best = vk==="pct_det" ? rows[0] : rows[rows.length-1];
+  const mx=Math.max(...rows.map(r=>r.v));
+  rankChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    grid:{left:8,right:60,top:10,bottom:18,containLabel:true},
+    tooltip:{trigger:"axis",axisPointer:{type:"shadow"},backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      formatter:p=>`${p[0].name}<br><b>${fmt1(p[0].value)}</b> ${vdef[2]}`},
+    xAxis:{type:"value",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    yAxis:{type:"category",data:rows.map(r=>r.c),axisLabel:{color:th.tx,fontSize:11.5},axisLine:{lineStyle:{color:th.axis}}},
+    series:[{type:"bar",data:rows.map(r=>({value:Math.round(r.v*10)/10,itemStyle:{color:speedRankColor(r.v/mx)}})),
+      barWidth:"62%",label:{show:true,position:"right",color:th.mut,fontSize:11,formatter:o=>fmt1(o.value)+" "+vdef[2]}}]
+  },true);
+  setTimeout(()=>rankChart.resize(),60);
+  $("rankview-foot").innerHTML = `Líder: <b style="color:#34d399">${best.c}</b> (${fmt1(best.v)} ${vdef[2]}). ${vk==="pct_det"?"Menor tiempo detenido es mejor.":vk==="vel"?"Mayor velocidad es mejor.":""}`;
+}
+const speedRankColor = t => `hsl(${t*150+10},65%,52%)`;
+function renderComparador(){
+  const comunas=(GEO.features||[]).map(f=>f.properties.name);
+  if(!comunas.includes(state.cmpA)) state.cmpA=comunas[0];
+  if(!comunas.includes(state.cmpB)) state.cmpB=comunas[1]||comunas[0];
+  const opt=sel=>comunas.map(c=>`<option ${c===sel?"selected":""}>${c}</option>`).join("");
+  $("special-view").innerHTML=`<section class="widget"><div class="widget-h">
+     <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7l-4 4 4 4M16 7l4 4-4 4M4 11h16"/></svg></span>
+     <div class="min-w-0"><h3>Comparador de comunas</h3><span class="sub">dos comunas lado a lado</span></div>
+     <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+       <select id="cmpA" class="side-search" style="width:auto;margin:0;padding:5px 8px">${opt(state.cmpA)}</select>
+       <span style="color:var(--dim)">vs</span>
+       <select id="cmpB" class="side-search" style="width:auto;margin:0;padding:5px 8px">${opt(state.cmpB)}</select></div></div>
+     <div class="widget-b"><div id="cmp-grid" class="grid2" style="margin-bottom:14px"></div><div id="cmp-chart" style="height:280px"></div></div></section>`;
+  $("cmpA").onchange=e=>{state.cmpA=e.target.value;render();};
+  $("cmpB").onchange=e=>{state.cmpB=e.target.value;render();};
+  const col=["#38bdf8","#fb923c"];
+  const card=(comuna,ci)=>{
+    const k=(T.cells||{})[`${comuna}|TODAS`]; const kpi=k&&k.kpi||{};
+    return `<div style="border:1px solid var(--line);border-radius:12px;padding:14px">
+      <div style="font-weight:600;color:${col[ci]};margin-bottom:8px">${comuna}</div>
+      ${[["Velocidad media",fmt1(kpi.vel)+" km/h"],["Tiempo detenido",fmt1(kpi.pct_det)+" %"],["Flota en punta",fmt(kpi.flota_pico)],["Líneas",kpi.n_lineas||"—"],["Registros",((kpi.pulsos||0)/1e6).toFixed(1)+" M"]]
+        .map(r=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);font-size:13px"><span class="hint">${r[0]}</span><b style="font-family:var(--mono)">${r[1]}</b></div>`).join("")}</div>`;
+  };
+  $("cmp-grid").innerHTML = card(state.cmpA,0)+card(state.cmpB,1);
+  // perfil de velocidad por hora superpuesto
+  const th=TH(); if(cmpChart) cmpChart.dispose(); cmpChart=echarts.init($("cmp-chart"));
+  const prof=comuna=>{const k=(T.cells||{})[`${comuna}|TODAS`];return k&&k.horas?k.horas.map(h=>h?h.v:null):[];};
+  cmpChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    grid:{left:38,right:16,top:30,bottom:24,containLabel:true},
+    legend:{data:[state.cmpA,state.cmpB],textStyle:{color:th.mut},top:0},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx}},
+    xAxis:{type:"category",data:HORAS,axisLabel:{color:th.mut,fontSize:9},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"km/h",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    series:[{name:state.cmpA,type:"line",data:prof(state.cmpA),smooth:true,symbol:"none",lineStyle:{width:2.5,color:col[0]}},
+            {name:state.cmpB,type:"line",data:prof(state.cmpB),smooth:true,symbol:"none",lineStyle:{width:2.5,color:col[1]}}]
+  },true);
+  setTimeout(()=>cmpChart.resize(),60);
+}
+
 /* ---------- init ---------- */
 (async function(){
   try{
@@ -580,12 +693,13 @@ function renderCalidad(){
     J("operacion_linea.json").then(d=>{ OP=d; renderOperacion(); renderCalidad(); }).catch(()=>{});
     J("speed_grid_hora.json").then(d=>{ GRID=d; if(state.mapMode==="conges") renderMapa(); }).catch(()=>{});
     buildMapModes();
+    buildPeriodo();
     buildComunaTabs();
     buildLineaList();
     $("linea-search").addEventListener("input", e=>buildLineaList(e.target.value));
-    $("reset-btn").onclick = ()=>{ state={comuna:"TODAS",linea:"TODAS",csDia:state.csDia,csVar:state.csVar}; $("linea-search").value=""; buildLineaList(); render(); };
+    $("reset-btn").onclick = ()=>{ Object.assign(state,{comuna:"TODAS",linea:"TODAS",vista:"normal"}); $("linea-search").value=""; buildLineaList(); render(); };
     render();
     loadLive(); setInterval(loadLive, 60000);   // buses operando ahora, refresco 60 s
-    addEventListener("resize", ()=>{ if(chart) chart.resize(); if(csChart) csChart.resize(); if(eqChart) eqChart.resize(); if(nseChart) nseChart.resize(); if(lmap) lmap.invalidateSize(); });
+    addEventListener("resize", ()=>{ [chart,csChart,eqChart,nseChart,rankChart,cmpChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();
