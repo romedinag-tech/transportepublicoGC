@@ -4,13 +4,13 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=47`).then(r=>r.json());
-const BUILD = "2026-06-24 21:00";
+const J = n => fetch(`data/${n}?v=48`).then(r=>r.json());
+const BUILD = "2026-06-24 21:35";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
-let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={};
+let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stops:[]};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", cmpA:null, cmpB:null};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
@@ -428,6 +428,17 @@ function drawCoverage(mode){
         {sticky:true,direction:"top"}).addTo(coverLayer);
     });
   }
+  // PARADEROS en el modo Espera: punto con su tiempo de espera al pasar el cursor
+  if(mode==="wait" && PESP && PESP.stops){
+    PESP.stops.forEach(s=>{
+      if(!inComuna(s.la,s.lo)) return;
+      const w = s.wait ? s.wait[state.periodo] : null;
+      L.circleMarker([s.la,s.lo],{renderer:coverCanvas,radius:3,weight:1,color:"#0b1220",
+        fillColor:waitColor(w),fillOpacity:.95})
+        .bindTooltip(`<b>Paradero</b> · ${s.nl} línea${s.nl===1?"":"s"}<br>espera ${w==null?"sin servicio":`<b>${w} min</b>`} (${periodoLbl(state.periodo)})`,
+        {direction:"top"}).addTo(coverLayer);
+    });
+  }
   // equipamiento sensible (salud/educación) SOLO en sus propios modos
   if(COB.sensibles && (mode==="salud"||mode==="edu")){
     COB.sensibles.forEach(s=>{
@@ -448,7 +459,7 @@ function setCoverLegend(mode){
   const GYR = `<span class="grad" style="background:linear-gradient(90deg,hsl(0,70%,50%),hsl(60,70%,50%),hsl(120,70%,50%))"></span>`;
   const txt = mode==="cover" ? ["% de destinos EOD alcanzables (≤1 transbordo)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>color de la manzana = accesibilidad · ○ destino (tamaño = demanda)</span>"]
     : mode==="trans" ? ["Intensidad de transbordo (% de lo alcanzable)",RYG,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>verde = directo · rojo = exige transbordo</span>"]
-    : mode==="wait" ? [`Espera hacia destinos · ${periodoLbl(state.periodo)} (min)`,RYG,"<span class='lbls'><i>0</i><i>1.5</i><i>3+</i></span><span class='par'>frecuencia real observada · <span style='color:#7f1d1d'>● sin servicio</span></span>"]
+    : mode==="wait" ? [`Espera hacia destinos · ${periodoLbl(state.periodo)} (min)`,RYG,"<span class='lbls'><i>0</i><i>1.5</i><i>3+</i></span><span class='par'>manzana = espera a destinos · ● paradero = espera ahí (hover)</span>"]
     : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
     : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#a78bfa'>● colegio</span>"]
     : mode==="conges" ? [`Velocidad efectiva · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>≤10</i><i>20</i><i>30+</i></span><span class='par'>incluye el tiempo detenido en tránsito</span>"]
@@ -1155,6 +1166,7 @@ function renderEvolucion(){
     J("detenciones.json").then(d=>{ DET2=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
     J("terminales.json").then(d=>{ TERM=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
     J("destinos_principales.json").then(d=>{ DEST=d; if(state.mapMode==="cover"||state.mapMode==="trans") renderMapa(); }).catch(()=>{});
+    J("paraderos_espera.json").then(d=>{ PESP=d; if(state.mapMode==="wait") renderMapa(); }).catch(()=>{});
     J("empresa_stats.json").then(d=>{ EMPR=d; renderEmpresas(); }).catch(()=>{});
     J("flota_mes_hora.json").then(d=>{ MESH=d; renderHeat(); }).catch(()=>{});
     J("dow_hora.json").then(d=>{ DOWH=d; renderHeat(); }).catch(()=>{});
