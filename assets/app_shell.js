@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=41`).then(r=>r.json());
-const BUILD = "2026-06-24 16:55";
+const J = n => fetch(`data/${n}?v=42`).then(r=>r.json());
+const BUILD = "2026-06-24 17:30";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
@@ -540,6 +540,50 @@ function renderMapa(){
     if(coverLayer) coverLayer.clearLayers(); setCoverLegend(null);
     drawLiveBuses();
   }
+  renderNarrative();
+}
+
+/* ---------- relato dinámico del mapa (qué busca el KPI + lectura de datos del ámbito) ---------- */
+function scopeWavg(getter){            // promedio ponderado por viviendas sobre las manzanas del ámbito
+  if(!COB||!COB.features) return null;
+  let sw=0, n=0;
+  for(const f of COB.features){ const p=f.properties; if(!inComuna(p.cy,p.cx)) continue;
+    const v=getter(p); if(v==null) continue; const w=p.n||1; sw+=v*w; n+=w; }
+  return n? sw/n : null;
+}
+function renderNarrative(){
+  const el=$("map-narrative"); if(!el) return;
+  if(state.linea!=="TODAS" || state.vista!=="normal"){ el.innerHTML=""; return; }
+  const M=state.mapMode, amb = state.comuna==="TODAS"?"el Gran Concepción":state.comuna;
+  const pu=state.purpose||"all", per=state.periodo, pl=purposeLbl(pu);
+  const pe = pu!=="all" ? ` de ${pl}` : "";
+  let txt="";
+  if(M==="cover"){
+    const v=scopeWavg(p=>p.dacc&&p.dacc[pu]);
+    txt=`<b>Cobertura</b> mide qué % de los <b>destinos reales</b> de la ciudad (matriz EOD) puede alcanzar cada manzana en transporte público con a lo más un transbordo, ponderado por los viajes${pe}. Verde = manzana bien conectada con sus destinos; rojo = aislada. ${v!=null?`En ${amb}, en promedio el <b>${v.toFixed(0)}%</b> de la demanda-destino es alcanzable. `:""}Va más allá de "¿hay un paradero cerca?": pregunta si el bus que pasa te lleva a donde la gente realmente viaja.`;
+  } else if(M==="trans"){
+    const v=scopeWavg(p=>p.tbi&&p.tbi[pu]);
+    txt=`<b>Transbordo</b> muestra cuánto de la demanda alcanzable <b>obliga a combinar dos buses</b>${pe}. Verde = llegas directo; rojo = dependes de transbordar (hoy = pagar dos pasajes). ${v!=null?`En ${amb}, la intensidad media de transbordo es <b>${v.toFixed(0)}%</b>. `:""}Es el insumo central para proponer <b>integración modal y tarifaria</b>: las zonas rojas son las que más se beneficiarían.`;
+  } else if(M==="wait"){
+    const v=scopeWavg(p=>p.waitd&&p.waitd[pu]&&p.waitd[pu][per]);
+    txt=`<b>Espera</b> estima el tiempo efectivo de espera hacia los destinos${pe}: ½·intervalo·(1+CV²), usando la <b>frecuencia real observada</b> y penalizando el <b>apelotonamiento</b> de buses. ${v!=null?`Media en ${amb} (${periodoLbl(per)}): <b>${v.toFixed(1)} min</b>. `:""}Cambia con el período del día — compara punta y fuera de punta para ver el deterioro.`;
+  } else if(M==="conges"){
+    const v=GRID?(function(){const cs=periodCellSpeeds().filter(x=>x>0);return cs.length?cs.reduce((a,b)=>a+b,0)/cs.length:null;})():null;
+    txt=`<b>Congestión</b>: velocidad media de los buses por arco de la red en <b>${periodoLbl(per)}</b>, interpolada sobre las calles. Rojo = ejes lentos donde la operación se degrada. ${v!=null?`Velocidad media de la red: <b>${v.toFixed(1)} km/h</b>. `:""}Cambia con el período para ver dónde y cuándo aparece la congestión.`;
+  } else if(M==="bunch"){
+    txt=`<b>Bunching</b>: regularidad de los intervalos entre buses (CV de los headways) medida en puntos de la red, en <b>${periodoLbl(per)}</b>. Verde = buses parejos; rojo = <b>apelotonados</b> (vienen pegados y luego un hueco largo) → peor espera efectiva aguas abajo. Es la huella de la congestión sobre la frecuencia.`;
+  } else if(M==="det"){
+    txt=`<b>Detenciones</b>: nodos donde los buses pasan más tiempo detenidos, <b>excluyendo los terminales</b> (que distorsionan por la espera de cabecera). Los círculos ámbar→rojo son cuellos de demora en marcha; las cajas <b>▣</b> cyan son terminales, con su flota por línea al pasar el cursor.`;
+  } else if(M==="salud"||M==="edu"){
+    const v=scopeWavg(p=>M==="salud"?p.salud:p.edu);
+    txt=`Tiempo de viaje en transporte público desde cada manzana al ${M==="salud"?"<b>centro de salud</b>":"<b>establecimiento educacional</b>"} más cercano (caminata + espera + bus). ${v!=null?`Mediana ${amb}: <b>${v.toFixed(0)} min</b>. `:""}Verde = cerca en tiempo real de viaje; rojo = lejos.`;
+  } else if(M==="nse"){
+    txt=`<b>Nivel socioeconómico</b> por manzana (avalúo del suelo como proxy). No es un KPI de transporte en sí: sirve para <b>cruzarlo</b> con cobertura, transbordo y espera y evaluar <b>equidad territorial</b> — ¿las zonas más vulnerables tienen peor servicio?`;
+  } else if(M==="live"){
+    const n=(LIVE&&LIVE.length)||0;
+    txt=`<b>En vivo</b>: posición de los buses operando en este momento (GTFS-RT). Cyan = en movimiento, ámbar = detenido. ${n?`Ahora mismo: <b>${NF.format(n)}</b> buses. `:""}Es la foto operacional instantánea del sistema.`;
+  }
+  el.innerHTML = txt;
 }
 
 function renderRanking(){
