@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=46`).then(r=>r.json());
-const BUILD = "2026-06-24 20:10";
+const J = n => fetch(`data/${n}?v=47`).then(r=>r.json());
+const BUILD = "2026-06-24 21:00";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
@@ -602,7 +602,7 @@ function renderNarrative(){
     txt=`<b>Transbordo</b> muestra cuánto de la demanda alcanzable <b>obliga a combinar dos buses</b>${pe}. Verde = llegas directo; rojo = dependes de transbordar (hoy = pagar dos pasajes). ${v!=null?`En ${amb}, la intensidad media de transbordo es <b>${v.toFixed(0)}%</b>. `:""}Es el insumo central para proponer <b>integración modal y tarifaria</b>: las zonas rojas son las que más se beneficiarían.`;
   } else if(M==="wait"){
     const v=scopeWavg(p=>p.waitd&&p.waitd[pu]&&p.waitd[pu][per]);
-    txt=`<b>Espera</b> estima el tiempo efectivo de espera hacia los destinos${pe}: ½·intervalo·(1+CV²), usando la <b>frecuencia real observada</b> y penalizando el <b>apelotonamiento</b> de buses. ${v!=null?`Media en ${amb} (${periodoLbl(per)}): <b>${v.toFixed(1)} min</b>. `:""}Cambia con el período del día — compara punta y fuera de punta para ver el deterioro.`;
+    txt=`<b>Espera</b> estima el tiempo efectivo de espera hacia los destinos${pe}: ½·intervalo·(1+CV²), con la <b>frecuencia real en el sentido que va hacia el destino</b> (un bus en dirección contraria no cuenta) y penalizando el <b>apelotonamiento</b>. ${v!=null?`Media en ${amb} (${periodoLbl(per)}): <b>${v.toFixed(1)} min</b>. `:""}Cambia con el período — compara punta y fuera de punta.`;
   } else if(M==="conges"){
     const v=GRID?(function(){const cs=periodCellSpeeds().filter(x=>x>0);return cs.length?cs.reduce((a,b)=>a+b,0)/cs.length:null;})():null;
     txt=`<b>Congestión</b>: <b>velocidad efectiva</b> de los buses por arco de la red en <b>${periodoLbl(per)}</b> — incluye el <b>tiempo detenido en tránsito</b> (semáforos, tacos), no solo cuando el bus avanza, por eso revela la congestión real. Rojo = ejes lentos. ${v!=null?`Velocidad efectiva media: <b>${v.toFixed(1)} km/h</b>. `:""}Cambia con el período para ver dónde y cuándo aparece.`;
