@@ -4,12 +4,12 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=28`).then(r=>r.json());
-const BUILD = "2026-06-18 21:10";
+const J = n => fetch(`data/${n}?v=29`).then(r=>r.json());
+const BUILD = "2026-06-18 21:40";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={};
-let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart;
-let EMPR=[], MESH=[], DOWH=[], DET2=[];
+let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart;
+let EMPR=[], MESH=[], DOWH=[], DET2=[], REC={top:[],lentos:[],reg:[],corr:[]};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", cmpA:null, cmpB:null};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
@@ -135,6 +135,7 @@ function render(){
   renderCalidad();
   renderEmpresas();
   renderHeat();
+  renderRecorridos();
 }
 
 function kpiCard(l,v,s){ return `<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`; }
@@ -746,6 +747,38 @@ function renderHeat(){
   setTimeout(()=>heatChart.resize(),60);
 }
 
+/* ---------- migrado de clásico: recorridos y corredores (vista sistema) ---------- */
+const REC_VIEWS=[["top","Más flota"],["lentos","Más lentos · punta"],["reg","Menos regulares"],["corr","Corredores lentos"]];
+function renderRecorridos(){
+  const card=$("rec-card");
+  const any=(REC.top.length||REC.lentos.length||REC.reg.length||REC.corr.length);
+  if(!sysScope() || !any){ card.style.display="none"; return; }
+  card.style.display="";
+  const rv=state.recView||"top";
+  $("rec-view").innerHTML=REC_VIEWS.map(([k,l])=>`<b data-r="${k}" class="${rv===k?"on":""}">${l}</b>`).join("");
+  $("rec-view").querySelectorAll("b").forEach(el=>el.onclick=()=>{state.recView=el.dataset.r;renderRecorridos();});
+  let rows, unit, foot, slow=false;
+  if(rv==="top"){ rows=REC.top.slice().sort((a,b)=>b.flota_pico-a.flota_pico).slice(0,15).map(x=>({n:x.recorrido,v:x.flota_pico})); unit="buses"; foot="Recorridos con más flota desplegada en punta."; }
+  else if(rv==="lentos"){ rows=REC.lentos.slice().sort((a,b)=>a.vel-b.vel).slice(0,15).map(x=>({n:x.recorrido,v:x.vel})); unit="km/h"; slow=true; foot="Recorridos más lentos en hora punta (peor velocidad comercial)."; }
+  else if(rv==="reg"){ rows=REC.reg.slice().sort((a,b)=>b.cv-a.cv).slice(0,15).map(x=>({n:x.recorrido,v:Math.round(x.cv*1000)/10})); unit="% CV"; slow=true; foot="Mayor variabilidad de la oferta entre días (CV) = servicio menos regular."; }
+  else { rows=REC.corr.slice().sort((a,b)=>a.vel_kmh-b.vel_kmh).slice(0,15).map(x=>({n:x.corredor,v:x.vel_kmh})); unit="km/h"; slow=true; foot="Ejes viales con menor velocidad de circulación de buses."; }
+  const isCV = unit==="% CV";
+  const colorOf = v => !slow ? "#38bdf8" : isCV ? `hsl(${(1-Math.min(v/40,1))*120},70%,50%)` : `hsl(${Math.min(v/35,1)*120},70%,50%)`;
+  const th=TH(); if(recChart) recChart.dispose(); recChart=echarts.init($("rec-chart"));
+  recChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    grid:{left:8,right:58,top:8,bottom:16,containLabel:true},
+    tooltip:{trigger:"axis",axisPointer:{type:"shadow"},backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      formatter:p=>`${p[0].name}<br><b>${fmt1(p[0].value)}</b> ${unit}`},
+    xAxis:{type:"value",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    yAxis:{type:"category",inverse:true,data:rows.map(r=>r.n),axisLabel:{color:th.tx,fontSize:11},axisLine:{lineStyle:{color:th.axis}}},
+    series:[{type:"bar",barWidth:"64%",data:rows.map(r=>({value:Math.round(r.v*10)/10,itemStyle:{color:colorOf(r.v)}})),
+      label:{show:true,position:"right",color:th.mut,fontSize:10.5,formatter:o=>fmt1(o.value)+" "+unit}}]
+  },true);
+  setTimeout(()=>recChart.resize(),60);
+  $("rec-foot").textContent=foot;
+}
+
 /* ---------- init ---------- */
 (async function(){
   try{
@@ -770,6 +803,8 @@ function renderHeat(){
     J("empresa_stats.json").then(d=>{ EMPR=d; renderEmpresas(); }).catch(()=>{});
     J("flota_mes_hora.json").then(d=>{ MESH=d; renderHeat(); }).catch(()=>{});
     J("dow_hora.json").then(d=>{ DOWH=d; renderHeat(); }).catch(()=>{});
+    Promise.all([J("top_recorridos.json").catch(()=>[]),J("lentos_punta.json").catch(()=>[]),J("regularidad.json").catch(()=>[]),J("corredores.json").catch(()=>[])])
+      .then(([t,l,r,c])=>{ REC={top:t,lentos:l,reg:r,corr:c}; renderRecorridos(); });
     buildMapModes();
     buildPeriodo();
     buildComunaTabs();
@@ -778,6 +813,6 @@ function renderHeat(){
     $("reset-btn").onclick = ()=>{ Object.assign(state,{comuna:"TODAS",linea:"TODAS",vista:"normal"}); $("linea-search").value=""; buildLineaList(); render(); };
     render();
     loadLive(); setInterval(loadLive, 60000);   // buses operando ahora, refresco 60 s
-    addEventListener("resize", ()=>{ [chart,csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
+    addEventListener("resize", ()=>{ [chart,csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();
