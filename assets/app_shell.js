@@ -4,16 +4,16 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=33`).then(r=>r.json());
-const BUILD = "2026-06-24 10:30";
+const J = n => fetch(`data/${n}?v=34`).then(r=>r.json());
+const BUILD = "2026-06-24 12:10";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={};
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
-let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
+let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", cmpA:null, cmpB:null};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
-const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["wait","Espera"],["conges","Congestión"],["det","Detenciones"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
+const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["det","Detenciones"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
 const PEAK_H = [7,8,9,17,18,19];
 
 const CS_DIAS = [["L","Laboral"],["S","Sábado"],["D","Domingo"]];
@@ -253,6 +253,8 @@ function drawLiveBuses(){
 /* ---------- KPI territorial: cobertura / acceso / espera / NSE (choropleth) ---------- */
 const accColor  = m => `hsl(${120-120*Math.min(m/12,1)},72%,50%)`;        // verde 0min -> rojo 12+
 const waitColor = m => m==null ? "#7f1d1d" : `hsl(${120-120*Math.min(Math.max((m-3)/17,0),1)},72%,50%)`;
+const daccColor = v => v==null ? "#475569" : `hsl(${1.2*Math.max(0,Math.min(v,100))},70%,50%)`;   // % destinos alcanzables: rojo bajo -> verde alto
+const tbiColor  = v => v==null ? "#475569" : `hsl(${120-1.2*Math.max(0,Math.min(v,100))},75%,50%)`; // intensidad transbordo: verde 0 -> rojo 100
 let NSE_LO=null, NSE_HI=null;
 function nseColor(v){
   if(v==null) return "#475569";
@@ -316,16 +318,33 @@ function drawCoverage(mode){
     const p=f.properties, cc=f.geometry.coordinates[0];
     if(!inComuna(p.cy!=null?p.cy:(cc[0][1]+cc[2][1])/2, p.cx!=null?p.cx:(cc[0][0]+cc[2][0])/2)) return;
     let col;
-    if(mode==="cover") col = p.cov===0 ? "#ef4444" : accColor(p.acc);     // desierto = rojo fuerte
+    if(mode==="cover") col = daccColor(p.dacc);                           // % destinos alcanzables (EOD)
+    else if(mode==="trans") col = tbiColor(p.tbi);                        // intensidad de transbordo
     else if(mode==="wait") col = waitColor(p.wait);
     else if(mode==="salud") col = accSColor(p.salud);
     else if(mode==="edu") col = accSColor(p.edu);
     else col = nseColor(p.nse);
     const ll=f.geometry.coordinates[0].map(c=>[c[1],c[0]]);
+    const tipAcc = `destinos: <b>${p.dacc??"—"}%</b> alcanzable · ${p.ddir??"—"}% directo · ${p.dtr??0}% con transbordo`;
+    const tip = (mode==="cover"||mode==="trans")
+      ? `${NF.format(p.n)} viviendas · acceso ${p.acc} min<br>${tipAcc}`
+      : `${NF.format(p.n)} viviendas · acceso ${p.acc} min · espera ${p.wait==null?"sin servicio":p.wait+" min"}<br>a salud ${p.salud??"—"} min · a educación ${p.edu??"—"} min`;
     L.polygon(ll,{renderer:coverCanvas,stroke:false,fillColor:col,fillOpacity:.55})
-      .bindTooltip(`${NF.format(p.n)} viviendas · acceso ${p.acc} min · espera ${p.wait==null?"sin servicio":p.wait+" min"}<br>a salud ${p.salud??"—"} min · a educación ${p.edu??"—"} min`,{sticky:true})
+      .bindTooltip(tip,{sticky:true})
       .addTo(coverLayer);
   });
+  // destinos EOD (capa sobre cobertura/transbordo): tamaño=viajes, color=exigencia de transbordo
+  if(DEST && DEST.destinos && (mode==="cover"||mode==="trans")){
+    const mxv = Math.max(...DEST.destinos.map(d=>d.viajes));
+    DEST.destinos.forEach(d=>{
+      if(!inComuna(d.lat,d.lon)) return;
+      const r = 5+13*Math.sqrt(d.viajes/mxv);
+      L.circleMarker([d.lat,d.lon],{renderer:coverCanvas,radius:r,weight:1.5,color:"#0b1220",
+        fillColor:tbiColor(d.pct_trans),fillOpacity:.92})
+        .bindTooltip(`<b>Destino · ${d.voc}</b> · ${d.comuna}<br>${NF.format(d.viajes)} viajes atraídos (EOD 2015)<br>exige transbordo al <b>${d.pct_trans??0}%</b> del territorio · ${d.nlineas_dir} líneas directas`,
+        {sticky:true,direction:"top"}).addTo(coverLayer);
+    });
+  }
   // equipamiento sensible visible en cobertura / salud / educación
   if(COB.sensibles && (mode==="cover"||mode==="salud"||mode==="edu")){
     COB.sensibles.forEach(s=>{
@@ -343,7 +362,9 @@ function setCoverLegend(mode){
   if(coverLegend){ lmap.removeControl(coverLegend); coverLegend=null; }
   if(!mode) return;
   const RYG = `<span class="grad" style="background:linear-gradient(90deg,hsl(120,72%,50%),hsl(60,72%,50%),hsl(0,72%,50%))"></span>`;
-  const txt = mode==="cover" ? ["Acceso al paradero (min) · rojo = desierto",RYG,"<span class='lbls'><i>0</i><i>6</i><i>12+</i></span><span class='par' style='color:#ef4444'>● desierto</span> <span class='par' style='color:#f43f5e'>● salud</span> <span class='par' style='color:#a78bfa'>● educación</span>"]
+  const GYR = `<span class="grad" style="background:linear-gradient(90deg,hsl(0,70%,50%),hsl(60,70%,50%),hsl(120,70%,50%))"></span>`;
+  const txt = mode==="cover" ? ["Destinos EOD alcanzables (≤1 transbordo)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>● destino · tamaño = viajes · color = exige transbordo</span>"]
+    : mode==="trans" ? ["Intensidad de transbordo (% de lo alcanzable)",RYG,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>verde = directo · rojo = exige transbordo</span>"]
     : mode==="wait" ? ["Tiempo de espera (½ frecuencia, min)",RYG,"<span class='lbls'><i>3</i><i>12</i><i>20+</i></span><span class='par' style='color:#7f1d1d'>● sin servicio</span>"]
     : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
     : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#a78bfa'>● colegio</span>"]
@@ -419,11 +440,12 @@ function renderMapa(){
     drawCoverage(state.mapMode);
     const b=$("live-count"), R=(COB&&COB.resumen)||{};
     const M=state.mapMode;
-    const titulo = {cover:"Cobertura del transporte",wait:"Tiempo de espera del transporte",
+    const titulo = {cover:"Cobertura: destinos alcanzables",trans:"Dependencia de transbordo",wait:"Tiempo de espera del transporte",
       conges:`Velocidad por arco · ${periodoLbl(state.periodo)}`, det:"Congestión y terminales",
       salud:"Accesibilidad a salud en transporte",edu:"Accesibilidad a educación en transporte",nse:"Nivel socioeconómico (avalúo)"}[M];
     // resumen sólo a nivel sistema (COB.resumen es de todo el GC); en comuna, etiqueta de ámbito
-    const badgeSys = {cover:`${R.pct_cubierto}% cubierto · ${R.pct_desierto}% en desierto · acceso ${R.acc_mediana} min`,
+    const badgeSys = {cover:`${R.dacc_medio??"—"}% de la demanda-destino EOD es alcanzable (≤1 transbordo) · destinos dimensionados por viajes`,
+      trans:`intensidad de transbordo media ${R.tbi_medio??"—"}% · rojo = zonas/destinos que exigen transbordo (integración modal/tarifaria)`,
       wait:"½ frecuencia de las líneas que sirven cada zona",
       conges:`velocidad media en ${periodoLbl(state.periodo)} · rojo = ejes lentos`,
       det:`${DET2.length} nodos de congestión (sin terminales) · ${(TERM&&TERM.terminales||[]).length} terminales detectados`,
@@ -900,6 +922,7 @@ function renderEvolucion(){
     J("speed_grid_hora.json").then(d=>{ GRID=d; if(state.mapMode==="conges") renderMapa(); }).catch(()=>{});
     J("detenciones.json").then(d=>{ DET2=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
     J("terminales.json").then(d=>{ TERM=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
+    J("destinos_principales.json").then(d=>{ DEST=d; if(state.mapMode==="cover"||state.mapMode==="trans") renderMapa(); }).catch(()=>{});
     J("empresa_stats.json").then(d=>{ EMPR=d; renderEmpresas(); }).catch(()=>{});
     J("flota_mes_hora.json").then(d=>{ MESH=d; renderHeat(); }).catch(()=>{});
     J("dow_hora.json").then(d=>{ DOWH=d; renderHeat(); }).catch(()=>{});
