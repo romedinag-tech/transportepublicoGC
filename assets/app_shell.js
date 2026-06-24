@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=29`).then(r=>r.json());
-const BUILD = "2026-06-18 21:40";
+const J = n => fetch(`data/${n}?v=30`).then(r=>r.json());
+const BUILD = "2026-06-18 22:20";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={};
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart;
@@ -95,7 +95,7 @@ function render(){
     e.classList.toggle("active", on);
   });
   document.querySelectorAll(".litem").forEach(e=>e.classList.toggle("active", e.dataset.l===state.linea && state.vista==="normal"));
-  const periodoRelevante = state.vista==="ranking" || (state.vista==="normal" && state.comuna==="TODAS" && state.linea==="TODAS" && state.mapMode==="conges");
+  const periodoRelevante = state.vista==="ranking" || (state.vista==="normal" && state.linea==="TODAS" && state.mapMode==="conges");
   $("periodo-sel").style.display = periodoRelevante ? "flex" : "none";
 
   // VISTAS ESPECIALES (territorio): ranking / comparador de comunas
@@ -195,6 +195,31 @@ function ensureMap(){
   liveLayer = L.layerGroup().addTo(lmap);
   if(window.ResizeObserver) new ResizeObserver(()=>lmap.invalidateSize()).observe($("lmap"));
 }
+/* ---------- filtro espacial por comuna (point-in-polygon) ---------- */
+const comunaGeom = name => { const f=(GEO.features||[]).find(x=>x.properties.name===name); return f&&f.geometry; };
+let _cgName=null,_cgGeom=null,_cgBox=null;
+function _setComuna(){
+  if(_cgName===state.comuna) return;
+  _cgName=state.comuna; _cgGeom=state.comuna==="TODAS"?null:comunaGeom(state.comuna); _cgBox=null;
+  if(_cgGeom){ let a=180,b=90,c=-180,d=-90;
+    const polys=_cgGeom.type==="Polygon"?[_cgGeom.coordinates]:_cgGeom.coordinates;
+    polys.forEach(p=>p[0].forEach(k=>{a=Math.min(a,k[0]);b=Math.min(b,k[1]);c=Math.max(c,k[0]);d=Math.max(d,k[1]);}));
+    _cgBox=[a,b,c,d]; }
+}
+function pipRing(x,y,r){ let inside=false; for(let i=0,j=r.length-1;i<r.length;j=i++){
+  const xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1];
+  if(((yi>y)!==(yj>y)) && (x<(xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside; } return inside; }
+function inComuna(lat,lon){
+  _setComuna();
+  if(!_cgGeom||!_cgBox) return true;
+  if(lon<_cgBox[0]||lon>_cgBox[2]||lat<_cgBox[1]||lat>_cgBox[3]) return false;
+  const polys=_cgGeom.type==="Polygon"?[_cgGeom.coordinates]:_cgGeom.coordinates;
+  for(const poly of polys){ if(pipRing(lon,lat,poly[0])){ let hole=false;
+    for(let h=1;h<poly.length;h++) if(pipRing(lon,lat,poly[h])){hole=true;break;}
+    if(!hole) return true; } }
+  return false;
+}
+
 /* buses operando AHORA (GTFS-RT vía live.json, posiciones ya snapeadas a la ruta) */
 function loadLive(){
   fetch(LIVE_URL+"?t="+Date.now(),{cache:"no-store"}).then(r=>r.json())
@@ -204,13 +229,13 @@ function drawLiveBuses(){
   if(!liveLayer) return;
   liveLayer.clearLayers();
   const badge=$("live-count");
-  // se muestran cuando NO hay comuna marcada (home o vista de línea); en vista comuna no.
-  if(!LIVE || !LIVE.buses || state.comuna!=="TODAS"){ if(badge) badge.textContent="geo en línea"; return; }
+  if(!LIVE || !LIVE.buses){ if(badge) badge.textContent="geo en línea"; return; }
   let n=0;
   LIVE.buses.forEach(b=>{
     const lat=b[0], lon=b[1], ln=b[2], spd=b[3], mv=b[4];
     if(!ln) return;                                      // sin línea = fuera de servicio -> no es "operando"
     if(state.linea!=="TODAS" && ln!==state.linea) return;
+    if(!inComuna(lat,lon)) return;                       // en vista de comuna, solo los de la comuna
     n++;
     L.circleMarker([lat,lon],{renderer:liveCanvas, radius: mv?3.2:2.5, weight:0,
       fillColor: mv?"#22d3ee":"#f59e0b", fillOpacity: mv?0.95:0.65})
@@ -238,6 +263,7 @@ function drawCongestion(){
   const hrs = PERIODO_H[state.periodo] || GRID.horas;
   const lbl = periodoLbl(state.periodo);
   GRID.cells.forEach((c,i)=>{
+    if(!inComuna(c[0],c[1])) return;
     const sp = hrs.map(h=>(GRID.vel[String(h)]||[])[i]).filter(v=>v>0);
     if(sp.length<1) return;
     const mean = sp.reduce((a,b)=>a+b,0)/sp.length;
@@ -253,6 +279,7 @@ function drawDetenciones(){
   if(!DET2||!DET2.length){ setCoverLegend("det"); return; }
   const mx=Math.max(...DET2.map(d=>d.det));
   DET2.forEach(d=>{
+    if(!inComuna(d.la,d.lo)) return;
     const r=6+22*Math.sqrt(d.det/mx);
     const col = d.buses>=150?"#fb7185":d.buses<=80?"#fbbf24":"#f97316";
     L.circleMarker([d.la,d.lo],{renderer:coverCanvas,radius:r,weight:1,color:"rgba(0,0,0,.35)",fillColor:col,fillOpacity:.6})
@@ -266,6 +293,8 @@ function drawCoverage(mode){
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!COB) return;
   COB.features.forEach(f=>{
+    const cc=f.geometry.coordinates[0];
+    if(!inComuna((cc[0][1]+cc[2][1])/2,(cc[0][0]+cc[2][0])/2)) return;
     const p=f.properties; let col;
     if(mode==="cover") col = p.cov===0 ? "#ef4444" : accColor(p.acc);     // desierto = rojo fuerte
     else if(mode==="wait") col = waitColor(p.wait);
@@ -282,6 +311,7 @@ function drawCoverage(mode){
     COB.sensibles.forEach(s=>{
       const isS=s[2]==="SALUD";
       if(mode==="salud"&&!isS) return; if(mode==="edu"&&isS) return;
+      if(!inComuna(s[0],s[1])) return;
       L.circleMarker([s[0],s[1]],{renderer:coverCanvas,radius:3.4,weight:1,color:"#fff",
         fillColor:isS?"#f43f5e":"#a78bfa",fillOpacity:.95})
         .bindTooltip(isS?"Salud":"Educación",{direction:"top"}).addTo(coverLayer);
@@ -360,25 +390,27 @@ function renderMapa(){
     $("map-title").textContent = "Mapa del sistema";
   }
   try{ if(bounds && (bounds.length||bounds.isValid&&bounds.isValid())) lmap.fitBounds(bounds,{padding:[20,20]}); }catch(e){}
-  // capas territoriales (cobertura/espera/NSE) solo en SISTEMA COMPLETO; si no, buses en vivo
-  const fullsys = state.comuna==="TODAS" && state.linea==="TODAS";
-  const seg = $("map-mode"); if(seg) seg.style.display = fullsys ? "" : "none";
-  if(fullsys && state.mapMode!=="live"){
+  // capas territoriales disponibles en SISTEMA y en COMUNA (eje territorial); en vista de LÍNEA no
+  const territorial = state.linea==="TODAS";
+  const ambito = state.comuna==="TODAS" ? "el Gran Concepción" : state.comuna;
+  const seg = $("map-mode"); if(seg) seg.style.display = territorial ? "" : "none";
+  if(territorial && state.mapMode!=="live"){
     liveLayer.clearLayers();
     drawCoverage(state.mapMode);
     const b=$("live-count"), R=(COB&&COB.resumen)||{};
     const M=state.mapMode;
-    const titulo = {cover:"Cobertura territorial del transporte",wait:"Tiempo de espera del transporte",
+    const titulo = {cover:"Cobertura del transporte",wait:"Tiempo de espera del transporte",
       conges:`Velocidad por arco · ${periodoLbl(state.periodo)}`, det:"Puntos de mayor detención",
       salud:"Accesibilidad a salud en transporte",edu:"Accesibilidad a educación en transporte",nse:"Nivel socioeconómico (avalúo)"}[M];
-    const badge = {cover:`${R.pct_cubierto}% cubierto · ${R.pct_desierto}% en desierto · acceso ${R.acc_mediana} min`,
+    // resumen sólo a nivel sistema (COB.resumen es de todo el GC); en comuna, etiqueta de ámbito
+    const badgeSys = {cover:`${R.pct_cubierto}% cubierto · ${R.pct_desierto}% en desierto · acceso ${R.acc_mediana} min`,
       wait:"½ frecuencia de las líneas que sirven cada zona",
-      conges:`velocidad media en ${periodoLbl(state.periodo)} · rojo = ejes lentos/congestionados`,
-      det:`${DET2.length} nodos · terminales, paraderos y cruces con más tiempo detenido`,
+      conges:`velocidad media en ${periodoLbl(state.periodo)} · rojo = ejes lentos`,
+      det:`${DET2.length} nodos · terminales, paraderos y cruces con más detención`,
       salud:`tiempo mediano a salud: ${R.salud_med} min`, edu:`tiempo mediano a educación: ${R.edu_med} min`,
       nse:"avalúo m² · azul bajo → ámbar alto"}[M];
-    if(b) b.textContent = badge||"";
-    $("map-title").textContent = titulo||"Mapa territorial";
+    if(b) b.textContent = state.comuna==="TODAS" ? (badgeSys||"") : `${titulo} · ${state.comuna}`;
+    $("map-title").textContent = (titulo||"Mapa territorial") + (state.comuna==="TODAS"?"":` · ${state.comuna}`);
   } else {
     if(coverLayer) coverLayer.clearLayers(); setCoverLegend(null);
     drawLiveBuses();
@@ -428,7 +460,11 @@ function renderCump(){
         <span class="hint" style="flex:1;text-align:right">${d.obs_dia[s]} obs / ${d.prog_dia[s]} prog</span></div>`;
     }).join("") + `<div class="hint" style="margin-top:8px">Despachos/día observados (GPS) vs programados (GTFS). 100% = línea blanca; &lt;80% = incumplimiento de frecuencia.</div>`;
   } else {
-    const rows = Object.keys(L).map(ln=>({ln, c:L[ln].cumpl.L, emp:empresaDe(ln)}))
+    // en comuna: solo las líneas que operan en ella
+    const lineasAmbito = state.comuna==="TODAS" ? null
+      : new Set((T.lineas||[]).map(l=>l.linea).filter(ln=>(T.cells||{})[`${state.comuna}|${ln}`]));
+    const rows = Object.keys(L).filter(ln=>!lineasAmbito||lineasAmbito.has(ln))
+                  .map(ln=>({ln, c:L[ln].cumpl.L, emp:empresaDe(ln)}))
                   .filter(r=>r.c!=null).sort((a,b)=>a.c-b.c).slice(0,12);
     box.innerHTML = rows.map(r=>`<div class="cump-row" data-l="${r.ln}" style="cursor:pointer">
       <b style="font-family:var(--mono);min-width:34px">${r.ln}</b>
@@ -525,11 +561,14 @@ function renderEquidad(){
 /* ---------- KPI territorial: brecha de cobertura por NSE (vista sistema) ---------- */
 function renderNseGap(){
   const card=$("nse-gap-card");
-  const sys = state.comuna==="TODAS" && state.linea==="TODAS";
-  if(!sys || !COB){ card.style.display="none"; return; }
+  // territorial: sistema o comuna (no en vista de línea)
+  if(state.linea!=="TODAS" || state.vista!=="normal" || !COB){ card.style.display="none"; return; }
+  // quintiles de NSE ponderados por viviendas (filtrando a la comuna si hay una elegida)
+  const cells = COB.features.filter(f=>{ const cc=f.geometry.coordinates[0];
+      return inComuna((cc[0][1]+cc[2][1])/2,(cc[0][0]+cc[2][0])/2); })
+    .map(f=>f.properties).filter(p=>p.nse>0 && p.n>0).sort((a,b)=>a.nse-b.nse);
+  if(cells.length<25){ card.style.display="none"; return; }   // muy pocas celdas para quintiles
   card.style.display="";
-  // quintiles de NSE ponderados por viviendas
-  const cells = COB.features.map(f=>f.properties).filter(p=>p.nse>0 && p.n>0).sort((a,b)=>a.nse-b.nse);
   const totN = cells.reduce((s,c)=>s+c.n,0);
   const Q=[[],[],[],[],[]]; let acc=0,qi=0;
   cells.forEach(c=>{ acc+=c.n; Q[Math.min(4,Math.floor(acc/totN*5-1e-9))].push(c); });
@@ -697,9 +736,12 @@ const mesLab = s => { const p=String(s).split("-"); return (MES[(+p[1]||1)-1]||"
 const sysScope = () => state.vista==="normal" && state.comuna==="TODAS" && state.linea==="TODAS";
 function renderEmpresas(){
   const card=$("empresas-card");
-  if(!sysScope() || !EMPR.length){ card.style.display="none"; return; }
+  if(state.linea!=="TODAS" || state.vista!=="normal" || !EMPR.length){ card.style.display="none"; return; }
+  // en comuna: solo las empresas que operan ahí
+  let d = state.comuna==="TODAS" ? EMPR.slice() : EMPR.filter(e=>(e.comunas||"").includes(state.comuna));
+  if(!d.length){ card.style.display="none"; return; }
   card.style.display="";
-  const d=EMPR.slice().sort((a,b)=>b.buses-a.buses).slice(0,18), th=TH();
+  d=d.sort((a,b)=>b.buses-a.buses).slice(0,18); const th=TH();
   if(empresasChart) empresasChart.dispose(); empresasChart=echarts.init($("empresas-chart"));
   empresasChart.setOption({
     textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
