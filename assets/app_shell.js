@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=31`).then(r=>r.json());
-const BUILD = "2026-06-18 23:05";
+const J = n => fetch(`data/${n}?v=32`).then(r=>r.json());
+const BUILD = "2026-06-18 23:40";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={};
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
@@ -294,9 +294,9 @@ function drawCoverage(mode){
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!COB) return;
   COB.features.forEach(f=>{
-    const cc=f.geometry.coordinates[0];
-    if(!inComuna((cc[0][1]+cc[2][1])/2,(cc[0][0]+cc[2][0])/2)) return;
-    const p=f.properties; let col;
+    const p=f.properties, cc=f.geometry.coordinates[0];
+    if(!inComuna(p.cy!=null?p.cy:(cc[0][1]+cc[2][1])/2, p.cx!=null?p.cx:(cc[0][0]+cc[2][0])/2)) return;
+    let col;
     if(mode==="cover") col = p.cov===0 ? "#ef4444" : accColor(p.acc);     // desierto = rojo fuerte
     else if(mode==="wait") col = waitColor(p.wait);
     else if(mode==="salud") col = accSColor(p.salud);
@@ -565,8 +565,8 @@ function renderNseGap(){
   // territorial: sistema o comuna (no en vista de línea)
   if(state.linea!=="TODAS" || state.vista!=="normal" || !COB){ card.style.display="none"; return; }
   // quintiles de NSE ponderados por viviendas (filtrando a la comuna si hay una elegida)
-  const cells = COB.features.filter(f=>{ const cc=f.geometry.coordinates[0];
-      return inComuna((cc[0][1]+cc[2][1])/2,(cc[0][0]+cc[2][0])/2); })
+  const cells = COB.features.filter(f=>{ const p=f.properties, cc=f.geometry.coordinates[0];
+      return inComuna(p.cy!=null?p.cy:(cc[0][1]+cc[2][1])/2, p.cx!=null?p.cx:(cc[0][0]+cc[2][0])/2); })
     .map(f=>f.properties).filter(p=>p.nse>0 && p.n>0).sort((a,b)=>a.nse-b.nse);
   if(cells.length<25){ card.style.display="none"; return; }   // muy pocas celdas para quintiles
   card.style.display="";
