@@ -27,7 +27,7 @@ Interfaz tipo *control room* a pantalla completa: **barra de comando**, **sideba
 | **Cumplimiento de frecuencia** | Despachos **programados (GTFS)** vs **observados (GPS)** — apples-to-apples |
 | **Cumplimiento semanal por variable** | Evolución semana a semana de **frecuencia, cobertura horaria, regularidad y flota**, con desglose **Laboral / Sábado / Domingo** |
 
-La **Vista clásica** (`clasico.html`) conserva el mapa en vivo, los mapas de calor y los corredores.
+Todo el análisis vive en una sola página: navegación por **comuna** (barra superior, con *Ranking* y *Comparador* de comunas) y por **línea** (sidebar), con **selector de período del día** para los indicadores de velocidad/congestión.
 
 ## 🛰️ Datos en vivo + histórico
 
@@ -63,7 +63,6 @@ Tracking GPS de la flota regulada entregado por la **División de Transporte Pú
 ```
 .
 ├── index.html              # Centro de Mando (Tailwind + ECharts + Leaflet)
-├── clasico.html            # Vista clásica (live + heatmaps + corredores)
 ├── assets/
 │   ├── app_shell.js        # Motor del visor (doble eje, mapa, cumplimiento, tema)
 │   ├── shell.css / styles.css   # Layout y variables de tema (claro/oscuro)

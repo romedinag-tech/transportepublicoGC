@@ -4,15 +4,16 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=27`).then(r=>r.json());
-const BUILD = "2026-06-18 20:40";
+const J = n => fetch(`data/${n}?v=28`).then(r=>r.json());
+const BUILD = "2026-06-18 21:10";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={};
-let eqChart, nseChart, rankChart, cmpChart;
+let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart;
+let EMPR=[], MESH=[], DOWH=[], DET2=[];
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", cmpA:null, cmpB:null};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
-const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["wait","Espera"],["conges","Congestión"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
+const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["wait","Espera"],["conges","Congestión"],["det","Detenciones"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
 const PEAK_H = [7,8,9,17,18,19];
 
 const CS_DIAS = [["L","Laboral"],["S","Sábado"],["D","Domingo"]];
@@ -132,6 +133,8 @@ function render(){
   renderNseGap();
   renderOperacion();
   renderCalidad();
+  renderEmpresas();
+  renderHeat();
 }
 
 function kpiCard(l,v,s){ return `<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`; }
@@ -244,8 +247,21 @@ function drawCongestion(){
   });
   setCoverLegend("conges");
 }
+function drawDetenciones(){
+  if(!coverLayer) return; coverLayer.clearLayers();
+  if(!DET2||!DET2.length){ setCoverLegend("det"); return; }
+  const mx=Math.max(...DET2.map(d=>d.det));
+  DET2.forEach(d=>{
+    const r=6+22*Math.sqrt(d.det/mx);
+    const col = d.buses>=150?"#fb7185":d.buses<=80?"#fbbf24":"#f97316";
+    L.circleMarker([d.la,d.lo],{renderer:coverCanvas,radius:r,weight:1,color:"rgba(0,0,0,.35)",fillColor:col,fillOpacity:.6})
+      .bindTooltip(`<b>${d.calle||d.tipo}</b> · ${d.comuna||""}<br>${d.tipo}<br>Detenciones: ${fmt(d.det)} · ${d.buses} buses · ${d.dias} días`,{sticky:true}).addTo(coverLayer);
+  });
+  setCoverLegend("det");
+}
 function drawCoverage(mode){
   if(mode==="conges"){ drawCongestion(); return; }
+  if(mode==="det"){ drawDetenciones(); return; }
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!COB) return;
   COB.features.forEach(f=>{
@@ -281,6 +297,7 @@ function setCoverLegend(mode){
     : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
     : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#a78bfa'>● colegio</span>"]
     : mode==="conges" ? [`Velocidad media · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>0</i><i>20</i><i>40+</i></span>"]
+    : mode==="det" ? ["Puntos de mayor detención","","<span class='lbls' style='gap:10px'><i style='color:#fb7185'>● alto flujo</i><i style='color:#f97316'>● medio</i><i style='color:#fbbf24'>● bajo</i></span><span class='par'>tamaño = tiempo detenido total</span>"]
     : ["NSE (avalúo CLP/m²)",`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
   coverLegend = L.control({position:"bottomleft"});
   coverLegend.onAdd = ()=>{ const d=L.DomUtil.create("div","speedleg"); d.innerHTML=`<b>${txt[0]}</b>${txt[1]}${txt[2]}`; return d; };
@@ -351,11 +368,12 @@ function renderMapa(){
     const b=$("live-count"), R=(COB&&COB.resumen)||{};
     const M=state.mapMode;
     const titulo = {cover:"Cobertura territorial del transporte",wait:"Tiempo de espera del transporte",
-      conges:`Velocidad por arco · ${periodoLbl(state.periodo)}`,
+      conges:`Velocidad por arco · ${periodoLbl(state.periodo)}`, det:"Puntos de mayor detención",
       salud:"Accesibilidad a salud en transporte",edu:"Accesibilidad a educación en transporte",nse:"Nivel socioeconómico (avalúo)"}[M];
     const badge = {cover:`${R.pct_cubierto}% cubierto · ${R.pct_desierto}% en desierto · acceso ${R.acc_mediana} min`,
       wait:"½ frecuencia de las líneas que sirven cada zona",
       conges:`velocidad media en ${periodoLbl(state.periodo)} · rojo = ejes lentos/congestionados`,
+      det:`${DET2.length} nodos · terminales, paraderos y cruces con más tiempo detenido`,
       salud:`tiempo mediano a salud: ${R.salud_med} min`, edu:`tiempo mediano a educación: ${R.edu_med} min`,
       nse:"avalúo m² · azul bajo → ámbar alto"}[M];
     if(b) b.textContent = badge||"";
@@ -672,6 +690,62 @@ function renderComparador(){
   setTimeout(()=>cmpChart.resize(),60);
 }
 
+/* ---------- migrado de clásico: empresas + heatmaps temporales (vista sistema) ---------- */
+const MES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const mesLab = s => { const p=String(s).split("-"); return (MES[(+p[1]||1)-1]||"")+" "+(p[0]||"").slice(2); };
+const sysScope = () => state.vista==="normal" && state.comuna==="TODAS" && state.linea==="TODAS";
+function renderEmpresas(){
+  const card=$("empresas-card");
+  if(!sysScope() || !EMPR.length){ card.style.display="none"; return; }
+  card.style.display="";
+  const d=EMPR.slice().sort((a,b)=>b.buses-a.buses).slice(0,18), th=TH();
+  if(empresasChart) empresasChart.dispose(); empresasChart=echarts.init($("empresas-chart"));
+  empresasChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    grid:{left:8,right:52,top:8,bottom:16,containLabel:true},
+    tooltip:{trigger:"axis",axisPointer:{type:"shadow"},backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      formatter:p=>{const x=d[p[0].dataIndex];return `<b>${x.fantasia}</b> (L${x.linea})<br>${x.razon_social}<br>Buses: <b>${x.buses}</b> · ${(x.pulsos/1e6).toFixed(1)} M pulsos<br>Vel ${x.vel} km/h · ${x.comunas}`;}},
+    xAxis:{type:"value",name:"buses",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    yAxis:{type:"category",inverse:true,data:d.map(x=>`${x.fantasia} (L${x.linea})`),axisLabel:{fontSize:11,color:th.tx},axisLine:{lineStyle:{color:th.axis}}},
+    series:[{type:"bar",data:d.map(x=>x.buses),barWidth:"66%",itemStyle:{borderRadius:[0,5,5,0],
+      color:new echarts.graphic.LinearGradient(1,0,0,0,[{offset:0,color:"#a78bfa"},{offset:1,color:"rgba(167,139,250,.35)"}])},
+      label:{show:true,position:"right",color:th.mut,fontSize:10.5,formatter:o=>o.value}}]
+  },true);
+  setTimeout(()=>empresasChart.resize(),60);
+}
+function renderHeat(){
+  const card=$("heat-card");
+  if(!sysScope() || (!MESH.length && !DOWH.length)){ card.style.display="none"; return; }
+  card.style.display="";
+  const hm=state.heatMode||"mes";
+  $("heat-mode").innerHTML=[["mes","Mes × hora"],["dow","Semana × hora"]].map(([k,l])=>`<b data-h="${k}" class="${hm===k?"on":""}">${l}</b>`).join("");
+  $("heat-mode").querySelectorAll("b").forEach(el=>el.onclick=()=>{state.heatMode=el.dataset.h;renderHeat();});
+  const th=TH(); if(heatChart) heatChart.dispose(); heatChart=echarts.init($("heat-chart"));
+  let yCats,data,maxv;
+  if(hm==="mes"){
+    const meses=[...new Set(MESH.map(x=>x.mes))].sort();
+    yCats=meses.map(mesLab); data=MESH.map(x=>[x.hora, meses.indexOf(x.mes), Math.round(x.prom)]);
+    maxv=Math.max(...MESH.map(x=>x.prom));
+  } else {
+    const lab=["","Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+    yCats=[1,2,3,4,5,6,7].map(d=>lab[d]); data=DOWH.map(x=>[x.hora, x.dow-1, Math.round(x.prom)]);
+    maxv=Math.max(...DOWH.map(x=>x.prom));
+  }
+  heatChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    grid:{left:54,right:20,top:12,bottom:44,containLabel:true},
+    tooltip:{position:"top",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      formatter:p=>`${yCats[p.data[1]]} · ${HORAS[p.data[0]]}<br>Flota: <b>${fmt1(p.data[2])}</b> buses`},
+    xAxis:{type:"category",data:HORAS,axisLabel:{color:th.mut,fontSize:9},axisLine:{lineStyle:{color:th.axis}},splitArea:{show:false}},
+    yAxis:{type:"category",data:yCats,axisLabel:{color:th.tx,fontSize:11},axisLine:{lineStyle:{color:th.axis}}},
+    visualMap:{min:0,max:Math.ceil(maxv),calculable:false,orient:"horizontal",left:"center",bottom:2,itemWidth:12,itemHeight:120,
+      inRange:{color:["#0b1220","#143656","#0ea5e9","#34d399","#fbbf24"]},textStyle:{color:th.mut,fontSize:10}},
+    series:[{type:"heatmap",data,label:{show:false},itemStyle:{borderColor:"rgba(0,0,0,.12)",borderWidth:1},
+      emphasis:{itemStyle:{shadowBlur:8,shadowColor:"rgba(0,0,0,.5)"}}}]
+  },true);
+  setTimeout(()=>heatChart.resize(),60);
+}
+
 /* ---------- init ---------- */
 (async function(){
   try{
@@ -692,6 +766,10 @@ function renderComparador(){
     J("flota_equidad.json").then(d=>{ EQ=d; renderEquidad(); }).catch(()=>{});
     J("operacion_linea.json").then(d=>{ OP=d; renderOperacion(); renderCalidad(); }).catch(()=>{});
     J("speed_grid_hora.json").then(d=>{ GRID=d; if(state.mapMode==="conges") renderMapa(); }).catch(()=>{});
+    J("detenciones.json").then(d=>{ DET2=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
+    J("empresa_stats.json").then(d=>{ EMPR=d; renderEmpresas(); }).catch(()=>{});
+    J("flota_mes_hora.json").then(d=>{ MESH=d; renderHeat(); }).catch(()=>{});
+    J("dow_hora.json").then(d=>{ DOWH=d; renderHeat(); }).catch(()=>{});
     buildMapModes();
     buildPeriodo();
     buildComunaTabs();
@@ -700,6 +778,6 @@ function renderComparador(){
     $("reset-btn").onclick = ()=>{ Object.assign(state,{comuna:"TODAS",linea:"TODAS",vista:"normal"}); $("linea-search").value=""; buildLineaList(); render(); };
     render();
     loadLive(); setInterval(loadLive, 60000);   // buses operando ahora, refresco 60 s
-    addEventListener("resize", ()=>{ [chart,csChart,eqChart,nseChart,rankChart,cmpChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
+    addEventListener("resize", ()=>{ [chart,csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();
