@@ -4,13 +4,13 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=37`).then(r=>r.json());
-const BUILD = "2026-06-24 14:30";
+const J = n => fetch(`data/${n}?v=38`).then(r=>r.json());
+const BUILD = "2026-06-24 15:10";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
-let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", cmpA:null, cmpB:null};
+let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", cmpA:null, cmpB:null};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
@@ -52,6 +52,9 @@ const empresaDe = ln => { const x=(T.lineas||[]).find(l=>l.linea===ln); return x
 const PERIODOS = [["agg","Agregado"],["am","Punta AM"],["md","Mediodía"],["pm","Punta PM"],["off","Fuera punta"]];
 const PERIODO_H = {agg:[6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22], am:[7,8,9], md:[12,13,14], pm:[17,18,19], off:[10,11,15,16,20,21,22]};
 const periodoLbl = p => (PERIODOS.find(x=>x[0]===p)||["","Agregado"])[1];
+const PURPOSES = [["all","Todos"],["trab","Trabajo"],["est","Estudio"],["sal","Salud"],["otr","Otros"]];
+const PURP_FIELD = {all:"viajes",trab:"trabajo",est:"estudio",sal:"salud",otr:"otros"};
+const purposeLbl = p => (PURPOSES.find(x=>x[0]===p)||["","Todos"])[1];
 
 function buildComunaTabs(){
   const order = (GEO.features||[]).map(f=>f.properties.name);
@@ -73,6 +76,14 @@ function buildPeriodo(){
   box.querySelectorAll("b").forEach(el=>el.onclick=()=>{ state.periodo=el.dataset.p;
     box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.p===state.periodo));
     if(state.mapMode==="conges" || state.mapMode==="wait" || state.mapMode==="bunch" || state.vista==="ranking") render(); });
+}
+function buildPurpose(){
+  const box=$("purpose-sel"); if(!box) return;
+  box.innerHTML = `<span class="lbl">Propósito</span><div class="seg">`+
+    PURPOSES.map(([k,l])=>`<b data-p="${k}" class="${state.purpose===k?"on":""}">${l}</b>`).join("")+`</div>`;
+  box.querySelectorAll("b").forEach(el=>el.onclick=()=>{ state.purpose=el.dataset.p;
+    box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.p===state.purpose));
+    if(["cover","trans","wait"].includes(state.mapMode)) render(); });
 }
 function buildLineaList(filter=""){
   const f = filter.trim().toLowerCase();
@@ -102,6 +113,8 @@ function render(){
   document.querySelectorAll(".litem").forEach(e=>e.classList.toggle("active", e.dataset.l===state.linea && state.vista==="normal"));
   const periodoRelevante = state.vista==="ranking" || (state.vista==="normal" && state.linea==="TODAS" && (state.mapMode==="conges"||state.mapMode==="wait"||state.mapMode==="bunch"));
   $("periodo-sel").style.display = periodoRelevante ? "flex" : "none";
+  const purposeRel = state.vista==="normal" && state.linea==="TODAS" && ["cover","trans","wait"].includes(state.mapMode);
+  if($("purpose-sel")) $("purpose-sel").style.display = purposeRel ? "flex" : "none";
 
   // VISTAS ESPECIALES (territorio): ranking / comparador de comunas
   if(state.vista==="ranking" || state.vista==="comparador"){
@@ -363,35 +376,39 @@ function drawCoverage(mode){
   COB.features.forEach(f=>{
     const p=f.properties, cc=f.geometry.coordinates[0];
     if(!inComuna(p.cy!=null?p.cy:(cc[0][1]+cc[2][1])/2, p.cx!=null?p.cx:(cc[0][0]+cc[2][0])/2)) return;
+    const pu = state.purpose||"all";
+    const dG = k => (p[k] && typeof p[k]==="object") ? p[k][pu] : p[k];   // lee dacc/ddir/dtr/tbi por propósito (compat)
     let col;
-    if(mode==="cover") col = daccColor(p.dacc);                           // % destinos alcanzables (EOD)
-    else if(mode==="trans") col = tbiColor(p.tbi);                        // intensidad de transbordo
-    else if(mode==="wait") col = waitColor(p.waitd ? p.waitd[state.periodo] : null);
+    if(mode==="cover") col = daccColor(dG("dacc"));                       // % destinos alcanzables (EOD, por propósito)
+    else if(mode==="trans") col = tbiColor(dG("tbi"));                    // intensidad de transbordo
+    else if(mode==="wait") col = waitColor(p.waitd ? p.waitd[pu][state.periodo] : null);
     else if(mode==="salud") col = accSColor(p.salud);
     else if(mode==="edu") col = accSColor(p.edu);
     else col = nseColor(p.nse);
     const ll=f.geometry.coordinates[0].map(c=>[c[1],c[0]]);
-    const tipAcc = `destinos: <b>${p.dacc??"—"}%</b> alcanzable · ${p.ddir??"—"}% directo · ${p.dtr??0}% con transbordo`;
+    const tipAcc = `destinos (${purposeLbl(pu)}): <b>${dG("dacc")??"—"}%</b> alcanzable · ${dG("ddir")??"—"}% directo · ${dG("dtr")??0}% con transbordo`;
     const per = state.periodo;
-    const wd = p.waitd ? p.waitd[per] : null, wf = p.wait ? p.wait[per] : null;
+    const wd = p.waitd ? p.waitd[pu][per] : null, wf = p.wait ? p.wait[per] : null;
     const tip = (mode==="cover"||mode==="trans")
       ? `${NF.format(p.n)} viviendas · acceso ${p.acc} min<br>${tipAcc}`
       : (mode==="wait")
-      ? `${NF.format(p.n)} viviendas · ${periodoLbl(per)}<br>espera hacia destinos: <b>${wd==null?"sin servicio":wd+" min"}</b> · al primer bus ${wf==null?"—":wf+" min"}`
+      ? `${NF.format(p.n)} viviendas · ${periodoLbl(per)} · ${purposeLbl(pu)}<br>espera hacia destinos: <b>${wd==null?"sin servicio":wd+" min"}</b> · al primer bus ${wf==null?"—":wf+" min"}`
       : `${NF.format(p.n)} viviendas · acceso ${p.acc} min · espera ${wf==null?"sin servicio":wf+" min"}<br>a salud ${p.salud??"—"} min · a educación ${p.edu??"—"} min`;
     L.polygon(ll,{renderer:coverCanvas,stroke:false,fillColor:col,fillOpacity:.55})
       .bindTooltip(tip,{sticky:true})
       .addTo(coverLayer);
   });
-  // destinos EOD (capa sobre cobertura/transbordo): tamaño=viajes, color=exigencia de transbordo
+  // destinos EOD (capa sobre cobertura/transbordo): tamaño=demanda del propósito, color=exigencia de transbordo
   if(DEST && DEST.destinos && (mode==="cover"||mode==="trans")){
-    const mxv = Math.max(...DEST.destinos.map(d=>d.viajes));
-    DEST.destinos.forEach(d=>{
+    const pu = state.purpose||"all", fld = PURP_FIELD[pu];
+    const ds = DEST.destinos.filter(d=>(d[fld]||0)>0);
+    const mxv = Math.max(1, ...ds.map(d=>d[fld]||0));
+    ds.forEach(d=>{
       if(!inComuna(d.lat,d.lon)) return;
-      const r = 5+13*Math.sqrt(d.viajes/mxv);
+      const r = 5+13*Math.sqrt((d[fld]||0)/mxv);
       L.circleMarker([d.lat,d.lon],{renderer:coverCanvas,radius:r,weight:1.5,color:"#0b1220",
         fillColor:tbiColor(d.pct_trans),fillOpacity:.92})
-        .bindTooltip(`<b>Destino · ${d.voc}</b> · ${d.comuna}<br>${NF.format(d.viajes)} viajes atraídos (EOD 2015)<br>exige transbordo al <b>${d.pct_trans??0}%</b> del territorio · ${d.nlineas_dir} líneas directas`,
+        .bindTooltip(`<b>Destino · ${d.voc}</b> · ${d.comuna}<br>${NF.format(d[fld]||0)} viajes de ${purposeLbl(pu)} (EOD 2015)<br>exige transbordo al <b>${d.pct_trans??0}%</b> del territorio · ${d.nlineas_dir} líneas directas`,
         {sticky:true,direction:"top"}).addTo(coverLayer);
     });
   }
@@ -984,7 +1001,7 @@ function renderEvolucion(){
       .then(([t,l,r,c])=>{ REC={top:t,lentos:l,reg:r,corr:c}; renderRecorridos(); });
     J("evolucion_comuna.json").then(d=>{ EVOL=d; renderEvolucion(); }).catch(()=>{});
     buildMapModes();
-    buildPeriodo();
+    buildPeriodo(); buildPurpose();
     buildComunaTabs();
     buildLineaList();
     $("linea-search").addEventListener("input", e=>buildLineaList(e.target.value));
