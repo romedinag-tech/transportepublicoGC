@@ -4,10 +4,10 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=35`).then(r=>r.json());
-const BUILD = "2026-06-24 13:05";
+const J = n => fetch(`data/${n}?v=36`).then(r=>r.json());
+const BUILD = "2026-06-24 13:40";
 
-let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={};
+let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", cmpA:null, cmpB:null};
@@ -265,20 +265,44 @@ function nseColor(v){
 }
 const accSColor = m => m==null ? "#555b6b" : `hsl(${120-120*Math.min(m/25,1)},72%,50%)`;  // 0min verde -> 25+ rojo
 const congSpeedColor = v => `hsl(${Math.min(v/40,1)*120},75%,50%)`;   // 0 km/h rojo -> 40+ verde
+function periodCellSpeeds(){            // velocidad media por celda en el período elegido
+  const hrs = PERIODO_H[state.periodo] || GRID.horas;
+  const n = GRID.cells.length, sp = new Array(n).fill(0);
+  for(let i=0;i<n;i++){ let s=0,k=0;
+    for(const h of hrs){ const v=(GRID.vel[String(h)]||[])[i]; if(v>0){s+=v;k++;} }
+    sp[i] = k>0 ? s/k : 0;
+  }
+  return sp;
+}
 function drawCongestion(){
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!GRID){ setCoverLegend("conges"); return; }
-  const hrs = PERIODO_H[state.periodo] || GRID.horas;
   const lbl = periodoLbl(state.periodo);
+  if(CONGRED && CONGRED.roads){       // RED CONTINUA: velocidad drapeada sobre cada calle
+    const cs = periodCellSpeeds();
+    CONGRED.roads.forEach(rd=>{
+      const P=rd.p, C=rd.c;
+      for(let i=0;i<P.length-1;i++){
+        const a=C[i], b=C[i+1];
+        if(a<0||b<0) continue;
+        const va=cs[a], vb=cs[b];
+        if(!(va>0)||!(vb>0)) continue;
+        if(!inComuna((P[i][0]+P[i+1][0])/2,(P[i][1]+P[i+1][1])/2)) continue;
+        const m=(va+vb)/2;
+        L.polyline([P[i],P[i+1]],{renderer:coverCanvas,color:congSpeedColor(m),weight:3.6,opacity:.85,lineCap:"round"})
+          .bindTooltip(`${rd.n?rd.n+" · ":""}${Math.round(m)} km/h (${lbl})`,{sticky:true}).addTo(coverLayer);
+      }
+    });
+    setCoverLegend("conges"); return;
+  }
+  const hrs = PERIODO_H[state.periodo] || GRID.horas;   // fallback: celdas discretas
   GRID.cells.forEach((c,i)=>{
     if(!inComuna(c[0],c[1])) return;
     const sp = hrs.map(h=>(GRID.vel[String(h)]||[])[i]).filter(v=>v>0);
     if(sp.length<1) return;
     const mean = sp.reduce((a,b)=>a+b,0)/sp.length;
-    const free = Math.max(...GRID.horas.map(h=>(GRID.vel[String(h)]||[])[i]).filter(v=>v>0));
-    const drop = free>0 ? Math.round(100*(1-mean/free)) : 0;
     L.circleMarker([c[0],c[1]],{renderer:coverCanvas,radius:4.2,weight:0,fillColor:congSpeedColor(mean),fillOpacity:.62})
-      .bindTooltip(`velocidad ${Math.round(mean)} km/h (${lbl})${drop>0?` · ${drop}% bajo el flujo libre`:""}`,{sticky:true}).addTo(coverLayer);
+      .bindTooltip(`velocidad ${Math.round(mean)} km/h (${lbl})`,{sticky:true}).addTo(coverLayer);
   });
   setCoverLegend("conges");
 }
@@ -383,7 +407,7 @@ function buildMapModes(){
   const box=$("map-mode"); if(!box) return;
   box.innerHTML = MAP_MODES.map(([k,l])=>`<b data-m="${k}" class="${state.mapMode===k?"on":""}">${l}</b>`).join("");
   box.querySelectorAll("b").forEach(el=>el.onclick=()=>{ state.mapMode=el.dataset.m;
-    box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.m===state.mapMode)); renderMapa(); });
+    box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.m===state.mapMode)); render(); });
 }
 function setSpeedLegend(on){
   if(on && !speedLegend){
@@ -924,6 +948,7 @@ function renderEvolucion(){
     J("flota_equidad.json").then(d=>{ EQ=d; renderEquidad(); }).catch(()=>{});
     J("operacion_linea.json").then(d=>{ OP=d; renderOperacion(); renderCalidad(); }).catch(()=>{});
     J("speed_grid_hora.json").then(d=>{ GRID=d; if(state.mapMode==="conges") renderMapa(); }).catch(()=>{});
+    J("congestion_red.json").then(d=>{ CONGRED=d; if(state.mapMode==="conges") renderMapa(); }).catch(()=>{});
     J("detenciones.json").then(d=>{ DET2=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
     J("terminales.json").then(d=>{ TERM=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
     J("destinos_principales.json").then(d=>{ DEST=d; if(state.mapMode==="cover"||state.mapMode==="trans") renderMapa(); }).catch(()=>{});
