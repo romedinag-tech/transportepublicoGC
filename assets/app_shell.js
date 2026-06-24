@@ -4,12 +4,12 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=30`).then(r=>r.json());
-const BUILD = "2026-06-18 22:20";
+const J = n => fetch(`data/${n}?v=31`).then(r=>r.json());
+const BUILD = "2026-06-18 23:05";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={};
-let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart;
-let EMPR=[], MESH=[], DOWH=[], DET2=[], REC={top:[],lentos:[],reg:[],corr:[]};
+let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
+let EMPR=[], MESH=[], DOWH=[], DET2=[], REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", cmpA:null, cmpB:null};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
@@ -136,6 +136,7 @@ function render(){
   renderEmpresas();
   renderHeat();
   renderRecorridos();
+  renderEvolucion();
 }
 
 function kpiCard(l,v,s){ return `<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`; }
@@ -821,6 +822,42 @@ function renderRecorridos(){
   $("rec-foot").textContent=foot;
 }
 
+/* ---------- evolución 12 meses por comuna (¿mejoró o empeoró?) ---------- */
+const EVOL_VARS=[["vel","Velocidad","km/h",1],["det","Tiempo detenido","%",-1],["pulsos","Registros","M",1]];
+const MES3=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const mesLbl3 = s => { const p=String(s).split("-"); return (MES3[(+p[1]||1)-1]||"")+"'"+(p[0]||"").slice(2); };
+function renderEvolucion(){
+  const card=$("evol-card");
+  const ambito = state.comuna==="TODAS" ? "TODAS" : state.comuna;
+  const d=(EVOL.comunas||{})[ambito];
+  if(state.linea!=="TODAS" || state.vista!=="normal" || !d){ card.style.display="none"; return; }
+  card.style.display="";
+  const vk=state.evolVar||"vel", vdef=EVOL_VARS.find(v=>v[0]===vk);
+  $("evol-title").textContent = "Evolución últimos 12 meses" + (ambito==="TODAS"?"":` · ${ambito}`);
+  $("evol-var").innerHTML=EVOL_VARS.map(v=>`<b data-e="${v[0]}" class="${vk===v[0]?"on":""}">${v[1]}</b>`).join("");
+  $("evol-var").querySelectorAll("b").forEach(el=>el.onclick=()=>{state.evolVar=el.dataset.e;renderEvolucion();});
+  const serie=d[vk]||[], xs=EVOL.meses.map(mesLbl3);
+  const valid=serie.filter(x=>x!=null);
+  const first=valid[0], last=valid[valid.length-1], delta=last!=null&&first!=null?Math.round((last-first)*10)/10:null;
+  const mejor = vdef[3]>0 ? (delta>0) : (delta<0);
+  const col = delta==null||Math.abs(delta)<0.2 ? "#94a1ba" : mejor ? "#34d399" : "#fb7185";
+  const th=TH(); if(evolChart) evolChart.dispose(); evolChart=echarts.init($("evol-chart"));
+  evolChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    grid:{left:40,right:18,top:16,bottom:24,containLabel:true},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      formatter:p=>`${p[0].name}<br>${vdef[1]}: <b>${p[0].value==null?"—":fmt1(p[0].value)} ${vdef[2]}</b>`},
+    xAxis:{type:"category",data:xs,axisLabel:{color:th.mut,fontSize:10},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",scale:true,name:vdef[2],axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    series:[{type:"line",data:serie,smooth:true,symbol:"circle",symbolSize:6,connectNulls:true,
+      lineStyle:{width:2.6,color:col},itemStyle:{color:col},areaStyle:{color:col+"1f"}}]
+  },true);
+  setTimeout(()=>evolChart.resize(),60);
+  const flecha = delta==null?"":delta>0?"▲":delta<0?"▼":"=";
+  $("evol-foot").innerHTML = delta==null ? "Sin datos suficientes." :
+    `${vdef[1]} pasó de <b>${fmt1(first)}</b> a <b>${fmt1(last)} ${vdef[2]}</b> en ${valid.length} meses: <b style="color:${col}">${flecha} ${delta>0?"+":""}${delta} ${vdef[2]}</b> (${mejor?"mejora":"empeora"}).`;
+}
+
 /* ---------- init ---------- */
 (async function(){
   try{
@@ -847,6 +884,7 @@ function renderRecorridos(){
     J("dow_hora.json").then(d=>{ DOWH=d; renderHeat(); }).catch(()=>{});
     Promise.all([J("top_recorridos.json").catch(()=>[]),J("lentos_punta.json").catch(()=>[]),J("regularidad.json").catch(()=>[]),J("corredores.json").catch(()=>[])])
       .then(([t,l,r,c])=>{ REC={top:t,lentos:l,reg:r,corr:c}; renderRecorridos(); });
+    J("evolucion_comuna.json").then(d=>{ EVOL=d; renderEvolucion(); }).catch(()=>{});
     buildMapModes();
     buildPeriodo();
     buildComunaTabs();
@@ -855,6 +893,6 @@ function renderRecorridos(){
     $("reset-btn").onclick = ()=>{ Object.assign(state,{comuna:"TODAS",linea:"TODAS",vista:"normal"}); $("linea-search").value=""; buildLineaList(); render(); };
     render();
     loadLive(); setInterval(loadLive, 60000);   // buses operando ahora, refresco 60 s
-    addEventListener("resize", ()=>{ [chart,csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
+    addEventListener("resize", ()=>{ [chart,csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();
