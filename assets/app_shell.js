@@ -4,13 +4,13 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=43`).then(r=>r.json());
-const BUILD = "2026-06-24 18:00";
+const J = n => fetch(`data/${n}?v=44`).then(r=>r.json());
+const BUILD = "2026-06-24 18:40";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
-let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null;
+let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", cmpA:null, cmpB:null};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
@@ -509,6 +509,21 @@ function renderMapa(){
       L.circleMarker([s[0],s[1]],{radius:3.2,color:"#0b1220",weight:1,fillColor:"#e2e8f0",fillOpacity:0.95})
         .bindTooltip(s[2],{direction:"top"}).addTo(stopLayer);
     });
+    // TERMINALES y cabeceras de la línea (▣ = terminal con dwell; ◇ = cabecera de ruta)
+    const tl = TLIN[state.linea];
+    if(tl && tl.puntos){
+      tl.puntos.forEach(t=>{
+        if(t.tipo==="terminal"){
+          const icon=L.divIcon({className:"term-ic",html:`<div class="term-box">▣ Terminal</div>`,iconSize:[58,18],iconAnchor:[29,9]});
+          L.marker([t.lat,t.lon],{icon,zIndexOffset:600}).bindTooltip(
+            `<b>Terminal · Línea ${state.linea}</b><br>${NF.format(t.det)} pulsos detenidos · ${t.buses} buses<br>intensidad ${t.intens} (reposo por bus/día)<br><span style="color:#fbbf24">se excluye del análisis en ruta</span>`,
+            {sticky:true,direction:"top"}).addTo(routeLayer);
+        } else {
+          L.circleMarker([t.lat,t.lon],{radius:6,weight:2,color:"#38bdf8",fillColor:"#0b1220",fillOpacity:.5})
+            .bindTooltip(`Cabecera de ruta · Línea ${state.linea}`,{direction:"top"}).addTo(routeLayer);
+        }
+      });
+    }
     const nrec = new Set(GEOM[state.linea].map(s=>s.rec)).size;
     $("map-title").textContent = `Línea ${state.linea} · ${nrec} recorrido${nrec>1?"s":""} · ${ps.length} paraderos · color = velocidad`;
   } else if(state.comuna!=="TODAS"){
@@ -563,7 +578,18 @@ function scopeWavg(getter){            // promedio ponderado por viviendas sobre
 }
 function renderNarrative(){
   const el=$("map-narrative"); if(!el) return;
-  if(state.linea!=="TODAS" || state.vista!=="normal"){ el.innerHTML=""; return; }
+  if(state.vista!=="normal"){ el.innerHTML=""; return; }
+  if(state.linea!=="TODAS"){
+    const tl=TLIN[state.linea];
+    if(tl && tl.puntos){
+      const nt=tl.puntos.filter(p=>p.tipo==="terminal").length, d=tl.dist||{};
+      const dist = (d.share_terminal>=8)
+        ? ` <b style="color:#fbbf24">El ${d.share_terminal}% de su tiempo detenido es dwell de terminal</b>, no demora en marcha: al excluirlo, el tiempo detenido en ruta baja de <b>${d.det_raw}%</b> a <b>${d.det_corr}%</b>.`
+        : ` Su dwell de terminal es bajo (${d.share_terminal??0}% del detenido): las demoras que ves son mayormente en ruta.`;
+      el.innerHTML = `<b>Terminales de la línea ${state.linea}</b>: ${nt} terminal${nt===1?"":"es"} de alto reposo (▣) y sus cabeceras de ruta (◇), detectados desde el GPS.${dist} La velocidad media no se distorsiona (ya excluye los buses parados); el <b>% de tiempo detenido</b> sí, por eso se reporta la versión <b>en ruta</b>.`;
+    } else el.innerHTML="";
+    return;
+  }
   const M=state.mapMode, amb = state.comuna==="TODAS"?"el Gran Concepción":state.comuna;
   const pu=state.purpose||"all", per=state.periodo, pl=purposeLbl(pu);
   const pe = pu!=="all" ? ` de ${pl}` : "";
@@ -1137,6 +1163,7 @@ function renderEvolucion(){
     J("evolucion_comuna.json").then(d=>{ EVOL=d; renderEvolucion(); }).catch(()=>{});
     Promise.all([J("variantes_freq.json").catch(()=>null), J("freq_trend.json").catch(()=>null)])
       .then(([vf,vt])=>{ VFREQ=vf; VTREND=vt; renderVarFreq(); });
+    J("terminales_linea.json").then(d=>{ TLIN=d; if(state.linea!=="TODAS") renderMapa(); }).catch(()=>{});
     buildMapModes();
     buildPeriodo(); buildPurpose();
     buildComunaTabs();
