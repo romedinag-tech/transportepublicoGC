@@ -10,8 +10,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Componentes y variables de tema existentes (kpi, ctab, litem, rank-row, cump-row, seg…) -->
-<link rel="stylesheet" href="assets/styles.css?v=32">
-<link rel="stylesheet" href="assets/shell.css?v=32">
+<link rel="stylesheet" href="assets/styles.css?v=33">
+<link rel="stylesheet" href="assets/shell.css?v=33">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <!-- Tailwind (Play CDN, sin build). preflight off para no pisar los componentes existentes. -->
@@ -85,6 +85,10 @@ tailwind.config = {
     border:1px solid var(--line2)!important;border-radius:9px!important;backdrop-filter:blur(10px);
     box-shadow:0 10px 30px -8px rgba(0,0,0,.6)!important;font-family:var(--sans);font-size:11.5px;font-weight:500}
   .leaflet-tooltip-top:before{border-top-color:var(--line2)!important}
+  .term-ic{background:none!important;border:none!important}
+  .term-box{display:inline-block;font:700 11px/1 var(--sans);color:#0b1220;background:#22d3ee;
+    border:1.5px solid #0e7490;border-radius:5px;padding:3px 6px;white-space:nowrap;
+    box-shadow:0 2px 8px -2px rgba(0,0,0,.7);letter-spacing:.02em}
   .leaflet-popup-tip{background:var(--topbar)!important;border:1px solid var(--line2)!important}
   .leaflet-bar a,.leaflet-control-layers{background:var(--panel)!important;color:var(--tx)!important;border-color:var(--line)!important}
   .leaflet-bar a:hover{background:var(--panel2)!important;color:var(--acc)!important}
@@ -238,6 +242,7 @@ tailwind.config = {
         <span class="text-[10.5px] font-semibold tracking-[.12em] text-[var(--dim)] uppercase">Operador · Líneas</span>
       </div>
       <input class="side-search" id="linea-search" placeholder="Buscar línea o empresa…" autocomplete="off">
+      <div id="linea-hint" class="text-[10px] text-[var(--dim)] px-1 pt-1 pb-0.5"></div>
       <div id="linea-list"></div>
     </aside>
 
@@ -265,7 +270,7 @@ tailwind.config = {
         <!-- MAPA HÉROE (2/3) -->
         <section class="widget xl:col-span-2 flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=32" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=33" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -287,7 +292,7 @@ tailwind.config = {
         <div class="flex flex-col gap-4">
           <section class="widget">
             <div class="widget-h">
-              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=32" alt="" width="22" height="22"></span>
+              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=33" alt="" width="22" height="22"></span>
               <div><h3>Flota y velocidad</h3><span class="sub">por hora · días laborables</span></div>
             </div>
             <div class="widget-b"><div id="ch-hora" style="height:236px"></div></div>
@@ -306,7 +311,7 @@ tailwind.config = {
       <!-- Cumplimiento de frecuencia -->
       <section class="widget">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=32" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=33" alt="" width="22" height="22"></span>
           <div><h3>Cumplimiento de frecuencia</h3><span class="sub">programado (GTFS) vs observado (GPS)</span></div>
         </div>
         <div class="widget-b"><div id="cump-box"></div></div>
@@ -315,7 +320,7 @@ tailwind.config = {
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=32" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=33" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -423,7 +428,7 @@ tailwind.config = {
 </div>
 
 <script src="assets/echarts.min.js"></script>
-<script src="assets/app_shell.js?v=32"></script>
+<script src="assets/app_shell.js?v=33"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

@@ -4,12 +4,12 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=32`).then(r=>r.json());
-const BUILD = "2026-06-18 23:40";
+const J = n => fetch(`data/${n}?v=33`).then(r=>r.json());
+const BUILD = "2026-06-24 10:30";
 
-let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={};
+let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={};
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
-let EMPR=[], MESH=[], DOWH=[], DET2=[], REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
+let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", cmpA:null, cmpB:null};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
@@ -63,7 +63,7 @@ function buildComunaTabs(){
     el.onclick = ()=>{ const v=el.dataset.v;
       if(v==="normal"){ state.vista="normal"; state.comuna=el.dataset.c; state.linea="TODAS"; }
       else { state.vista=v; state.comuna="TODAS"; state.linea="TODAS"; }
-      render(); };
+      buildLineaList($("linea-search")?$("linea-search").value:""); render(); };
   });
 }
 function buildPeriodo(){
@@ -76,14 +76,19 @@ function buildPeriodo(){
 }
 function buildLineaList(filter=""){
   const f = filter.trim().toLowerCase();
-  const items = (T.lineas||[]).filter(l => !f || l.linea.includes(f) || (l.empresa||"").toLowerCase().includes(f));
+  const setC = (state.comuna!=="TODAS" && CLIN[state.comuna]) ? new Set(CLIN[state.comuna]) : null;
+  const items = (T.lineas||[])
+    .filter(l => !setC || setC.has(l.linea))
+    .filter(l => !f || l.linea.includes(f) || (l.empresa||"").toLowerCase().includes(f));
+  const hint = $("linea-hint");
+  if(hint) hint.textContent = setC ? `${items.length} líneas operan en ${state.comuna}` : `${items.length} líneas · sistema`;
   $("linea-list").innerHTML = items.map(l =>
     `<div class="litem" data-l="${l.linea}"><span class="ln">${l.linea}</span><span class="nm">${l.empresa||""}</span></div>`).join("");
   $("linea-list").querySelectorAll(".litem").forEach(el=>{
     el.onclick = ()=>{ state.linea = state.linea===el.dataset.l ? "TODAS" : el.dataset.l;
       state.vista = "normal";
       if(state.linea!=="TODAS") state.comuna = "TODAS";   // elegir línea limpia la comuna
-      render(); };
+      buildLineaList($("linea-search")?$("linea-search").value:""); render(); };
   });
 }
 
@@ -275,16 +280,30 @@ function drawCongestion(){
   });
   setCoverLegend("conges");
 }
+function congDetColor(t){ // t=0..1 (severidad) -> ámbar a rojo
+  const h = 45 - 45*Math.min(1,t); return `hsl(${h},85%,52%)`;
+}
 function drawDetenciones(){
   if(!coverLayer) return; coverLayer.clearLayers();
-  if(!DET2||!DET2.length){ setCoverLegend("det"); return; }
-  const mx=Math.max(...DET2.map(d=>d.det));
-  DET2.forEach(d=>{
-    if(!inComuna(d.la,d.lo)) return;
-    const r=6+22*Math.sqrt(d.det/mx);
-    const col = d.buses>=150?"#fb7185":d.buses<=80?"#fbbf24":"#f97316";
-    L.circleMarker([d.la,d.lo],{renderer:coverCanvas,radius:r,weight:1,color:"rgba(0,0,0,.35)",fillColor:col,fillOpacity:.6})
-      .bindTooltip(`<b>${d.calle||d.tipo}</b> · ${d.comuna||""}<br>${d.tipo}<br>Detenciones: ${fmt(d.det)} · ${d.buses} buses · ${d.dias} días`,{sticky:true}).addTo(coverLayer);
+  const cong = (DET2||[]).filter(d=>inComuna(d.la,d.lo));
+  const terms = ((TERM&&TERM.terminales)||[]).filter(t=>inComuna(t.la,t.lo));
+  // congestión: nodos reales de demora (terminales ya excluidos en el dato)
+  if(cong.length){
+    const mx=Math.max(...cong.map(d=>d.det));
+    cong.forEach(d=>{
+      const r=6+22*Math.sqrt(d.det/mx);
+      L.circleMarker([d.la,d.lo],{renderer:coverCanvas,radius:r,weight:1,color:"rgba(0,0,0,.35)",fillColor:congDetColor(d.det/mx),fillOpacity:.6})
+        .bindTooltip(`<b>${d.calle||d.tipo}</b> · ${d.comuna||""}<br>${d.tipo}<br>Tiempo detenido: ${fmt(d.det)} pulsos · ${d.buses} buses distintos`,{sticky:true}).addTo(coverLayer);
+    });
+  }
+  // terminales / cabeceras: capa distinta con flota por línea
+  terms.forEach(t=>{
+    const dom = (t.lineas&&t.lineas[0]) ? t.lineas[0].linea : "T";
+    const rows = (t.lineas||[]).map(l=>`<tr><td style="padding:0 8px 0 0">Línea ${l.linea}</td><td style="text-align:right"><b>${l.buses}</b> buses</td></tr>`).join("");
+    const icon = L.divIcon({className:"term-ic",html:`<div class="term-box">▣ ${dom}</div>`,iconSize:[36,18],iconAnchor:[18,9]});
+    L.marker([t.la,t.lo],{icon,zIndexOffset:500}).bindTooltip(
+      `<b>Terminal / cabecera · ${t.comuna||""}</b><br>Flota que opera desde aquí:<table style="margin-top:3px">${rows}</table>`,
+      {sticky:true,direction:"top"}).addTo(coverLayer);
   });
   setCoverLegend("det");
 }
@@ -329,7 +348,7 @@ function setCoverLegend(mode){
     : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
     : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#a78bfa'>● colegio</span>"]
     : mode==="conges" ? [`Velocidad media · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>0</i><i>20</i><i>40+</i></span>"]
-    : mode==="det" ? ["Puntos de mayor detención","","<span class='lbls' style='gap:10px'><i style='color:#fb7185'>● alto flujo</i><i style='color:#f97316'>● medio</i><i style='color:#fbbf24'>● bajo</i></span><span class='par'>tamaño = tiempo detenido total</span>"]
+    : mode==="det" ? ["Congestión: nodos de demora (sin terminales)",`<span class="grad" style="background:linear-gradient(90deg,hsl(45,85%,52%),hsl(0,85%,52%))"></span>`,"<span class='lbls'><i>menor</i><i>mayor</i></span><span class='par'><b style='color:#22d3ee'>▣</b> terminal · flota por línea al pasar</span>"]
     : ["NSE (avalúo CLP/m²)",`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
   coverLegend = L.control({position:"bottomleft"});
   coverLegend.onAdd = ()=>{ const d=L.DomUtil.create("div","speedleg"); d.innerHTML=`<b>${txt[0]}</b>${txt[1]}${txt[2]}`; return d; };
@@ -401,13 +420,13 @@ function renderMapa(){
     const b=$("live-count"), R=(COB&&COB.resumen)||{};
     const M=state.mapMode;
     const titulo = {cover:"Cobertura del transporte",wait:"Tiempo de espera del transporte",
-      conges:`Velocidad por arco · ${periodoLbl(state.periodo)}`, det:"Puntos de mayor detención",
+      conges:`Velocidad por arco · ${periodoLbl(state.periodo)}`, det:"Congestión y terminales",
       salud:"Accesibilidad a salud en transporte",edu:"Accesibilidad a educación en transporte",nse:"Nivel socioeconómico (avalúo)"}[M];
     // resumen sólo a nivel sistema (COB.resumen es de todo el GC); en comuna, etiqueta de ámbito
     const badgeSys = {cover:`${R.pct_cubierto}% cubierto · ${R.pct_desierto}% en desierto · acceso ${R.acc_mediana} min`,
       wait:"½ frecuencia de las líneas que sirven cada zona",
       conges:`velocidad media en ${periodoLbl(state.periodo)} · rojo = ejes lentos`,
-      det:`${DET2.length} nodos · terminales, paraderos y cruces con más detención`,
+      det:`${DET2.length} nodos de congestión (sin terminales) · ${(TERM&&TERM.terminales||[]).length} terminales detectados`,
       salud:`tiempo mediano a salud: ${R.salud_med} min`, edu:`tiempo mediano a educación: ${R.edu_med} min`,
       nse:"avalúo m² · azul bajo → ámbar alto"}[M];
     if(b) b.textContent = state.comuna==="TODAS" ? (badgeSys||"") : `${titulo} · ${state.comuna}`;
@@ -874,11 +893,13 @@ function renderEvolucion(){
       if(v.build && v.build!==BUILD) vb.innerHTML += ' · <span class="nueva" onclick="location.reload(true)">⚠ hay una versión más nueva — recargar</span>';
     }).catch(()=>{ const vb=$("vfoot-build"); if(vb) vb.textContent="Visor actualizado: "+BUILD; });
     applyTheme(document.documentElement.dataset.theme==="light" ? "light" : "dark");
+    J("comuna_lineas.json").then(d=>{ CLIN=d; buildLineaList($("linea-search")?$("linea-search").value:""); }).catch(()=>{});
     J("cobertura.json").then(d=>{ COB=d; renderNseGap(); if(state.mapMode!=="live") renderMapa(); }).catch(()=>{});
     J("flota_equidad.json").then(d=>{ EQ=d; renderEquidad(); }).catch(()=>{});
     J("operacion_linea.json").then(d=>{ OP=d; renderOperacion(); renderCalidad(); }).catch(()=>{});
     J("speed_grid_hora.json").then(d=>{ GRID=d; if(state.mapMode==="conges") renderMapa(); }).catch(()=>{});
     J("detenciones.json").then(d=>{ DET2=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
+    J("terminales.json").then(d=>{ TERM=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
     J("empresa_stats.json").then(d=>{ EMPR=d; renderEmpresas(); }).catch(()=>{});
     J("flota_mes_hora.json").then(d=>{ MESH=d; renderHeat(); }).catch(()=>{});
     J("dow_hora.json").then(d=>{ DOWH=d; renderHeat(); }).catch(()=>{});
