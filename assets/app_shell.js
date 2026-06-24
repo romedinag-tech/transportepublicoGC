@@ -4,13 +4,13 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=40`).then(r=>r.json());
-const BUILD = "2026-06-24 16:30";
+const J = n => fetch(`data/${n}?v=41`).then(r=>r.json());
+const BUILD = "2026-06-24 16:55";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
-let VFREQ=null, VTREND=null, curVar=null;
+let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", cmpA:null, cmpB:null};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
@@ -469,11 +469,16 @@ function renderMapa(){
   ensureMap();
   comunaLayer.clearLayers(); routeLayer.clearLayers(); stopLayer.clearLayers();
   setTimeout(()=>lmap.invalidateSize(),120);
-  // límites comunales
+  // límites comunales: al elegir comuna, enfocar en ella y atenuar fuerte las vecinas
   const feats = (GEO.features||[]);
+  const comActiva = state.comuna!=="TODAS";
   feats.forEach(f=>{
     const sel = f.properties.name===state.comuna;
-    L.geoJSON(f,{style:{color:sel?"#38bdf8":"rgba(148,161,186,.45)",weight:sel?2.5:1,fill:sel,fillColor:"#38bdf8",fillOpacity:sel?0.08:0}}).addTo(comunaLayer);
+    if(comActiva && !sel){
+      L.geoJSON(f,{style:{color:"rgba(148,161,186,.14)",weight:0.6,fill:false}}).addTo(comunaLayer);   // vecina atenuada
+    } else {
+      L.geoJSON(f,{style:{color:sel?"#38bdf8":"rgba(148,161,186,.4)",weight:sel?2.6:1,fill:sel,fillColor:"#38bdf8",fillOpacity:sel?0.05:0}}).addTo(comunaLayer);
+    }
   });
   let bounds=[];
   setSpeedLegend(state.linea!=="TODAS" && !!GEOM[state.linea]);
@@ -504,7 +509,10 @@ function renderMapa(){
     const gl = L.geoJSON({type:"FeatureCollection",features:feats}); bounds = gl.getBounds();
     $("map-title").textContent = "Mapa del sistema";
   }
-  try{ if(bounds && (bounds.length||bounds.isValid&&bounds.isValid())) lmap.fitBounds(bounds,{padding:[20,20]}); }catch(e){}
+  const fitScope = state.linea+"|"+state.comuna;
+  if(fitScope!==lastFitScope){ lastFitScope=fitScope;
+    try{ if(bounds && (bounds.length||bounds.isValid&&bounds.isValid())) lmap.fitBounds(bounds,{padding:[20,20]}); }catch(e){}
+  }
   // capas territoriales disponibles en SISTEMA y en COMUNA (eje territorial); en vista de LÍNEA no
   const territorial = state.linea==="TODAS";
   const ambito = state.comuna==="TODAS" ? "el Gran Concepción" : state.comuna;
