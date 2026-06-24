@@ -4,12 +4,13 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=38`).then(r=>r.json());
-const BUILD = "2026-06-24 15:10";
+const J = n => fetch(`data/${n}?v=39`).then(r=>r.json());
+const BUILD = "2026-06-24 15:55";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
+let VFREQ=null, VTREND=null, curVar=null;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", cmpA:null, cmpB:null};
 let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
@@ -150,6 +151,7 @@ function render(){
   renderEquidad();
   renderNseGap();
   renderOperacion();
+  renderVarFreq();
   renderCalidad();
   renderEmpresas();
   renderHeat();
@@ -727,6 +729,55 @@ function renderOperacion(){
   $("op-foot").innerHTML = `Viaje de extremo a extremo: <b>${fmt(o.tt_med)} min</b>.${q?` Índice de calidad de la línea: <b style="color:${calCol(q.score)}">${q.score}/100</b>.`:""}`;
 }
 
+/* ---------- KPI línea: frecuencia por variante (perfil 5 puntos + tendencia mensual) ---------- */
+let varProfChart=null, varTrendChart=null;
+function renderVarFreq(){
+  const card=$("var-freq-card"); if(!card) return;
+  if(state.linea==="TODAS" || state.vista!=="normal" || !VFREQ){ card.style.display="none"; return; }
+  const recs = Object.keys(VFREQ.variantes).filter(r=>VFREQ.variantes[r].linea===state.linea).sort();
+  if(!recs.length){ card.style.display="none"; return; }
+  card.style.display="";
+  if(!recs.includes(curVar)) curVar = recs[0];
+  const sel=$("var-sel");
+  sel.innerHTML = recs.map(r=>`<option value="${r}" ${r===curVar?"selected":""}>Variante ${r}</option>`).join("");
+  sel.onchange=()=>{ curVar=sel.value; drawVarCharts(); };
+  drawVarCharts();
+}
+function drawVarCharts(){
+  const th=TH(), v=VFREQ.variantes[curVar]; if(!v) return;
+  const xs=VFREQ.horas.map(h=>h+"h"), COLP=["#22d3ee","#38bdf8","#fbbf24","#a78bfa","#fb7185"];
+  if(varProfChart) varProfChart.dispose(); varProfChart=echarts.init($("var-prof-chart"));
+  varProfChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    grid:{left:36,right:12,top:34,bottom:22,containLabel:true},
+    legend:{type:"scroll",top:0,textStyle:{color:th.mut,fontSize:10},itemWidth:12,itemHeight:8},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx}},
+    xAxis:{type:"category",data:xs,axisLabel:{color:th.mut,fontSize:9},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"bus/h",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    series:v.puntos.map((pt,i)=>({name:pt.n,type:"line",data:pt.freq,smooth:true,symbol:"none",
+      lineStyle:{width:2,color:COLP[i]},itemStyle:{color:COLP[i]}}))
+  },true);
+  setTimeout(()=>varProfChart.resize(),60);
+  const vt = VTREND&&VTREND.variantes&&VTREND.variantes[curVar], lt = VTREND&&VTREND.lineas&&VTREND.lineas[state.linea];
+  if(VTREND && (vt||lt)){
+    const xs2=VTREND.meses.map(mesLbl3);
+    if(varTrendChart) varTrendChart.dispose(); varTrendChart=echarts.init($("var-trend-chart"));
+    varTrendChart.setOption({
+      textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+      grid:{left:36,right:12,top:34,bottom:22,containLabel:true},
+      legend:{top:0,textStyle:{color:th.mut,fontSize:10},itemWidth:12,itemHeight:8},
+      tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx}},
+      xAxis:{type:"category",data:xs2,axisLabel:{color:th.mut,fontSize:9},axisLine:{lineStyle:{color:th.axis}}},
+      yAxis:{type:"value",name:"desp/día",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+      series:[ vt?{name:"Variante "+curVar,type:"line",data:vt.dd,smooth:true,symbol:"circle",symbolSize:5,connectNulls:true,lineStyle:{width:2.6,color:"#22d3ee"},itemStyle:{color:"#22d3ee"}}:null,
+               lt?{name:"Línea "+state.linea,type:"line",data:lt.dd,smooth:true,symbol:"none",connectNulls:true,lineStyle:{width:2,color:"#94a1ba",type:"dashed"},itemStyle:{color:"#94a1ba"}}:null ].filter(Boolean)
+    },true);
+    setTimeout(()=>varTrendChart.resize(),60);
+  }
+  const cb=v.puntos.find(p=>p.n==="Cuello de botella");
+  $("var-foot").innerHTML = `Variante <b>${curVar}</b>${cb&&cb.vel?` · cuello de botella a <b>${cb.vel} km/h</b>`:""}. La frecuencia de pasada cambia a lo largo de la ruta (terminal → centro) y del día — sirve para evaluar consistencia y bunching.`;
+}
+
 /* ---------- KPI: índice sintético de calidad por línea ---------- */
 const calCol = s => s>=70?"#34d399":s>=50?"#fbbf24":"#fb7185";
 function calcCalidad(l){
@@ -1000,6 +1051,8 @@ function renderEvolucion(){
     Promise.all([J("top_recorridos.json").catch(()=>[]),J("lentos_punta.json").catch(()=>[]),J("regularidad.json").catch(()=>[]),J("corredores.json").catch(()=>[])])
       .then(([t,l,r,c])=>{ REC={top:t,lentos:l,reg:r,corr:c}; renderRecorridos(); });
     J("evolucion_comuna.json").then(d=>{ EVOL=d; renderEvolucion(); }).catch(()=>{});
+    Promise.all([J("variantes_freq.json").catch(()=>null), J("freq_trend.json").catch(()=>null)])
+      .then(([vf,vt])=>{ VFREQ=vf; VTREND=vt; renderVarFreq(); });
     buildMapModes();
     buildPeriodo(); buildPurpose();
     buildComunaTabs();
