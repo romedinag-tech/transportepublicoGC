@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=50`).then(r=>r.json());
-const BUILD = "2026-06-24 22:55";
+const J = n => fetch(`data/${n}?v=51`).then(r=>r.json());
+const BUILD = "2026-06-24 23:30";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
@@ -160,18 +160,28 @@ function render(){
   renderEvolucion();
 }
 
-function kpiCard(l,v,s){ return `<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`; }
+// estado semántico: "good"|"warning"|"critical"|"neutral" -> clases de valor y de tarjeta
+const SEM_CLS = {good:"is-good", warning:"is-warning", critical:"is-critical", neutral:"is-neutral"};
+const SEM_CARD = {good:"k-good", warning:"k-warning", critical:"k-critical", neutral:""};
+function kpiCard(l,v,s,icon,stt){   // stt = good|warning|critical|neutral
+  const st = stt||"neutral";
+  return `<div class="kpi ${SEM_CARD[st]}"><div class="lab">${icon?`<span class="ic">${icon}</span>`:""}${l}</div>`+
+    `<div class="val ${SEM_CLS[st]}">${v}</div><div class="sub">${s}</div></div>`;
+}
+// umbral "más alto es mejor" (velocidad) y "más bajo es mejor" (detenido)
+const semHigh = (v,g,w) => v>=g?"good":v>=w?"warning":"critical";
+const semLow  = (v,g,w) => v<g?"good":v<w?"warning":"critical";
 function renderKPIs(cell){
   const k = cell.kpi;
   if(!k){ $("kpis2").innerHTML = `<div class="empty">Sin datos para este ámbito.</div>`; return; }
   const ctx = state.linea!=="TODAS"
-      ? kpiCard("Comunas que sirve", k.n_comunas, "presencia territorial")
-      : kpiCard("Líneas", k.n_lineas, "operando en el ámbito");
+      ? kpiCard("Comunas que sirve", k.n_comunas, "presencia territorial", "🗺️", "neutral")
+      : kpiCard("Líneas", k.n_lineas, "operando en el ámbito", "🚍", "neutral");
   $("kpis2").innerHTML = [
-    kpiCard("Registros GPS", (k.pulsos/1e6).toFixed(1)+" M", "pulsos en el ámbito"),
-    kpiCard("Flota en punta", fmt(k.flota_pico), "buses activos máx/hora"),
-    kpiCard("Velocidad media", fmt1(k.vel)+" km/h", "en movimiento"),
-    kpiCard("Tiempo detenido", fmt1(k.pct_det)+" %", "en ruta · excl. terminales"),
+    kpiCard("Registros GPS", (k.pulsos/1e6).toFixed(1)+" M", "pulsos en el ámbito", "📡", "neutral"),
+    kpiCard("Flota en punta", fmt(k.flota_pico), "buses activos máx/hora", "🚍", "neutral"),
+    kpiCard("Velocidad media", fmt1(k.vel)+" km/h", "efectiva, en ruta", "⚡", semHigh(k.vel,22,14)),
+    kpiCard("Tiempo detenido", fmt1(k.pct_det)+" %", "en ruta · excl. terminales", "🛑", semLow(k.pct_det,18,28)),
     ctx,
   ].join("");
 }

@@ -10,8 +10,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Componentes y variables de tema existentes (kpi, ctab, litem, rank-row, cump-row, seg…) -->
-<link rel="stylesheet" href="assets/styles.css?v=50">
-<link rel="stylesheet" href="assets/shell.css?v=50">
+<link rel="stylesheet" href="assets/styles.css?v=51">
+<link rel="stylesheet" href="assets/shell.css?v=51">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <!-- Tailwind (Play CDN, sin build). preflight off para no pisar los componentes existentes. -->
@@ -247,7 +247,7 @@ tailwind.config = {
   <div class="flex flex-1 overflow-hidden">
 
     <!-- ===== SIDEBAR DE FILTROS (colapsable) ===== -->
-    <aside id="sidebar" class="thin-scroll w-[272px] shrink-0 overflow-y-auto border-r border-[var(--line)] bg-[var(--bg2)] px-3 py-4">
+    <aside id="sidebar" class="thin-scroll w-[296px] shrink-0 overflow-y-auto border-r border-[var(--line)] bg-[var(--bg2)] px-3 py-4">
       <!-- Operador / Líneas -->
       <div class="flex items-center gap-2 px-1 mb-2">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[var(--dim)]"><rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 11h16M8 21l1-3M16 21l-1-3"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg>
@@ -282,7 +282,7 @@ tailwind.config = {
         <!-- MAPA HÉROE (2/3) -->
         <section class="widget xl:col-span-2 flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=50" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=51" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -308,11 +308,11 @@ tailwind.config = {
           </div>
         </section>
 
-        <!-- COLUMNA DERECHA: flota/velocidad + ranking -->
-        <div class="flex flex-col gap-4">
+        <!-- COLUMNA DERECHA: flota/velocidad + ranking (flujo vertical propio, no se aplasta) -->
+        <div class="flex flex-col gap-4 xl:max-h-[680px] xl:overflow-y-auto thin-scroll xl:pr-1">
           <section class="widget">
             <div class="widget-h">
-              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=50" alt="" width="22" height="22"></span>
+              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=51" alt="" width="22" height="22"></span>
               <div><h3>Flota y velocidad</h3><span class="sub">por hora · días laborables</span></div>
             </div>
             <div class="widget-b"><div id="ch-hora" style="height:236px"></div><p id="hora-narr" class="wnarr"></p></div>
@@ -345,7 +345,7 @@ tailwind.config = {
       <!-- Cumplimiento de frecuencia -->
       <section class="widget">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=50" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=51" alt="" width="22" height="22"></span>
           <div><h3>Cumplimiento de frecuencia</h3><span class="sub">programado (GTFS) vs observado (GPS)</span></div>
         </div>
         <div class="widget-b"><div id="cump-box"></div><p id="cump-narr" class="wnarr"></p></div>
@@ -354,7 +354,7 @@ tailwind.config = {
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=50" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=51" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -479,7 +479,7 @@ tailwind.config = {
 </div>
 
 <script src="assets/echarts.min.js"></script>
-<script src="assets/app_shell.js?v=50"></script>
+<script src="assets/app_shell.js?v=51"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
