@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=56`).then(r=>r.json());
-const BUILD = "2026-06-25 18:23";
+const J = n => fetch(`data/${n}?v=57`).then(r=>r.json());
+const BUILD = "2026-06-25 18:35";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -225,23 +225,29 @@ function gaugeColor(pct,dir){
   const g = dir>0 ? pct : 200-pct;                       // "bondad": alta = mejor
   return g>=95 ? "#34d399" : g>=75 ? "#fbbf24" : "#f87171";
 }
-function gaugeSVG(pct,col){
-  const p = Math.max(0, Math.min(pct==null?100:pct, 200));
-  const a = Math.PI*(1 - p/200);                         // 0%→izq, 100%→arriba, 200%→der
-  const cx=46, cy=42, r=34, nx=cx+r*Math.cos(a), ny=cy-r*Math.sin(a);
-  return `<svg class="gauge" viewBox="0 0 92 50"><path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--track,#2a3550)" stroke-width="6" stroke-linecap="round"/>`+
-    `<line x1="${cx}" y1="${cy-r-1}" x2="${cx}" y2="${cy-r+5}" stroke="#64748b" stroke-width="1.5"/>`+
-    `<line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${col}" stroke-width="3" stroke-linecap="round"/>`+
-    `<circle cx="${cx}" cy="${cy}" r="3.6" fill="${col}"/></svg>`;
-}
 function liveBox(s, live, norm, pct){
+  // reloj semicírculo GRANDE: valor dentro del arco, aguja desde el centro-base, % en la punta
   const col = gaugeColor(pct, s.dir);
+  const cx=100, cy=102, r=80;
+  const p = Math.max(0, Math.min(pct==null?0:pct, 200));
+  const a = Math.PI*(1 - p/200);                         // 0%→izq, 100%→arriba, 200%→der
+  const tx=(cx+r*Math.cos(a)).toFixed(1), ty=(cy-r*Math.sin(a)).toFixed(1);
+  const lx=(cx+(r+17)*Math.cos(a)).toFixed(1), ly=(cy-(r+17)*Math.sin(a)).toFixed(1);
+  const valTxt = live==null ? "—" : s.f(live);
   const pctTxt = pct==null ? "—" : Math.round(pct)+"%";
   const normTxt = norm==null ? "—" : s.f(norm)+s.unit;
-  const liveTxt = live==null ? "—" : s.f(live)+`<span class="u">${s.unit}</span>`;
+  const prog = pct==null ? "" :
+    `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${tx} ${ty}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"/>`+
+    `<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="3" stroke-linecap="round"/>`+
+    `<circle cx="${cx}" cy="${cy}" r="5" fill="${col}"/>`+
+    `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" class="g-pct" fill="${col}">${pctTxt}</text>`;
   return `<div class="kpi klive"><div class="lab"><span class="ic">${s.ic}</span>${s.lab}</div>`+
-    `<div class="klive-row"><div class="klive-val">${liveTxt}</div>${gaugeSVG(pct,col)}</div>`+
-    `<div class="sub"><b style="color:${col}">${pctTxt}</b> de lo normal · típico ${normTxt}</div></div>`;
+    `<svg class="gauge" viewBox="-10 -14 220 128">`+
+      `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--track,#2a3550)" stroke-width="8" stroke-linecap="round"/>`+
+      prog+
+      `<text x="${cx}" y="${cy-16}" text-anchor="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2">${s.unit}</tspan></text>`+
+    `</svg>`+
+    `<div class="sub">normal a esta hora: <b>${normTxt}</b></div></div>`;
 }
 function renderLiveKPIs(){
   const base = BASE30[DIA.dia_tipo] || {}, b = DIA.bin;
