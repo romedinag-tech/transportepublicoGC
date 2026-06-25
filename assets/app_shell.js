@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=49`).then(r=>r.json());
-const BUILD = "2026-06-24 22:20";
+const J = n => fetch(`data/${n}?v=50`).then(r=>r.json());
+const BUILD = "2026-06-24 22:55";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
@@ -150,6 +150,7 @@ function render(){
   renderCumpSem();
   renderEquidad();
   renderNseGap();
+  renderOpNow();
   renderOperacion();
   renderVarFreq();
   renderCalidad();
@@ -252,9 +253,54 @@ function inComuna(lat,lon){
 }
 
 /* buses operando AHORA (GTFS-RT vía live.json, posiciones ya snapeadas a la ruta) */
+const MXc = 111320*Math.cos(-36.83*Math.PI/180);
+function chileHour(){ try{ if(LIVE&&LIVE.snapshot_utc){ return (new Date(LIVE.snapshot_utc).getUTCHours()+20)%24; } }catch(e){} return (new Date().getUTCHours()+20)%24; }
+function nearTerminal(lat,lon,L){ const tl=TLIN[L]; if(!tl||!tl.puntos) return false;
+  for(const t of tl.puntos){ if(t.tipo!=="terminal") continue; const dy=(lat-t.lat)*110540, dx=(lon-t.lon)*MXc; if(dx*dx+dy*dy<=150*150) return true; } return false; }
+const semColor = r => r==null?"#94a1ba": r>=0.7?"#34d399": r>=0.4?"#fbbf24":"#fb7185";
+function renderOpNow(){
+  const card=$("opnow-card"); if(!card) return;
+  const isLine=state.linea!=="TODAS", isCom=state.comuna!=="TODAS";
+  if(state.vista!=="normal" || !LIVE || !LIVE.buses || (!isLine && !isCom)){ card.style.display="none"; return; }
+  card.style.display="";
+  const h=chileHour();
+  let buses=LIVE.buses.filter(b=>b[2]);                       // con línea = en servicio
+  if(isLine) buses=buses.filter(b=>b[2]===state.linea);
+  if(isCom)  buses=buses.filter(b=>inComuna(b[0],b[1]));
+  let calle=0,term=0,ruta=0; const byLine={};
+  buses.forEach(b=>{ const mv=b[4];
+    if(mv) calle++; else if(nearTerminal(b[0],b[1],b[2])) term++; else ruta++;
+    byLine[b[2]]=(byLine[b[2]]||0)+1; });
+  const operando=calle+term+ruta;
+  const key = isLine ? `TODAS|${state.linea}` : `${state.comuna}|TODAS`;
+  const hist=((((T.cells||{})[key]||{}).horas)||[])[h];
+  const exp = hist&&hist.b ? hist.b : null;
+  const ratio = exp ? operando/exp : null;
+  $("opnow-title").textContent = isLine ? `Operación en tiempo real · Línea ${state.linea}` : `Operación en tiempo real · ${state.comuna}`;
+  const rect=(l,v,s,col)=>`<div class="kpi"><div class="lab">${l}</div><div class="val"${col?` style="color:${col}"`:""}>${v}</div><div class="sub">${s}</div></div>`;
+  let rects = rect("En calle (operando)", calle, "buses en movimiento", "#22d3ee")
+    + rect("En terminal", term, "parados en cabecera", "#a78bfa")
+    + rect("Detenidos en ruta", ruta, "semáforo / taco");
+  if(isCom) rects = rect("Líneas operando", Object.keys(byLine).length, `de ${(CLIN[state.comuna]||[]).length} que operan aquí`, "#38bdf8") + rects;
+  $("opnow-rects").innerHTML = rects;
+  // semáforo SOLO en vista de línea (su flota está toda afuera => instante ≈ hora). En comuna el
+  // histórico cuenta los buses distintos de TODA la hora (de paso) y el ratio instantáneo sesga bajo.
+  const sem=$("opnow-semaforo");
+  if(isLine && ratio!=null){ const c=semColor(ratio); sem.style.cssText=`margin-left:auto;background:${c}22;color:${c}`;
+    sem.textContent = ratio>=0.7?`● normal (${Math.round(ratio*100)}%)`:ratio>=0.4?`▲ bajo (${Math.round(ratio*100)}%)`:`▲ muy bajo (${Math.round(ratio*100)}%)`; }
+  else if(isCom){ sem.style.cssText="margin-left:auto;background:#38bdf822;color:#38bdf8"; sem.textContent=`${Object.keys(byLine).length} líneas activas`; }
+  else { sem.style.cssText="margin-left:auto;background:#94a1ba22;color:#94a1ba"; sem.textContent="sin referencia"; }
+  // desglose por línea (vista comuna)
+  if(isCom){ const rows=Object.entries(byLine).sort((a,b)=>b[1]-a[1]);
+    $("opnow-lines").innerHTML = `<div class="hint" style="margin-bottom:4px">Buses operando ahora por línea</div>`+
+      rows.map(([l,c])=>`<span style="display:inline-block;margin:2px 6px 2px 0;padding:2px 7px;border-radius:999px;background:var(--track);font-size:11px"><b style="font-family:var(--mono)">${l}</b> ${c}</span>`).join("");
+  } else $("opnow-lines").innerHTML="";
+  const ref = exp ? (isLine ? ` · típico a las ${h}h ≈ <b>${fmt1(exp)}</b> buses (laborable)` : ` · en una hora laborable circulan ≈ <b>${fmt1(exp)}</b> buses distintos por la comuna`) : "";
+  $("opnow-narr").innerHTML = `<b>${operando}</b> buses con servicio ahora${ref}. "En calle" = en movimiento; "en terminal" = parados en cabecera (no es falla); "detenidos en ruta" = semáforo o taco. <span style="color:var(--dim)">Inactivos (flota que no salió hoy) requiere acumular el día en el capturador — pendiente.</span>`;
+}
 function loadLive(){
   fetch(LIVE_URL+"?t="+Date.now(),{cache:"no-store"}).then(r=>r.json())
-    .then(d=>{ LIVE=d; drawLiveBuses(); }).catch(()=>{});
+    .then(d=>{ LIVE=d; drawLiveBuses(); renderOpNow(); }).catch(()=>{});
 }
 function drawLiveBuses(){
   if(!liveLayer) return;
