@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=48`).then(r=>r.json());
-const BUILD = "2026-06-24 21:35";
+const J = n => fetch(`data/${n}?v=49`).then(r=>r.json());
+const BUILD = "2026-06-24 22:20";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
@@ -50,8 +50,8 @@ const cellOf = () => (T.cells[`${state.comuna}|${state.linea}`] || {kpi:null, ho
 const empresaDe = ln => { const x=(T.lineas||[]).find(l=>l.linea===ln); return x?x.empresa:""; };
 
 /* ---------- menús ---------- */
-const PERIODOS = [["agg","Agregado"],["am","Punta AM"],["md","Mediodía"],["pm","Punta PM"],["off","Fuera punta"]];
-const PERIODO_H = {agg:[6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22], am:[7,8,9], md:[12,13,14], pm:[17,18,19], off:[10,11,15,16,20,21,22]};
+const PERIODOS = [["agg","Agregado"],["am","Punta AM"],["md","Mediodía"],["pm","Punta PM"],["off","Fuera punta"],["noche","Noche"]];
+const PERIODO_H = {agg:[6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22], am:[7,8,9], md:[12,13,14], pm:[17,18,19], off:[10,11,15,16,20,21,22], noche:[21,22,23]};
 const periodoLbl = p => (PERIODOS.find(x=>x[0]===p)||["","Agregado"])[1];
 const PURPOSES = [["all","Todos"],["trab","Trabajo"],["est","Estudio"],["sal","Salud"],["otr","Otros"]];
 const PURP_FIELD = {all:"viajes",trab:"trabajo",est:"estudio",sal:"salud",otr:"otros"};
