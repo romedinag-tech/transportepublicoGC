@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=57`).then(r=>r.json());
-const BUILD = "2026-06-25 18:35";
+const J = n => fetch(`data/${n}?v=58`).then(r=>r.json());
+const BUILD = "2026-06-25 18:51";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -13,7 +13,7 @@ let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, 
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stops:[]};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", cmpA:null, cmpB:null};
-let chart, csChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
+let chart, csChart, freqChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
 const PEAK_H = [7,8,9,17,18,19];
@@ -166,6 +166,7 @@ function render(){
   const cell = cellOf();
   renderKPIs(cell);
   renderHora(cell);
+  renderFreqChart();
   renderMapa();
   renderRanking();
   renderCump();
@@ -260,8 +261,38 @@ function renderLiveKPIs(){
 function loadDia(){
   fetch("https://storage.googleapis.com/gccp-transporte-live/dia.json?t="+Date.now(),{cache:"no-store"})
     .then(r=>r.json()).then(d=>{ DIA=d;
-      if(state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS" && BASE30) renderLiveKPIs();
+      if(state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS" && BASE30){ renderLiveKPIs(); renderFreqChart(); }
     }).catch(()=>{});
+}
+// Gráfico: frecuencia de salida de terminales — promedio histórico del tipo de día vs observado hoy
+function renderFreqChart(){
+  const card=$("freq-card"); if(!card) return;
+  const home = state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS";
+  if(!home || !BASE30 || !DIA || !BASE30[DIA.dia_tipo]){ card.style.display="none"; return; }
+  card.style.display="";
+  if(!freqChart) freqChart = echarts.init($("ch-freq"));
+  const dt=DIA.dia_tipo, bins=BASE30.bins, base=BASE30[dt].freq||[], serie=DIA.freq_serie||[];
+  const i0=10, i1=47;                                    // 05:00–23:30 (horario de servicio)
+  const x=bins.slice(i0,i1+1);
+  const bvals=base.slice(i0,i1+1);
+  const ovals=x.map((_,j)=>{const i=i0+j; return i<=DIA.bin ? (serie[i]||0) : null;});   // observado solo hasta el bin actual
+  const th=TH(), dtl=dt==="L"?"laborable":dt==="S"?"sábado":"domingo";
+  freqChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
+    legend:{data:[`Promedio ${dtl}`,"Observado hoy"],textStyle:{color:th.mut},top:0},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      formatter:p=>{const t=p[0].axisValue; let s=`${t}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${Math.round(x.value)}</b><br>`;}); return s;}},
+    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:3},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"despachos/30min",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    series:[
+      {name:`Promedio ${dtl}`,type:"line",data:bvals,smooth:true,symbol:"none",lineStyle:{width:2,color:th.mut,type:"dashed"}},
+      {name:"Observado hoy",type:"line",data:ovals,smooth:true,symbol:"circle",symbolSize:4,connectNulls:false,
+        lineStyle:{width:2.6,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991f"}},
+    ],
+  },true);
+  setTimeout(()=>freqChart.resize(),60);
+  $("freq-sub").textContent = `despachos/30 min · promedio ${dtl} vs observado hoy`;
 }
 
 function renderHora(cell){
