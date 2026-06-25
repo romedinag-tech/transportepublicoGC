@@ -4,10 +4,11 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=55`).then(r=>r.json());
-const BUILD = "2026-06-25 14:42";
+const J = n => fetch(`data/${n}?v=56`).then(r=>r.json());
+const BUILD = "2026-06-25 18:23";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
+let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stops:[]};
@@ -193,18 +194,68 @@ function kpiCard(l,v,s,icon,stt){   // stt = good|warning|critical|neutral
 const semHigh = (v,g,w) => v>=g?"good":v>=w?"warning":"critical";
 const semLow  = (v,g,w) => v<g?"good":v<w?"warning":"critical";
 function renderKPIs(cell){
+  // INICIO (sistema completo): recuadros "ahora vs lo normal" (vivo vs baseline 30 min)
+  const home = state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS";
+  if(home && DIA && BASE30){ renderLiveKPIs(); return; }
   const k = cell.kpi;
   if(!k){ $("kpis2").innerHTML = `<div class="empty">Sin datos para este ámbito.</div>`; return; }
   const ctx = state.linea!=="TODAS"
       ? kpiCard("Comunas que sirve", k.n_comunas, "presencia territorial", "🗺️", "neutral")
       : kpiCard("Líneas", k.n_lineas, "operando en el ámbito", "🚍", "neutral");
   $("kpis2").innerHTML = [
-    kpiCard("Registros GPS", (k.pulsos/1e6).toFixed(1)+" M", "pulsos en el ámbito", "📡", "neutral"),
     kpiCard("Flota en punta", fmt(k.flota_pico), "buses activos máx/hora", "🚍", "neutral"),
     kpiCard("Velocidad media", fmt1(k.vel)+" km/h", "efectiva, en ruta", "⚡", semHigh(k.vel,22,14)),
     kpiCard("Tiempo detenido", fmt1(k.pct_det)+" %", "en ruta · excl. terminales", "🛑", semLow(k.pct_det,18,28)),
     ctx,
   ].join("");
+}
+
+/* ---------- Recuadros del INICIO: vivo (dia.json) vs baseline histórico del bin actual ---------- */
+const LIVE_KPIS = [
+  {k:"buses_op", lab:"Buses operando",         ic:"🚍", dir:1,  unit:"",       f:v=>fmt(Math.round(v))},
+  {k:"vel",      lab:"Velocidad media",        ic:"⚡", dir:1,  unit:" km/h",  f:v=>fmt1(v)},
+  {k:"det",      lab:"Tiempo detenido",        ic:"🛑", dir:-1, unit:" %",     f:v=>fmt1(v)},
+  {k:"freq",     lab:"Frecuencia terminales",  ic:"🟢", dir:1,  unit:"/30min", f:v=>fmt(Math.round(v))},
+  {k:"term",     lab:"Buses en terminal",      ic:"🅿️", dir:0,  unit:"",       f:v=>fmt(Math.round(v))},
+  {k:"inact",    lab:"Sin operar hoy",         ic:"💤", dir:-1, unit:"",       f:v=>fmt(Math.round(v))},
+];
+function gaugeColor(pct,dir){
+  if(pct==null) return "#64748b";
+  if(dir===0) return "#38bdf8";
+  const g = dir>0 ? pct : 200-pct;                       // "bondad": alta = mejor
+  return g>=95 ? "#34d399" : g>=75 ? "#fbbf24" : "#f87171";
+}
+function gaugeSVG(pct,col){
+  const p = Math.max(0, Math.min(pct==null?100:pct, 200));
+  const a = Math.PI*(1 - p/200);                         // 0%→izq, 100%→arriba, 200%→der
+  const cx=46, cy=42, r=34, nx=cx+r*Math.cos(a), ny=cy-r*Math.sin(a);
+  return `<svg class="gauge" viewBox="0 0 92 50"><path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--track,#2a3550)" stroke-width="6" stroke-linecap="round"/>`+
+    `<line x1="${cx}" y1="${cy-r-1}" x2="${cx}" y2="${cy-r+5}" stroke="#64748b" stroke-width="1.5"/>`+
+    `<line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${col}" stroke-width="3" stroke-linecap="round"/>`+
+    `<circle cx="${cx}" cy="${cy}" r="3.6" fill="${col}"/></svg>`;
+}
+function liveBox(s, live, norm, pct){
+  const col = gaugeColor(pct, s.dir);
+  const pctTxt = pct==null ? "—" : Math.round(pct)+"%";
+  const normTxt = norm==null ? "—" : s.f(norm)+s.unit;
+  const liveTxt = live==null ? "—" : s.f(live)+`<span class="u">${s.unit}</span>`;
+  return `<div class="kpi klive"><div class="lab"><span class="ic">${s.ic}</span>${s.lab}</div>`+
+    `<div class="klive-row"><div class="klive-val">${liveTxt}</div>${gaugeSVG(pct,col)}</div>`+
+    `<div class="sub"><b style="color:${col}">${pctTxt}</b> de lo normal · típico ${normTxt}</div></div>`;
+}
+function renderLiveKPIs(){
+  const base = BASE30[DIA.dia_tipo] || {}, b = DIA.bin;
+  $("kpis2").innerHTML = LIVE_KPIS.map(s=>{
+    const live = DIA[s.k], norm = (base[s.k]||[])[b];
+    const pct = (norm!=null && norm>0) ? 100*live/norm : null;
+    return liveBox(s, live, norm, pct);
+  }).join("");
+}
+function loadDia(){
+  fetch("https://storage.googleapis.com/gccp-transporte-live/dia.json?t="+Date.now(),{cache:"no-store"})
+    .then(r=>r.json()).then(d=>{ DIA=d;
+      if(state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS" && BASE30) renderLiveKPIs();
+    }).catch(()=>{});
 }
 
 function renderHora(cell){
@@ -1297,6 +1348,8 @@ function renderEvolucion(){
     $("reset-btn").onclick = ()=>{ Object.assign(state,{comuna:"TODAS",linea:"TODAS",vista:"normal"}); $("linea-search").value=""; buildLineaList(); render(); };
     render();
     loadLive(); setInterval(loadLive, 60000);   // buses operando ahora, refresco 60 s
+    J("baseline_30min.json").then(d=>{ BASE30=d; loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
+    setInterval(loadDia, 60000);                 // dia.json (vivo vs normal), refresco 60 s
     addEventListener("resize", ()=>{ [chart,csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();
