@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=60`).then(r=>r.json());
-const BUILD = "2026-06-25 19:31";
+const J = n => fetch(`data/${n}?v=61`).then(r=>r.json());
+const BUILD = "2026-06-26 19:56";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -211,8 +211,11 @@ function renderKPIs(cell){
   ].join("");
 }
 
-/* ---------- Recuadros del INICIO: vivo (dia.json) vs baseline histórico del bin actual ---------- */
-const LIVE_KPIS = [
+/* ---------- Recuadros del INICIO: vivo (dia.json) vs baseline histórico del bin actual ----------
+   Los KPIs se definen en data/kpis_spec.json (declarativo). Agregar uno = añadir un objeto allí.
+   Fallback inline por si el spec no cargó. */
+const _LIVE_FMT = {int:v=>fmt(Math.round(v)), dec1:v=>fmt1(v), pct:v=>fmt1(v)+"%"};
+let LIVE_KPIS = [
   // los 4 estados de flota (en ruta + en terminal + fuera de servicio + sin operar = flota)
   {k:"buses_op", lab:"Buses en ruta",          ic:"🚍", dir:1,  unit:"",       f:v=>fmt(Math.round(v))},
   {k:"term",     lab:"Buses en terminal",      ic:"🅿️", dir:0,  unit:"",       f:v=>fmt(Math.round(v))},
@@ -1388,6 +1391,10 @@ function renderEvolucion(){
     $("reset-btn").onclick = ()=>{ Object.assign(state,{comuna:"TODAS",linea:"TODAS",vista:"normal"}); $("linea-search").value=""; buildLineaList(); render(); };
     render();
     loadLive(); setInterval(loadLive, 60000);   // buses operando ahora, refresco 60 s
+    // spec declarativo de KPIs (opcional, fallback al hardcode si no carga)
+    J("kpis_spec.json").then(s=>{
+      if(s && Array.isArray(s.kpis)) LIVE_KPIS = s.kpis.map(o=>({...o, f:(_LIVE_FMT[o.fmt]||_LIVE_FMT.int)}));
+    }).catch(()=>{});
     J("baseline_30min.json").then(d=>{ BASE30=d; loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
     setInterval(loadDia, 60000);                 // dia.json (vivo vs normal), refresco 60 s
     addEventListener("resize", ()=>{ [chart,csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });

@@ -1,0 +1,22 @@
+{
+  "_nota": "Spec declarativo de los recuadros del inicio (vivo vs baseline). Agregar un KPI = añadir un objeto aquí + (si requiere) un cálculo nuevo en baseline + clave en dia.json. El frontend lee este JSON y renderiza automáticamente.",
+  "version": 1,
+  "kpis": [
+    {"k":"buses_op", "lab":"Buses en ruta",         "ic":"🚍",  "dir": 1, "unit":"",       "fmt":"int",   "group":"flota"},
+    {"k":"term",     "lab":"Buses en terminal",     "ic":"🅿️", "dir": 0, "unit":"",       "fmt":"int",   "group":"flota"},
+    {"k":"descanso", "lab":"Fuera de servicio",     "ic":"⏸️", "dir": 0, "unit":"",       "fmt":"int",   "group":"flota"},
+    {"k":"inact",    "lab":"Sin operar hoy",        "ic":"💤",  "dir":-1, "unit":"",       "fmt":"int",   "group":"flota"},
+    {"k":"vel",      "lab":"Velocidad media",       "ic":"⚡",  "dir": 1, "unit":" km/h",  "fmt":"dec1",  "group":"calidad"},
+    {"k":"det",      "lab":"Tiempo detenido",       "ic":"🛑",  "dir":-1, "unit":" %",     "fmt":"dec1",  "group":"calidad"},
+    {"k":"freq",     "lab":"Frecuencia terminales", "ic":"🟢",  "dir": 1, "unit":"/30min", "fmt":"int",   "group":"calidad"}
+  ],
+  "_glosario": {
+    "k":     "clave en dia.json (vivo) y baseline_30min.json (histórico)",
+    "lab":   "etiqueta visible",
+    "ic":    "ícono (emoji o id de SVG)",
+    "dir":   "dirección buena: +1 = más es mejor (verde alto) · -1 = menos es mejor · 0 = neutro (azul)",
+    "unit":  "sufijo de unidad",
+    "fmt":   "int / dec1 / pct",
+    "group": "flota (en ruta+terminal+fuera+sin operar = registro) · calidad (vel/det/freq) · ... (otros a futuro)"
+  }
+}
