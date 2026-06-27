@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=61`).then(r=>r.json());
-const BUILD = "2026-06-26 19:56";
+const J = n => fetch(`data/${n}?v=69`).then(r=>r.json());
+const BUILD = "2026-06-27 19:12";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -133,7 +133,11 @@ function render(){
   document.querySelectorAll(".litem").forEach(e=>e.classList.toggle("active", e.dataset.l===state.linea && state.vista==="normal"));
   const coverDyn = state.mapMode==="cover" && (state.coverSub==="of" || state.coverSub==="od");
   const periodoRelevante = state.vista==="ranking" || (state.vista==="normal" && state.linea==="TODAS" && (state.mapMode==="conges"||state.mapMode==="wait"||state.mapMode==="bunch"||coverDyn));
-  $("periodo-sel").style.display = periodoRelevante ? "flex" : "none";
+  // F1: período visible siempre en home (vista normal). Si no aplica al modo actual,
+  // se marca data-inactive=1 (opacity .5) — sigue siendo un control de contexto presente.
+  const periodoVisible = state.vista==="normal" || state.vista==="ranking";
+  $("periodo-sel").style.display = periodoVisible ? "flex" : "none";
+  $("periodo-sel").dataset.inactive = (periodoVisible && !periodoRelevante) ? "1" : "";
   const purposeRel = state.vista==="normal" && state.linea==="TODAS" && state.mapMode==="wait";
   if($("purpose-sel")) $("purpose-sel").style.display = purposeRel ? "flex" : "none";
   const coverSubRel = state.vista==="normal" && state.linea==="TODAS" && state.mapMode==="cover";
@@ -233,36 +237,129 @@ function gaugeColor(pct,dir){
   return g>=95 ? "#34d399" : g>=75 ? "#fbbf24" : "#f87171";
 }
 function liveBox(s, live, norm, pct){
-  // reloj semicírculo GRANDE: valor dentro del arco, aguja desde el centro-base, % en la punta
+  // F1: reloj semicírculo más compacto; valor dentro del arco, aguja, % al final de la aguja.
+  // Baseline "normal a esta hora" abajo en mono/--muted + delta semántico (▲/▼/=).
   const col = gaugeColor(pct, s.dir);
-  const cx=100, cy=102, r=80;
+  const cx=100, cy=98, r=72;                             // r baja de 80 a 72 (más aire)
   const p = Math.max(0, Math.min(pct==null?0:pct, 200));
   const a = Math.PI*(1 - p/200);                         // 0%→izq, 100%→arriba, 200%→der
   const tx=(cx+r*Math.cos(a)).toFixed(1), ty=(cy-r*Math.sin(a)).toFixed(1);
-  const lx=(cx+(r+17)*Math.cos(a)).toFixed(1), ly=(cy-(r+17)*Math.sin(a)).toFixed(1);
+  const lx=(cx+(r+16)*Math.cos(a)).toFixed(1), ly=(cy-(r+16)*Math.sin(a)).toFixed(1);
   const valTxt = live==null ? "—" : s.f(live);
   const pctTxt = pct==null ? "—" : Math.round(pct)+"%";
   const normTxt = norm==null ? "—" : s.f(norm)+s.unit;
+  // delta semántico: ▲ mejor, ▼ peor, = igual (según dir del KPI)
+  let deltaTxt = "", deltaCol = "var(--muted)";
+  if(pct!=null && s.dir!==0){
+    const diff = Math.round(pct-100);
+    const arrow = diff>2 ? "▲" : diff<-2 ? "▼" : "=";
+    deltaCol = gaugeColor(pct, s.dir);
+    deltaTxt = `<span class="g-delta" style="color:${deltaCol}">${arrow} ${diff>=0?"+":""}${diff}%</span>`;
+  } else if(pct!=null){
+    deltaTxt = `<span class="g-delta" style="color:${col}">${pctTxt}</span>`;
+  }
   const prog = pct==null ? "" :
-    `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${tx} ${ty}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"/>`+
-    `<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="3" stroke-linecap="round"/>`+
-    `<circle cx="${cx}" cy="${cy}" r="5" fill="${col}"/>`+
+    `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${tx} ${ty}" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round"/>`+
+    `<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`+
+    `<circle cx="${cx}" cy="${cy}" r="4" fill="${col}"/>`+
     `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" class="g-pct" fill="${col}">${pctTxt}</text>`;
-  return `<div class="kpi klive"><div class="lab"><span class="ic">${s.ic}</span>${s.lab}</div>`+
-    `<svg class="gauge" viewBox="-10 -14 220 128">`+
-      `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--track,#2a3550)" stroke-width="8" stroke-linecap="round"/>`+
+  return `<div class="kpi klive" data-k="${s.k}"><div class="lab"><span class="ic">${s.ic}</span>${s.lab}</div>`+
+    `<svg class="gauge" viewBox="-8 -12 216 118">`+
+      `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--track,#2a3550)" stroke-width="7" stroke-linecap="round"/>`+
       prog+
-      `<text x="${cx}" y="${cy-16}" text-anchor="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2">${s.unit}</tspan></text>`+
+      `<text x="${cx}" y="${cy-14}" text-anchor="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2">${s.unit}</tspan></text>`+
     `</svg>`+
-    `<div class="sub">normal a esta hora: <b>${normTxt}</b></div></div>`;
+    `<div class="sub">normal: <b class="g-norm">${normTxt}</b>${deltaTxt}</div></div>`;
+}
+// F2: animación count-up; respeta prefers-reduced-motion
+const REDUCED_MOTION = matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const LIVE_PREV = {};
+function animateNumber(setter, from, to, ms, fmt){
+  if(REDUCED_MOTION || from==null || to==null){ setter(fmt(to)); return; }
+  if(Math.abs(to-from) < 0.5){ setter(fmt(to)); return; }
+  const t0 = performance.now();
+  let done = false;
+  (function step(t){
+    if(done) return;
+    const k = Math.min(1, ((t||performance.now())-t0)/ms);
+    const e = k<.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2;
+    setter(fmt(from + (to-from)*e));
+    if(k<1) requestAnimationFrame(step); else done = true;
+  })(performance.now());
+  // Fallback: garantiza valor final aunque rAF se retrase (preview headless / pestaña en background)
+  setTimeout(()=>{ if(!done){ done = true; setter(fmt(to)); } }, ms+80);
+}
+// F2: actualizar una tarjeta KPI in-place (sin reescribir el SVG entero) → count-up suave
+function updateLiveCard(card, s, live, norm, pct, prev){
+  const cx=100, cy=98, r=72;
+  const col = gaugeColor(pct, s.dir);
+  const p = Math.max(0, Math.min(pct==null?0:pct, 200));
+  const a = Math.PI*(1 - p/200);
+  const tx=(cx+r*Math.cos(a)).toFixed(1), ty=(cy-r*Math.sin(a)).toFixed(1);
+  const lx=(cx+(r+16)*Math.cos(a)).toFixed(1), ly=(cy-(r+16)*Math.sin(a)).toFixed(1);
+  const pctTxt = pct==null ? "—" : Math.round(pct)+"%";
+  const normTxt = norm==null ? "—" : s.f(norm)+s.unit;
+  const valNode = card.querySelector('.g-val');
+  const valText = valNode && valNode.firstChild;
+  const unitT = valNode && valNode.querySelector('.g-unit');
+  // animar el textNode del valor; mantener el tspan de unidad
+  if(valText && live!=null){
+    const fromV = (prev==null) ? 0 : prev;
+    animateNumber(t => { valText.nodeValue = t; }, fromV, live, 650, s.f);
+  } else if(valText){ valText.nodeValue = "—"; }
+  if(unitT) unitT.textContent = s.unit;
+  // arco/aguja/% del gauge
+  const paths = card.querySelectorAll('svg.gauge path');
+  if(paths[1]){ paths[1].setAttribute('d', `M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${tx} ${ty}`); paths[1].setAttribute('stroke', col); }
+  const line = card.querySelector('svg.gauge line');
+  if(line){ line.setAttribute('x2', tx); line.setAttribute('y2', ty); line.setAttribute('stroke', col); }
+  const dot = card.querySelectorAll('svg.gauge circle')[0];
+  if(dot){ dot.setAttribute('fill', col); }
+  const gPct = card.querySelector('.g-pct');
+  if(gPct){ gPct.textContent = pctTxt; gPct.setAttribute('x', lx); gPct.setAttribute('y', ly); gPct.setAttribute('fill', col); }
+  // subtítulo
+  const gNorm = card.querySelector('.g-norm');
+  if(gNorm) gNorm.textContent = normTxt;
+  const gDelta = card.querySelector('.g-delta');
+  if(gDelta){
+    if(pct!=null && s.dir!==0){
+      const diff = Math.round(pct-100);
+      const arrow = diff>2 ? "▲" : diff<-2 ? "▼" : "=";
+      gDelta.textContent = `${arrow} ${diff>=0?"+":""}${diff}%`;
+      gDelta.style.color = col;
+    } else if(pct!=null){
+      gDelta.textContent = pctTxt; gDelta.style.color = col;
+    } else { gDelta.textContent = ""; }
+  }
 }
 function renderLiveKPIs(){
   const base = BASE30[DIA.dia_tipo] || {}, b = DIA.bin;
-  $("kpis2").innerHTML = LIVE_KPIS.map(s=>{
+  const cont = $("kpis2");
+  const cards = cont.querySelectorAll(".klive");
+  // primera vez: crear DOM y disparar count-up desde 0
+  if(cards.length !== LIVE_KPIS.length){
+    cont.innerHTML = LIVE_KPIS.map(s=>{
+      const live = DIA[s.k], norm = (base[s.k]||[])[b];
+      const pct = (norm!=null && norm>0) ? 100*live/norm : null;
+      return liveBox(s, live, norm, pct);
+    }).join("");
+    LIVE_KPIS.forEach(s=>{
+      const card = cont.querySelector(`.klive[data-k="${s.k}"]`); if(!card) return;
+      const live = DIA[s.k];
+      const vn = card.querySelector('.g-val'), tn = vn && vn.firstChild;
+      if(tn && live!=null) animateNumber(t => { tn.nodeValue = t; }, 0, live, 850, s.f);
+      LIVE_PREV[s.k] = live;
+    });
+    return;
+  }
+  // refresh: actualizar in-place y animar desde el valor previo
+  LIVE_KPIS.forEach(s=>{
+    const card = cont.querySelector(`.klive[data-k="${s.k}"]`); if(!card) return;
     const live = DIA[s.k], norm = (base[s.k]||[])[b];
     const pct = (norm!=null && norm>0) ? 100*live/norm : null;
-    return liveBox(s, live, norm, pct);
-  }).join("");
+    updateLiveCard(card, s, live, norm, pct, LIVE_PREV[s.k]);
+    LIVE_PREV[s.k] = live;
+  });
 }
 function loadDia(){
   fetch("https://storage.googleapis.com/gccp-transporte-live/dia.json?t="+Date.now(),{cache:"no-store"})
@@ -427,23 +524,111 @@ function loadLive(){
   fetch(LIVE_URL+"?t="+Date.now(),{cache:"no-store"}).then(r=>r.json())
     .then(d=>{ LIVE=d; drawLiveBuses(); renderOpNow(); }).catch(()=>{});
 }
+// F3: extender L.Canvas para dibujar buses orientados por rumbo (chevron) en lugar de círculos.
+// Mantiene UNA sola capa canvas (mismo perf que circleMarker) y conserva tooltips/eventos.
+if(typeof L!=="undefined" && !L.Canvas.prototype._updateBusArrow){
+  L.Canvas.include({
+    _updateBusArrow(layer){
+      if(!this._drawing || layer._empty()) return;
+      const p = layer._point, ctx = this._ctx, r = layer._radius, o = layer.options;
+      const brg = (o.brg||0) * Math.PI/180;
+      ctx.save(); ctx.translate(p.x, p.y);
+      if(o.mv){
+        // chevron orientado: triángulo con muesca trasera, punta apunta al rumbo
+        ctx.rotate(brg);
+        ctx.beginPath();
+        ctx.moveTo(0, -r*1.8);            // punta
+        ctx.lineTo(r*1.05, r*1.2);        // ala derecha
+        ctx.lineTo(0, r*0.4);             // muesca
+        ctx.lineTo(-r*1.05, r*1.2);       // ala izquierda
+        ctx.closePath();
+      } else {
+        // detenido: círculo compacto (sin rumbo)
+        ctx.beginPath(); ctx.arc(0, 0, r*0.9, 0, Math.PI*2);
+      }
+      this._fillStroke(ctx, layer);
+      ctx.restore();
+    }
+  });
+}
+const BusMarker = (typeof L!=="undefined") ? L.CircleMarker.extend({
+  options: { brg:0, mv:1 },
+  _updatePath(){ this._renderer._updateBusArrow(this); }
+}) : null;
+
 function drawLiveBuses(){
   if(!liveLayer) return;
   liveLayer.clearLayers();
   const badge=$("live-count");
   if(!LIVE || !LIVE.buses){ if(badge) badge.textContent="geo en línea"; return; }
-  let n=0;
+  let n=0, t0=performance.now();
   LIVE.buses.forEach(b=>{
-    const lat=b[0], lon=b[1], ln=b[2], spd=b[3], mv=b[4];
+    const lat=b[0], lon=b[1], ln=b[2], spd=b[3], mv=b[4], brg=b[5]||0;
     if(!ln) return;                                      // sin línea = fuera de servicio -> no es "operando"
     if(state.linea!=="TODAS" && ln!==state.linea) return;
     if(!inComuna(lat,lon)) return;                       // en vista de comuna, solo los de la comuna
     n++;
-    L.circleMarker([lat,lon],{renderer:liveCanvas, radius: mv?3.2:2.5, weight:0,
-      fillColor: mv?"#22d3ee":"#f59e0b", fillOpacity: mv?0.95:0.65})
-      .bindTooltip(`Línea ${ln||"—"} · ${spd} km/h${mv?"":" · detenido"}`,{direction:"top"}).addTo(liveLayer);
+    // F3: chevron orientado por rumbo; mv=0 → punto compacto sin rotar
+    new BusMarker([lat,lon],{renderer:liveCanvas, radius: mv?3.6:2.8, weight:0,
+      fillColor: mv?"#22d3ee":"#f59e0b", fillOpacity: mv?0.95:0.7, brg, mv})
+      .bindTooltip(
+        `<b>Línea ${ln||"—"}</b> · ${spd} km/h${mv?"":" · detenido"}`+
+        (mv?`<br><span style="color:var(--dim);font-size:10.5px">rumbo ${Math.round(brg)}°</span>`:""),
+        {direction:"top"}).addTo(liveLayer);
   });
   if(badge) badge.textContent = n>0 ? (NF.format(n)+" buses operando ahora") : "sin buses en vivo";
+  // F1: pill resumen en la barra de comunas
+  const hdr = $("hdr-live"); if(hdr) hdr.textContent = n>0 ? NF.format(n) : "—";
+  // F2: pill grande en topbar (count-up suave)
+  const big = $("hdr-live-big");
+  if(big){
+    const prev = parseInt(big.dataset.v || "0", 10) || 0;
+    animateNumber(t => { big.textContent = t; }, prev, n, 700, v=>NF.format(Math.round(v)));
+    big.dataset.v = n;
+  }
+}
+
+// F5: a11y — promover spans/divs clickeables a controles navegables por teclado.
+// .ctab, .litem, .rank-row, .seg b son spans/divs con onclick → ahora con role/tabindex/keydown.
+const _A11Y_SEL = ".ctab,.litem,.rank-row,.seg > b";
+function a11yEnhance(root){
+  const apply = el => {
+    if(!el || el.nodeType!==1 || el.dataset.a11y) return;
+    el.dataset.a11y = "1";
+    el.setAttribute("role","button");
+    el.setAttribute("tabindex","0");
+    el.addEventListener("keydown", ev=>{
+      if(ev.key==="Enter" || ev.key===" " || ev.key==="Spacebar"){
+        ev.preventDefault(); el.click();
+      }
+    });
+  };
+  if(root && root.nodeType===1){
+    if(root.matches && root.matches(_A11Y_SEL)) apply(root);    // el nodo mismo (cuando addedNodes ES el .ctab)
+    root.querySelectorAll && root.querySelectorAll(_A11Y_SEL).forEach(apply);
+  } else {
+    document.querySelectorAll(_A11Y_SEL).forEach(apply);
+  }
+}
+// Observer global: enhancea elementos nuevos automáticamente cuando los buildXxx los pintan.
+if(typeof MutationObserver!=="undefined"){
+  new MutationObserver(muts=>{
+    for(const m of muts) for(const n of m.addedNodes){
+      if(n.nodeType===1) a11yEnhance(n);
+    }
+  }).observe(document.documentElement, {childList:true, subtree:true});
+}
+
+// F2: "actualizado hace Xs" calculado del snapshot del feed (live.json o dia.json)
+function tickLiveAge(){
+  const el = $("live-age"); if(!el) return;
+  // priorizar el snapshot real del feed RT (vehicle ts → live.json.snapshot_utc), fallback al dia.snapshot
+  const iso = (typeof LIVE!=="undefined" && LIVE && LIVE.snapshot_utc)
+    || (typeof DIA!=="undefined" && DIA && DIA.snapshot)
+    || null;
+  if(!iso){ el.textContent = "—"; return; }
+  const age = Math.max(0, Math.floor((Date.now() - Date.parse(iso))/1000));
+  el.textContent = age<60 ? `${age}s` : age<3600 ? `${Math.floor(age/60)}m ${age%60}s` : `${Math.floor(age/3600)}h`;
 }
 
 /* ---------- KPI territorial: cobertura / acceso / espera / NSE (choropleth) ---------- */
@@ -1391,6 +1576,8 @@ function renderEvolucion(){
     $("reset-btn").onclick = ()=>{ Object.assign(state,{comuna:"TODAS",linea:"TODAS",vista:"normal"}); $("linea-search").value=""; buildLineaList(); render(); };
     render();
     loadLive(); setInterval(loadLive, 60000);   // buses operando ahora, refresco 60 s
+    // F2: "actualizado hace Xs" — tick cada segundo
+    tickLiveAge(); setInterval(tickLiveAge, 1000);
     // spec declarativo de KPIs (opcional, fallback al hardcode si no carga)
     J("kpis_spec.json").then(s=>{
       if(s && Array.isArray(s.kpis)) LIVE_KPIS = s.kpis.map(o=>({...o, f:(_LIVE_FMT[o.fmt]||_LIVE_FMT.int)}));
