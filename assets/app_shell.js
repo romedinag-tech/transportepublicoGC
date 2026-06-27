@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=61`).then(r=>r.json());
-const BUILD = "2026-06-26 19:56";
+const J = n => fetch(`data/${n}?v=62`).then(r=>r.json());
+const BUILD = "2026-06-27 18:21";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -133,7 +133,11 @@ function render(){
   document.querySelectorAll(".litem").forEach(e=>e.classList.toggle("active", e.dataset.l===state.linea && state.vista==="normal"));
   const coverDyn = state.mapMode==="cover" && (state.coverSub==="of" || state.coverSub==="od");
   const periodoRelevante = state.vista==="ranking" || (state.vista==="normal" && state.linea==="TODAS" && (state.mapMode==="conges"||state.mapMode==="wait"||state.mapMode==="bunch"||coverDyn));
-  $("periodo-sel").style.display = periodoRelevante ? "flex" : "none";
+  // F1: período visible siempre en home (vista normal). Si no aplica al modo actual,
+  // se marca data-inactive=1 (opacity .5) — sigue siendo un control de contexto presente.
+  const periodoVisible = state.vista==="normal" || state.vista==="ranking";
+  $("periodo-sel").style.display = periodoVisible ? "flex" : "none";
+  $("periodo-sel").dataset.inactive = (periodoVisible && !periodoRelevante) ? "1" : "";
   const purposeRel = state.vista==="normal" && state.linea==="TODAS" && state.mapMode==="wait";
   if($("purpose-sel")) $("purpose-sel").style.display = purposeRel ? "flex" : "none";
   const coverSubRel = state.vista==="normal" && state.linea==="TODAS" && state.mapMode==="cover";
@@ -233,28 +237,39 @@ function gaugeColor(pct,dir){
   return g>=95 ? "#34d399" : g>=75 ? "#fbbf24" : "#f87171";
 }
 function liveBox(s, live, norm, pct){
-  // reloj semicírculo GRANDE: valor dentro del arco, aguja desde el centro-base, % en la punta
+  // F1: reloj semicírculo más compacto; valor dentro del arco, aguja, % al final de la aguja.
+  // Baseline "normal a esta hora" abajo en mono/--muted + delta semántico (▲/▼/=).
   const col = gaugeColor(pct, s.dir);
-  const cx=100, cy=102, r=80;
+  const cx=100, cy=98, r=72;                             // r baja de 80 a 72 (más aire)
   const p = Math.max(0, Math.min(pct==null?0:pct, 200));
   const a = Math.PI*(1 - p/200);                         // 0%→izq, 100%→arriba, 200%→der
   const tx=(cx+r*Math.cos(a)).toFixed(1), ty=(cy-r*Math.sin(a)).toFixed(1);
-  const lx=(cx+(r+17)*Math.cos(a)).toFixed(1), ly=(cy-(r+17)*Math.sin(a)).toFixed(1);
+  const lx=(cx+(r+16)*Math.cos(a)).toFixed(1), ly=(cy-(r+16)*Math.sin(a)).toFixed(1);
   const valTxt = live==null ? "—" : s.f(live);
   const pctTxt = pct==null ? "—" : Math.round(pct)+"%";
   const normTxt = norm==null ? "—" : s.f(norm)+s.unit;
+  // delta semántico: ▲ mejor, ▼ peor, = igual (según dir del KPI)
+  let deltaTxt = "", deltaCol = "var(--muted)";
+  if(pct!=null && s.dir!==0){
+    const diff = Math.round(pct-100);
+    const arrow = diff>2 ? "▲" : diff<-2 ? "▼" : "=";
+    deltaCol = gaugeColor(pct, s.dir);
+    deltaTxt = `<span class="g-delta" style="color:${deltaCol}">${arrow} ${diff>=0?"+":""}${diff}%</span>`;
+  } else if(pct!=null){
+    deltaTxt = `<span class="g-delta" style="color:${col}">${pctTxt}</span>`;
+  }
   const prog = pct==null ? "" :
-    `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${tx} ${ty}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"/>`+
-    `<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="3" stroke-linecap="round"/>`+
-    `<circle cx="${cx}" cy="${cy}" r="5" fill="${col}"/>`+
+    `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${tx} ${ty}" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round"/>`+
+    `<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`+
+    `<circle cx="${cx}" cy="${cy}" r="4" fill="${col}"/>`+
     `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" class="g-pct" fill="${col}">${pctTxt}</text>`;
   return `<div class="kpi klive"><div class="lab"><span class="ic">${s.ic}</span>${s.lab}</div>`+
-    `<svg class="gauge" viewBox="-10 -14 220 128">`+
-      `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--track,#2a3550)" stroke-width="8" stroke-linecap="round"/>`+
+    `<svg class="gauge" viewBox="-8 -12 216 118">`+
+      `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--track,#2a3550)" stroke-width="7" stroke-linecap="round"/>`+
       prog+
-      `<text x="${cx}" y="${cy-16}" text-anchor="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2">${s.unit}</tspan></text>`+
+      `<text x="${cx}" y="${cy-14}" text-anchor="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2">${s.unit}</tspan></text>`+
     `</svg>`+
-    `<div class="sub">normal a esta hora: <b>${normTxt}</b></div></div>`;
+    `<div class="sub">normal: <b class="g-norm">${normTxt}</b>${deltaTxt}</div></div>`;
 }
 function renderLiveKPIs(){
   const base = BASE30[DIA.dia_tipo] || {}, b = DIA.bin;
@@ -444,6 +459,8 @@ function drawLiveBuses(){
       .bindTooltip(`Línea ${ln||"—"} · ${spd} km/h${mv?"":" · detenido"}`,{direction:"top"}).addTo(liveLayer);
   });
   if(badge) badge.textContent = n>0 ? (NF.format(n)+" buses operando ahora") : "sin buses en vivo";
+  // F1: pill resumen en la barra de comunas
+  const hdr = $("hdr-live"); if(hdr) hdr.textContent = n>0 ? NF.format(n) : "—";
 }
 
 /* ---------- KPI territorial: cobertura / acceso / espera / NSE (choropleth) ---------- */

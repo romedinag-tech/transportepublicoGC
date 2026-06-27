@@ -10,8 +10,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Componentes y variables de tema existentes (kpi, ctab, litem, rank-row, cump-row, seg…) -->
-<link rel="stylesheet" href="assets/styles.css?v=61">
-<link rel="stylesheet" href="assets/shell.css?v=61">
+<link rel="stylesheet" href="assets/styles.css?v=62">
+<link rel="stylesheet" href="assets/shell.css?v=62">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <!-- Tailwind (Play CDN, sin build). preflight off para no pisar los componentes existentes. -->
@@ -126,15 +126,22 @@ tailwind.config = {
   #ch-hora,#cs-chart{width:100%}
 
   /* ===== Barra superior de comunas (territorio) ===== */
-  .comuna-bar{display:flex;align-items:center;gap:3px;padding:7px 12px;overflow-x:auto;white-space:nowrap;
+  .comuna-bar{display:flex;align-items:center;gap:6px;padding:8px 14px;white-space:nowrap;
     border-bottom:1px solid var(--line);background:var(--topbar);backdrop-filter:blur(8px);flex:none;z-index:40}
+  .comuna-bar #comuna-tabs{flex:1;min-width:0;overflow-x:auto;display:flex;align-items:center;gap:3px}
   .comuna-bar .ctab{flex:none}
   .comuna-bar .vsep{width:1px;height:20px;background:var(--line2);margin:0 7px;flex:none}
   .comuna-bar .ctab.special{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line2)}
   .comuna-bar .ctab.special.active{border-color:var(--acc)}
+  /* F1: aside derecho de la barra (período + resumen vivo) */
+  .comuna-bar .cb-aside{display:flex;align-items:center;gap:10px;flex:none;border-left:1px solid var(--line);padding-left:12px;margin-left:6px}
+  .comuna-bar .cb-live{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);
+    padding:5px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--chip)}
+  .comuna-bar .cb-live b{color:var(--tx);font-family:var(--mono);font-weight:700}
   /* selector de período del día (congestión) */
-  .periodo-sel{display:inline-flex;align-items:center;gap:6px;margin-left:auto;flex:none}
+  .periodo-sel{display:inline-flex;align-items:center;gap:6px;flex:none}
   .periodo-sel .lbl{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+  .periodo-sel[data-inactive="1"]{opacity:.5}
 
   /* ===== HERO intro: red neuronal animada ===== */
   #hero-splash{position:fixed;inset:0;z-index:9999;background:radial-gradient(120% 120% at 50% 40%,#0e1730,#070b16 70%);
@@ -154,13 +161,18 @@ tailwind.config = {
   .hero-load span{display:block;height:100%;width:38%;border-radius:3px;background:linear-gradient(90deg,#22d3ee,#34d399);animation:heroSweep 1.15s cubic-bezier(.5,0,.5,1) infinite}
   @keyframes heroSweep{0%{transform:translateX(-130%)}100%{transform:translateX(360%)}}
   .hero-skip{margin-top:18px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);opacity:.7}
-  /* recuadros del inicio: reloj semicírculo grande con el valor dentro */
-  .kpi.klive .lab{justify-content:center;text-align:center}
-  .kpi.klive .gauge{width:100%;height:auto;display:block;margin:1px 0 0}
-  .kpi.klive .g-val{font:700 30px/1 "JetBrains Mono",monospace;fill:var(--tx,#e6edf7)}
-  .kpi.klive .g-unit{font-size:13px;font-weight:500;fill:var(--dim)}
-  .kpi.klive .g-pct{font:700 15px/1 "Inter",sans-serif}
-  .kpi.klive .sub{margin-top:1px;font-size:11px;color:var(--dim);text-align:center}
+  /* F1: recuadros del inicio — más compactos, baseline legible, delta semántico claro */
+  .kpi.klive{padding:11px 13px 9px}
+  .kpi.klive .lab{justify-content:center;text-align:center;font-size:var(--fs-kpi-lab,11px);
+    text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .kpi.klive .gauge{width:100%;height:auto;display:block;margin:2px 0 0}
+  .kpi.klive .g-val{font:700 var(--fs-kpi-val,24px)/1 "JetBrains Mono",monospace;fill:var(--tx,#e6edf7);letter-spacing:-.01em}
+  .kpi.klive .g-unit{font-size:var(--fs-kpi-unit,12px);font-weight:500;fill:var(--muted)}
+  .kpi.klive .g-pct{font:700 var(--fs-kpi-pct,16px)/1 "Inter",sans-serif}
+  .kpi.klive .sub{margin-top:3px;font-size:var(--fs-kpi-sub,13px);color:var(--muted);text-align:center;line-height:1.35}
+  .kpi.klive .sub .g-norm{font-family:var(--mono);color:var(--tx);font-weight:600}
+  .kpi.klive .sub .g-delta{display:inline-block;margin-left:6px;font-family:var(--mono);font-weight:700;
+    padding:1px 6px;border-radius:5px;font-size:11.5px;background:rgba(255,255,255,.04)}
 </style>
 </head>
 
@@ -247,7 +259,13 @@ tailwind.config = {
 
   <!-- ============ BARRA SUPERIOR: TERRITORIO (comunas) ============ -->
   <div class="comuna-bar thin-scroll">
-    <nav id="comuna-tabs" style="display:flex;align-items:center;gap:3px"></nav>
+    <nav id="comuna-tabs" class="thin-scroll"></nav>
+    <div class="cb-aside">
+      <!-- selector de período movido aquí desde undermap-ctrls (F1) -->
+      <div class="periodo-sel" id="periodo-sel" title="Período del día (afecta velocidad/congestión/espera/cobertura dinámica)"></div>
+      <!-- pill vivo: resumen "en vivo" balanceando la fila -->
+      <span class="cb-live" title="Buses operando en este momento (GTFS-RT)"><span class="dot-live"></span> <b id="hdr-live">—</b> buses operando</span>
+    </div>
   </div>
 
   <!-- ============ ESPACIO DE TRABAJO ============ -->
@@ -289,7 +307,7 @@ tailwind.config = {
         <!-- MAPA HÉROE (2/3) -->
         <section class="widget xl:col-span-2 flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=61" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=62" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -308,7 +326,7 @@ tailwind.config = {
             <div class="undermap">
               <div class="undermap-ctrls">
                 <div class="periodo-sel" id="cover-sub" title="Dimensión de cobertura (estática / oferta dinámica)"></div>
-                <div class="periodo-sel" id="periodo-sel" title="Período del día (afecta velocidad/congestión/espera)"></div>
+                <!-- periodo-sel movido a la barra de comunas (F1) -->
                 <div class="periodo-sel" id="purpose-sel" title="Propósito de viaje (repondera por demanda EOD)"></div>
               </div>
               <p id="map-narrative" class="map-narr"></p>
@@ -320,7 +338,7 @@ tailwind.config = {
         <div class="flex flex-col gap-4 xl:max-h-[680px] xl:overflow-y-auto thin-scroll xl:pr-1">
           <section class="widget">
             <div class="widget-h">
-              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=61" alt="" width="22" height="22"></span>
+              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=62" alt="" width="22" height="22"></span>
               <div><h3>Flota y velocidad</h3><span class="sub">por hora · días laborables</span></div>
             </div>
             <div class="widget-b"><div id="ch-hora" style="height:236px"></div><p id="hora-narr" class="wnarr"></p></div>
@@ -361,7 +379,7 @@ tailwind.config = {
       <!-- Cumplimiento de frecuencia -->
       <section class="widget">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=61" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=62" alt="" width="22" height="22"></span>
           <div><h3>Cumplimiento de frecuencia</h3><span class="sub">programado (GTFS) vs observado (GPS)</span></div>
         </div>
         <div class="widget-b"><div id="cump-box"></div><p id="cump-narr" class="wnarr"></p></div>
@@ -370,7 +388,7 @@ tailwind.config = {
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=61" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=62" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -495,7 +513,7 @@ tailwind.config = {
 </div>
 
 <script src="assets/echarts.min.js"></script>
-<script src="assets/app_shell.js?v=61"></script>
+<script src="assets/app_shell.js?v=62"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

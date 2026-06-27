@@ -9,6 +9,17 @@
   --radius:16px; --radius-sm:11px;
   --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  /* Escala tipográfica coherente (F1) — usar variables, no números mágicos */
+  --fs-widget-title:13px;
+  --fs-widget-sub:11px;
+  --fs-kpi-lab:11px;        /* etiqueta del KPI */
+  --fs-kpi-val:24px;        /* cifra protagonista, baja de 30 */
+  --fs-kpi-unit:12px;
+  --fs-kpi-pct:16px;        /* delta semántico, sube de 15 */
+  --fs-kpi-sub:13px;        /* baseline "normal a esta hora", sube de 11 */
+  --fs-litem:13.5px;        /* sidebar líneas */
+  --fs-ctab:13px;           /* tabs comunas */
+  --fs-seg:12px;
 }
 :root[data-theme="light"]{
   --bg:#eef2f7; --bg2:#e6ecf3; --panel:#ffffff; --panel2:#f6f9fc;
