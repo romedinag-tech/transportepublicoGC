@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=63`).then(r=>r.json());
-const BUILD = "2026-06-27 18:32";
+const J = n => fetch(`data/${n}?v=64`).then(r=>r.json());
+const BUILD = "2026-06-27 18:42";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -524,21 +524,57 @@ function loadLive(){
   fetch(LIVE_URL+"?t="+Date.now(),{cache:"no-store"}).then(r=>r.json())
     .then(d=>{ LIVE=d; drawLiveBuses(); renderOpNow(); }).catch(()=>{});
 }
+// F3: extender L.Canvas para dibujar buses orientados por rumbo (chevron) en lugar de círculos.
+// Mantiene UNA sola capa canvas (mismo perf que circleMarker) y conserva tooltips/eventos.
+if(typeof L!=="undefined" && !L.Canvas.prototype._updateBusArrow){
+  L.Canvas.include({
+    _updateBusArrow(layer){
+      if(!this._drawing || layer._empty()) return;
+      const p = layer._point, ctx = this._ctx, r = layer._radius, o = layer.options;
+      const brg = (o.brg||0) * Math.PI/180;
+      ctx.save(); ctx.translate(p.x, p.y);
+      if(o.mv){
+        // chevron orientado: triángulo con muesca trasera, punta apunta al rumbo
+        ctx.rotate(brg);
+        ctx.beginPath();
+        ctx.moveTo(0, -r*1.8);            // punta
+        ctx.lineTo(r*1.05, r*1.2);        // ala derecha
+        ctx.lineTo(0, r*0.4);             // muesca
+        ctx.lineTo(-r*1.05, r*1.2);       // ala izquierda
+        ctx.closePath();
+      } else {
+        // detenido: círculo compacto (sin rumbo)
+        ctx.beginPath(); ctx.arc(0, 0, r*0.9, 0, Math.PI*2);
+      }
+      this._fillStroke(ctx, layer);
+      ctx.restore();
+    }
+  });
+}
+const BusMarker = (typeof L!=="undefined") ? L.CircleMarker.extend({
+  options: { brg:0, mv:1 },
+  _updatePath(){ this._renderer._updateBusArrow(this); }
+}) : null;
+
 function drawLiveBuses(){
   if(!liveLayer) return;
   liveLayer.clearLayers();
   const badge=$("live-count");
   if(!LIVE || !LIVE.buses){ if(badge) badge.textContent="geo en línea"; return; }
-  let n=0;
+  let n=0, t0=performance.now();
   LIVE.buses.forEach(b=>{
-    const lat=b[0], lon=b[1], ln=b[2], spd=b[3], mv=b[4];
+    const lat=b[0], lon=b[1], ln=b[2], spd=b[3], mv=b[4], brg=b[5]||0;
     if(!ln) return;                                      // sin línea = fuera de servicio -> no es "operando"
     if(state.linea!=="TODAS" && ln!==state.linea) return;
     if(!inComuna(lat,lon)) return;                       // en vista de comuna, solo los de la comuna
     n++;
-    L.circleMarker([lat,lon],{renderer:liveCanvas, radius: mv?3.2:2.5, weight:0,
-      fillColor: mv?"#22d3ee":"#f59e0b", fillOpacity: mv?0.95:0.65})
-      .bindTooltip(`Línea ${ln||"—"} · ${spd} km/h${mv?"":" · detenido"}`,{direction:"top"}).addTo(liveLayer);
+    // F3: chevron orientado por rumbo; mv=0 → punto compacto sin rotar
+    new BusMarker([lat,lon],{renderer:liveCanvas, radius: mv?3.6:2.8, weight:0,
+      fillColor: mv?"#22d3ee":"#f59e0b", fillOpacity: mv?0.95:0.7, brg, mv})
+      .bindTooltip(
+        `<b>Línea ${ln||"—"}</b> · ${spd} km/h${mv?"":" · detenido"}`+
+        (mv?`<br><span style="color:var(--dim);font-size:10.5px">rumbo ${Math.round(brg)}°</span>`:""),
+        {direction:"top"}).addTo(liveLayer);
   });
   if(badge) badge.textContent = n>0 ? (NF.format(n)+" buses operando ahora") : "sin buses en vivo";
   // F1: pill resumen en la barra de comunas
