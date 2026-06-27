@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=65`).then(r=>r.json());
-const BUILD = "2026-06-27 18:50";
+const J = n => fetch(`data/${n}?v=66`).then(r=>r.json());
+const BUILD = "2026-06-27 19:00";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -586,6 +586,37 @@ function drawLiveBuses(){
     animateNumber(t => { big.textContent = t; }, prev, n, 700, v=>NF.format(Math.round(v)));
     big.dataset.v = n;
   }
+}
+
+// F5: a11y — promover spans/divs clickeables a controles navegables por teclado.
+// .ctab, .litem, .rank-row, .seg b son spans/divs con onclick → ahora con role/tabindex/keydown.
+const _A11Y_SEL = ".ctab,.litem,.rank-row,.seg > b";
+function a11yEnhance(root){
+  const apply = el => {
+    if(!el || el.nodeType!==1 || el.dataset.a11y) return;
+    el.dataset.a11y = "1";
+    el.setAttribute("role","button");
+    el.setAttribute("tabindex","0");
+    el.addEventListener("keydown", ev=>{
+      if(ev.key==="Enter" || ev.key===" " || ev.key==="Spacebar"){
+        ev.preventDefault(); el.click();
+      }
+    });
+  };
+  if(root && root.nodeType===1){
+    if(root.matches && root.matches(_A11Y_SEL)) apply(root);    // el nodo mismo (cuando addedNodes ES el .ctab)
+    root.querySelectorAll && root.querySelectorAll(_A11Y_SEL).forEach(apply);
+  } else {
+    document.querySelectorAll(_A11Y_SEL).forEach(apply);
+  }
+}
+// Observer global: enhancea elementos nuevos automáticamente cuando los buildXxx los pintan.
+if(typeof MutationObserver!=="undefined"){
+  new MutationObserver(muts=>{
+    for(const m of muts) for(const n of m.addedNodes){
+      if(n.nodeType===1) a11yEnhance(n);
+    }
+  }).observe(document.documentElement, {childList:true, subtree:true});
 }
 
 // F2: "actualizado hace Xs" calculado del snapshot del feed (live.json o dia.json)
