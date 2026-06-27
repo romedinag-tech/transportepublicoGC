@@ -6,32 +6,18 @@
 <title>GCCP · Centro de Mando · Transporte Gran Concepción</title>
 <meta name="description" content="Centro de mando analítico del transporte público del Gran Concepción: flota, velocidad, cumplimiento GTFS vs GPS y geometría oficial sobre 302 millones de registros.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- F4: Leaflet self-hosted (antes desde unpkg.com en <head> sin defer → bloqueaba render) -->
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=65"/>
+<script defer src="assets/vendor/leaflet/leaflet.js?v=65"></script>
 <!-- Componentes y variables de tema existentes (kpi, ctab, litem, rank-row, cump-row, seg…) -->
-<link rel="stylesheet" href="assets/styles.css?v=64">
-<link rel="stylesheet" href="assets/shell.css?v=64">
+<link rel="stylesheet" href="assets/styles.css?v=65">
+<link rel="stylesheet" href="assets/shell.css?v=65">
+<!-- F4: Tailwind purgado (~12 KB) antes era 280 KB de JS engine vía cdn.tailwindcss.com -->
+<link rel="stylesheet" href="assets/tw.css?v=65">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
-<!-- Tailwind (Play CDN, sin build). preflight off para no pisar los componentes existentes. -->
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-tailwind.config = {
-  corePlugins: { preflight: false },
-  theme: { extend: {
-    fontFamily: {
-      sans: ['Inter','-apple-system','Segoe UI','Roboto','sans-serif'],
-      mono: ['JetBrains Mono','ui-monospace','SFMono-Regular','Menlo','monospace'],
-    },
-    colors: { neon: { cyan:'#22d3ee', sky:'#38bdf8', emerald:'#34d399', amber:'#fbbf24', orange:'#fb923c', rose:'#fb7185' } },
-    keyframes: {
-      pulsering: { '0%':{boxShadow:'0 0 0 0 rgba(52,211,153,.55)'}, '70%':{boxShadow:'0 0 0 7px rgba(52,211,153,0)'}, '100%':{boxShadow:'0 0 0 0 rgba(52,211,153,0)'} },
-    },
-    animation: { pulsering: 'pulsering 2s infinite' },
-  }},
-};
-</script>
 <style>
   /* ===== Chrome del centro de mando (usa las variables de tema -> respeta claro/oscuro) ===== */
   html,body{height:100%}
@@ -200,6 +186,17 @@ tailwind.config = {
 
 <body class="font-sans">
 
+<!-- F4: respaldo cuando JavaScript está deshabilitado (antes página en blanco) -->
+<noscript>
+  <div style="max-width:640px;margin:60px auto;padding:30px;border:1px solid #1f2937;border-radius:14px;background:#0d1424;color:#e8eef8;font-family:Inter,sans-serif;line-height:1.55">
+    <h1 style="font-size:18px;margin-bottom:10px;color:#22d3ee">Centro de Mando · Transporte Gran Concepción</h1>
+    <p style="font-size:14px;color:#93a1ba;margin-bottom:14px">Este visor requiere JavaScript activado para mostrar los mapas en vivo, los KPIs y los gráficos interactivos sobre los 302 millones de registros GPS del sistema.</p>
+    <p style="font-size:13px;color:#64718c">Para ver capturas estáticas y la metodología del proyecto, visita el repositorio:<br>
+      <a href="https://github.com/romedinag-tech/transportepublicoGC" style="color:#38bdf8">github.com/romedinag-tech/transportepublicoGC</a>
+    </p>
+  </div>
+</noscript>
+
 <!-- ============ HERO INTRO: red neuronal animada ============ -->
 <div id="hero-splash">
   <canvas id="hero-canvas"></canvas>
@@ -355,7 +352,7 @@ tailwind.config = {
         <!-- MAPA HÉROE (2/3) -->
         <section class="widget xl:col-span-2 flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=64" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=65" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -386,7 +383,7 @@ tailwind.config = {
         <div class="flex flex-col gap-4 xl:max-h-[680px] xl:overflow-y-auto thin-scroll xl:pr-1">
           <section class="widget">
             <div class="widget-h">
-              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=64" alt="" width="22" height="22"></span>
+              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=65" alt="" width="22" height="22"></span>
               <div><h3>Flota y velocidad</h3><span class="sub">por hora · días laborables</span></div>
             </div>
             <div class="widget-b"><div id="ch-hora" style="height:236px"></div><p id="hora-narr" class="wnarr"></p></div>
@@ -427,7 +424,7 @@ tailwind.config = {
       <!-- Cumplimiento de frecuencia -->
       <section class="widget">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=64" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=65" alt="" width="22" height="22"></span>
           <div><h3>Cumplimiento de frecuencia</h3><span class="sub">programado (GTFS) vs observado (GPS)</span></div>
         </div>
         <div class="widget-b"><div id="cump-box"></div><p id="cump-narr" class="wnarr"></p></div>
@@ -436,7 +433,7 @@ tailwind.config = {
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=64" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=65" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -560,8 +557,9 @@ tailwind.config = {
   </div>
 </div>
 
-<script src="assets/echarts.min.js"></script>
-<script src="assets/app_shell.js?v=64"></script>
+<!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
+<script defer src="assets/echarts.min.js"></script>
+<script defer src="assets/app_shell.js?v=65"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

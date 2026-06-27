@@ -11,3 +11,6 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+
+# F4: Tailwind CLI binario y workfile (la salida assets/tw.css SÍ se commitea)
+.tw/
