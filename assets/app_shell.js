@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=62`).then(r=>r.json());
-const BUILD = "2026-06-27 18:21";
+const J = n => fetch(`data/${n}?v=63`).then(r=>r.json());
+const BUILD = "2026-06-27 18:32";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -263,7 +263,7 @@ function liveBox(s, live, norm, pct){
     `<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`+
     `<circle cx="${cx}" cy="${cy}" r="4" fill="${col}"/>`+
     `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" class="g-pct" fill="${col}">${pctTxt}</text>`;
-  return `<div class="kpi klive"><div class="lab"><span class="ic">${s.ic}</span>${s.lab}</div>`+
+  return `<div class="kpi klive" data-k="${s.k}"><div class="lab"><span class="ic">${s.ic}</span>${s.lab}</div>`+
     `<svg class="gauge" viewBox="-8 -12 216 118">`+
       `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--track,#2a3550)" stroke-width="7" stroke-linecap="round"/>`+
       prog+
@@ -271,13 +271,95 @@ function liveBox(s, live, norm, pct){
     `</svg>`+
     `<div class="sub">normal: <b class="g-norm">${normTxt}</b>${deltaTxt}</div></div>`;
 }
+// F2: animación count-up; respeta prefers-reduced-motion
+const REDUCED_MOTION = matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const LIVE_PREV = {};
+function animateNumber(setter, from, to, ms, fmt){
+  if(REDUCED_MOTION || from==null || to==null){ setter(fmt(to)); return; }
+  if(Math.abs(to-from) < 0.5){ setter(fmt(to)); return; }
+  const t0 = performance.now();
+  let done = false;
+  (function step(t){
+    if(done) return;
+    const k = Math.min(1, ((t||performance.now())-t0)/ms);
+    const e = k<.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2;
+    setter(fmt(from + (to-from)*e));
+    if(k<1) requestAnimationFrame(step); else done = true;
+  })(performance.now());
+  // Fallback: garantiza valor final aunque rAF se retrase (preview headless / pestaña en background)
+  setTimeout(()=>{ if(!done){ done = true; setter(fmt(to)); } }, ms+80);
+}
+// F2: actualizar una tarjeta KPI in-place (sin reescribir el SVG entero) → count-up suave
+function updateLiveCard(card, s, live, norm, pct, prev){
+  const cx=100, cy=98, r=72;
+  const col = gaugeColor(pct, s.dir);
+  const p = Math.max(0, Math.min(pct==null?0:pct, 200));
+  const a = Math.PI*(1 - p/200);
+  const tx=(cx+r*Math.cos(a)).toFixed(1), ty=(cy-r*Math.sin(a)).toFixed(1);
+  const lx=(cx+(r+16)*Math.cos(a)).toFixed(1), ly=(cy-(r+16)*Math.sin(a)).toFixed(1);
+  const pctTxt = pct==null ? "—" : Math.round(pct)+"%";
+  const normTxt = norm==null ? "—" : s.f(norm)+s.unit;
+  const valNode = card.querySelector('.g-val');
+  const valText = valNode && valNode.firstChild;
+  const unitT = valNode && valNode.querySelector('.g-unit');
+  // animar el textNode del valor; mantener el tspan de unidad
+  if(valText && live!=null){
+    const fromV = (prev==null) ? 0 : prev;
+    animateNumber(t => { valText.nodeValue = t; }, fromV, live, 650, s.f);
+  } else if(valText){ valText.nodeValue = "—"; }
+  if(unitT) unitT.textContent = s.unit;
+  // arco/aguja/% del gauge
+  const paths = card.querySelectorAll('svg.gauge path');
+  if(paths[1]){ paths[1].setAttribute('d', `M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${tx} ${ty}`); paths[1].setAttribute('stroke', col); }
+  const line = card.querySelector('svg.gauge line');
+  if(line){ line.setAttribute('x2', tx); line.setAttribute('y2', ty); line.setAttribute('stroke', col); }
+  const dot = card.querySelectorAll('svg.gauge circle')[0];
+  if(dot){ dot.setAttribute('fill', col); }
+  const gPct = card.querySelector('.g-pct');
+  if(gPct){ gPct.textContent = pctTxt; gPct.setAttribute('x', lx); gPct.setAttribute('y', ly); gPct.setAttribute('fill', col); }
+  // subtítulo
+  const gNorm = card.querySelector('.g-norm');
+  if(gNorm) gNorm.textContent = normTxt;
+  const gDelta = card.querySelector('.g-delta');
+  if(gDelta){
+    if(pct!=null && s.dir!==0){
+      const diff = Math.round(pct-100);
+      const arrow = diff>2 ? "▲" : diff<-2 ? "▼" : "=";
+      gDelta.textContent = `${arrow} ${diff>=0?"+":""}${diff}%`;
+      gDelta.style.color = col;
+    } else if(pct!=null){
+      gDelta.textContent = pctTxt; gDelta.style.color = col;
+    } else { gDelta.textContent = ""; }
+  }
+}
 function renderLiveKPIs(){
   const base = BASE30[DIA.dia_tipo] || {}, b = DIA.bin;
-  $("kpis2").innerHTML = LIVE_KPIS.map(s=>{
+  const cont = $("kpis2");
+  const cards = cont.querySelectorAll(".klive");
+  // primera vez: crear DOM y disparar count-up desde 0
+  if(cards.length !== LIVE_KPIS.length){
+    cont.innerHTML = LIVE_KPIS.map(s=>{
+      const live = DIA[s.k], norm = (base[s.k]||[])[b];
+      const pct = (norm!=null && norm>0) ? 100*live/norm : null;
+      return liveBox(s, live, norm, pct);
+    }).join("");
+    LIVE_KPIS.forEach(s=>{
+      const card = cont.querySelector(`.klive[data-k="${s.k}"]`); if(!card) return;
+      const live = DIA[s.k];
+      const vn = card.querySelector('.g-val'), tn = vn && vn.firstChild;
+      if(tn && live!=null) animateNumber(t => { tn.nodeValue = t; }, 0, live, 850, s.f);
+      LIVE_PREV[s.k] = live;
+    });
+    return;
+  }
+  // refresh: actualizar in-place y animar desde el valor previo
+  LIVE_KPIS.forEach(s=>{
+    const card = cont.querySelector(`.klive[data-k="${s.k}"]`); if(!card) return;
     const live = DIA[s.k], norm = (base[s.k]||[])[b];
     const pct = (norm!=null && norm>0) ? 100*live/norm : null;
-    return liveBox(s, live, norm, pct);
-  }).join("");
+    updateLiveCard(card, s, live, norm, pct, LIVE_PREV[s.k]);
+    LIVE_PREV[s.k] = live;
+  });
 }
 function loadDia(){
   fetch("https://storage.googleapis.com/gccp-transporte-live/dia.json?t="+Date.now(),{cache:"no-store"})
@@ -461,6 +543,25 @@ function drawLiveBuses(){
   if(badge) badge.textContent = n>0 ? (NF.format(n)+" buses operando ahora") : "sin buses en vivo";
   // F1: pill resumen en la barra de comunas
   const hdr = $("hdr-live"); if(hdr) hdr.textContent = n>0 ? NF.format(n) : "—";
+  // F2: pill grande en topbar (count-up suave)
+  const big = $("hdr-live-big");
+  if(big){
+    const prev = parseInt(big.dataset.v || "0", 10) || 0;
+    animateNumber(t => { big.textContent = t; }, prev, n, 700, v=>NF.format(Math.round(v)));
+    big.dataset.v = n;
+  }
+}
+
+// F2: "actualizado hace Xs" calculado del snapshot del feed (live.json o dia.json)
+function tickLiveAge(){
+  const el = $("live-age"); if(!el) return;
+  // priorizar el snapshot real del feed RT (vehicle ts → live.json.snapshot_utc), fallback al dia.snapshot
+  const iso = (typeof LIVE!=="undefined" && LIVE && LIVE.snapshot_utc)
+    || (typeof DIA!=="undefined" && DIA && DIA.snapshot)
+    || null;
+  if(!iso){ el.textContent = "—"; return; }
+  const age = Math.max(0, Math.floor((Date.now() - Date.parse(iso))/1000));
+  el.textContent = age<60 ? `${age}s` : age<3600 ? `${Math.floor(age/60)}m ${age%60}s` : `${Math.floor(age/3600)}h`;
 }
 
 /* ---------- KPI territorial: cobertura / acceso / espera / NSE (choropleth) ---------- */
@@ -1408,6 +1509,8 @@ function renderEvolucion(){
     $("reset-btn").onclick = ()=>{ Object.assign(state,{comuna:"TODAS",linea:"TODAS",vista:"normal"}); $("linea-search").value=""; buildLineaList(); render(); };
     render();
     loadLive(); setInterval(loadLive, 60000);   // buses operando ahora, refresco 60 s
+    // F2: "actualizado hace Xs" — tick cada segundo
+    tickLiveAge(); setInterval(tickLiveAge, 1000);
     // spec declarativo de KPIs (opcional, fallback al hardcode si no carga)
     J("kpis_spec.json").then(s=>{
       if(s && Array.isArray(s.kpis)) LIVE_KPIS = s.kpis.map(o=>({...o, f:(_LIVE_FMT[o.fmt]||_LIVE_FMT.int)}));
