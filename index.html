@@ -26,13 +26,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <!-- F4: Leaflet self-hosted (antes desde unpkg.com en <head> sin defer → bloqueaba render) -->
-<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=67"/>
-<script defer src="assets/vendor/leaflet/leaflet.js?v=67"></script>
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=69"/>
+<script defer src="assets/vendor/leaflet/leaflet.js?v=69"></script>
 <!-- Componentes y variables de tema existentes (kpi, ctab, litem, rank-row, cump-row, seg…) -->
-<link rel="stylesheet" href="assets/styles.css?v=67">
-<link rel="stylesheet" href="assets/shell.css?v=67">
+<link rel="stylesheet" href="assets/styles.css?v=69">
+<link rel="stylesheet" href="assets/shell.css?v=69">
 <!-- F4: Tailwind purgado (~12 KB) antes era 280 KB de JS engine vía cdn.tailwindcss.com -->
-<link rel="stylesheet" href="assets/tw.css?v=67">
+<link rel="stylesheet" href="assets/tw.css?v=69">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
@@ -282,8 +282,8 @@
 
 <div class="flex flex-col h-screen overflow-hidden">
 
-  <!-- ============ BARRA DE COMANDO (ultra-delgada) ============ -->
-  <header class="flex items-center gap-3 px-3 sm:px-4 h-12 shrink-0 z-50 border-b border-[var(--line)] bg-[var(--topbar)] backdrop-blur-xl relative relative-flow">
+  <!-- ============ BARRA DE COMANDO (compacta, h-14 para acomodar el título más grande) ============ -->
+  <header class="flex items-center gap-3 px-3 sm:px-4 h-14 shrink-0 z-50 border-b border-[var(--line)] bg-[var(--topbar)] backdrop-blur-xl relative relative-flow">
     <button id="side-toggle" class="grid place-items-center w-8 h-8 rounded-lg border border-[var(--line2)] text-[var(--muted)] hover:text-[var(--acc)] hover:border-[var(--acc)]" title="Mostrar/ocultar filtros" aria-label="Filtros">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
@@ -293,28 +293,42 @@
       <span class="tb-led tb-led--rx"></span>
       <span class="tb-led tb-led--tx"></span>
     </div>
-    <div class="flex items-center gap-2.5 min-w-0">
-      <!-- F2: logo SVG inline — red de rutas convergentes (motivo de red de transporte) -->
-      <svg class="tb-logo" viewBox="0 0 32 32" width="34" height="34" aria-label="GCCP Centro de Mando" role="img">
+    <div class="flex items-center gap-3 min-w-0">
+      <!-- F5++: logo SVG inline — Campanil de la Universidad de Concepción, ícono geográfico
+           emblemático de la ciudad. Torre vertical estilizada (base, cuerpo, cabezal con reloj, pico). -->
+      <svg class="tb-logo" viewBox="0 0 32 40" width="38" height="46" aria-label="Transporte Gran Concepción · Campanil UdeC" role="img">
         <defs>
-          <linearGradient id="gcMark" x1="0" y1="0" x2="1" y2="1">
+          <linearGradient id="gcMark" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#22d3ee"/>
             <stop offset="100%" stop-color="#34d399"/>
           </linearGradient>
         </defs>
-        <rect x="1" y="1" width="30" height="30" rx="9" fill="url(#gcMark)" opacity="0.14"/>
-        <g stroke="url(#gcMark)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M 5 22 Q 11 17 16 16"/>
-          <path d="M 5 10 Q 11 14 16 16"/>
-          <path d="M 27 6  Q 22 13 16 16"/>
-          <path d="M 27 22 Q 22 18 16 16"/>
+        <!-- Fondo redondeado tenue (mismo motivo que antes) -->
+        <rect x="0" y="2" width="32" height="36" rx="9" fill="url(#gcMark)" opacity="0.14"/>
+        <!-- CAMPANIL UdeC estilizado: torre vertical reconocible -->
+        <g fill="url(#gcMark)">
+          <path d="M 16 4 L 13.5 8.5 L 18.5 8.5 Z"/>      <!-- pico/aguja superior -->
+          <rect x="10.5" y="8.5" width="11" height="7" rx="1"/>   <!-- cabezal del reloj -->
+          <rect x="13" y="15.5" width="6" height="14"/>            <!-- cuerpo vertical alto -->
+          <rect x="9" y="29.5" width="14" height="3" rx="0.6"/>    <!-- base nivel 1 -->
+          <rect x="6" y="32.5" width="20" height="3.2" rx="0.6"/>  <!-- base nivel 2 (zócalo) -->
         </g>
-        <circle cx="16" cy="16" r="3.2" fill="var(--bg)"/>
-        <circle cx="16" cy="16" r="3.2" fill="none" stroke="url(#gcMark)" stroke-width="1.6"/>
+        <!-- Reloj (círculo en el cabezal) -->
+        <circle cx="16" cy="12" r="2.1" fill="var(--bg)"/>
+        <circle cx="16" cy="12" r="2.1" fill="none" stroke="url(#gcMark)" stroke-width="0.8"/>
+        <line x1="16" y1="12" x2="16" y2="10.3" stroke="url(#gcMark)" stroke-width="0.8" stroke-linecap="round"/>
+        <line x1="16" y1="12" x2="17.1" y2="12"  stroke="url(#gcMark)" stroke-width="0.8" stroke-linecap="round"/>
+        <!-- Líneas horizontales en el cuerpo (pisos del Campanil) -->
+        <g stroke="var(--bg)" stroke-width="0.55" opacity="0.55">
+          <line x1="13" y1="19"   x2="19" y2="19"/>
+          <line x1="13" y1="22.5" x2="19" y2="22.5"/>
+          <line x1="13" y1="26"   x2="19" y2="26"/>
+        </g>
       </svg>
       <div class="leading-tight min-w-0 hidden xs:block sm:block">
-        <b class="text-[14px] font-semibold block truncate tracking-tight">Transporte · Gran Concepción</b>
-        <span class="text-[10.5px] text-[var(--dim)] tracking-[.14em] uppercase">Centro de Mando · Analítica GPS</span>
+        <!-- F5++: título grande (24px ≈ 2× del original 14px), eyebrow compacto -->
+        <b class="block truncate tracking-tight" style="font-size:24px;font-weight:700;line-height:1.05">Transporte · Gran Concepción</b>
+        <span class="text-[10px] text-[var(--muted)] tracking-[.14em] uppercase font-medium">Centro de Mando · Analítica GPS</span>
       </div>
     </div>
 
@@ -391,7 +405,7 @@
         <!-- MAPA HÉROE (2/3) -->
         <section class="widget xl:col-span-2 flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=67" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=69" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -422,7 +436,7 @@
         <div class="flex flex-col gap-4 xl:max-h-[680px] xl:overflow-y-auto thin-scroll xl:pr-1">
           <section class="widget">
             <div class="widget-h">
-              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=67" alt="" width="22" height="22"></span>
+              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=69" alt="" width="22" height="22"></span>
               <div><h3>Flota y velocidad</h3><span class="sub">por hora · días laborables</span></div>
             </div>
             <div class="widget-b"><div id="ch-hora" style="height:236px"></div><p id="hora-narr" class="wnarr"></p></div>
@@ -463,7 +477,7 @@
       <!-- Cumplimiento de frecuencia -->
       <section class="widget">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=67" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=69" alt="" width="22" height="22"></span>
           <div><h3>Cumplimiento de frecuencia</h3><span class="sub">programado (GTFS) vs observado (GPS)</span></div>
         </div>
         <div class="widget-b"><div id="cump-box"></div><p id="cump-narr" class="wnarr"></p></div>
@@ -472,7 +486,7 @@
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=67" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=69" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -598,7 +612,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=67"></script>
+<script defer src="assets/app_shell.js?v=69"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
