@@ -26,13 +26,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <!-- F4: Leaflet self-hosted (antes desde unpkg.com en <head> sin defer → bloqueaba render) -->
-<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=66"/>
-<script defer src="assets/vendor/leaflet/leaflet.js?v=66"></script>
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=67"/>
+<script defer src="assets/vendor/leaflet/leaflet.js?v=67"></script>
 <!-- Componentes y variables de tema existentes (kpi, ctab, litem, rank-row, cump-row, seg…) -->
-<link rel="stylesheet" href="assets/styles.css?v=66">
-<link rel="stylesheet" href="assets/shell.css?v=66">
+<link rel="stylesheet" href="assets/styles.css?v=67">
+<link rel="stylesheet" href="assets/shell.css?v=67">
 <!-- F4: Tailwind purgado (~12 KB) antes era 280 KB de JS engine vía cdn.tailwindcss.com -->
-<link rel="stylesheet" href="assets/tw.css?v=66">
+<link rel="stylesheet" href="assets/tw.css?v=67">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
@@ -61,6 +61,22 @@
   /* Indicador "en vivo": punto verde parpadeante */
   .dot-live{width:8px;height:8px;border-radius:50%;background:var(--acc2);animation:pulsering 2s infinite}
   .status{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
+  /* F5+: mini panel router con 3 LEDs asincrónicos — sensación de conexión activa */
+  .tb-router{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;
+    border:1px solid var(--line);background:rgba(0,0,0,.25);flex:none}
+  .tb-led{display:block;width:6px;height:6px;border-radius:50%;background:#1f2937}
+  .tb-led--link{background:#34d399;box-shadow:0 0 5px rgba(52,211,153,.7);animation:ledLink 2.4s ease-in-out infinite}
+  .tb-led--rx  {background:#22d3ee;box-shadow:0 0 5px rgba(34,211,238,.65);animation:ledRx 0.9s steps(1,end) infinite;animation-delay:.18s}
+  .tb-led--tx  {background:#fbbf24;box-shadow:0 0 5px rgba(251,191,36,.6);animation:ledTx 1.7s steps(1,end) infinite;animation-delay:.55s}
+  /* link: latido suave, casi siempre encendido (power) */
+  @keyframes ledLink { 0%,100% {opacity:1} 50% {opacity:.45} }
+  /* rx: parpadeo rápido irregular (descarga de datos) */
+  @keyframes ledRx { 0%,30%,60% {opacity:1} 31%,59%,100% {opacity:.15} }
+  /* tx: parpadeo más espaciado (envío) */
+  @keyframes ledTx { 0%,12% {opacity:1} 13%,49% {opacity:.18} 50%,55% {opacity:1} 56%,100% {opacity:.18} }
+  @media (prefers-reduced-motion: reduce){
+    .tb-led--link,.tb-led--rx,.tb-led--tx{animation:none;opacity:.85}
+  }
   /* F2: identidad del logo y pill grande en topbar */
   .tb-logo{filter:drop-shadow(0 2px 10px rgba(34,211,238,.35)) drop-shadow(0 0 2px rgba(52,211,153,.18));flex:none}
   .tb-pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;
@@ -271,6 +287,12 @@
     <button id="side-toggle" class="grid place-items-center w-8 h-8 rounded-lg border border-[var(--line2)] text-[var(--muted)] hover:text-[var(--acc)] hover:border-[var(--acc)]" title="Mostrar/ocultar filtros" aria-label="Filtros">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
+    <!-- F5+: mini panel "router" — 3 luces que parpadean asincrónicas (puro adorno, sensación de conexión) -->
+    <div class="tb-router" aria-hidden="true" title="Telemetría activa">
+      <span class="tb-led tb-led--link"></span>
+      <span class="tb-led tb-led--rx"></span>
+      <span class="tb-led tb-led--tx"></span>
+    </div>
     <div class="flex items-center gap-2.5 min-w-0">
       <!-- F2: logo SVG inline — red de rutas convergentes (motivo de red de transporte) -->
       <svg class="tb-logo" viewBox="0 0 32 32" width="34" height="34" aria-label="GCCP Centro de Mando" role="img">
@@ -369,7 +391,7 @@
         <!-- MAPA HÉROE (2/3) -->
         <section class="widget xl:col-span-2 flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=66" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=67" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -400,7 +422,7 @@
         <div class="flex flex-col gap-4 xl:max-h-[680px] xl:overflow-y-auto thin-scroll xl:pr-1">
           <section class="widget">
             <div class="widget-h">
-              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=66" alt="" width="22" height="22"></span>
+              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=67" alt="" width="22" height="22"></span>
               <div><h3>Flota y velocidad</h3><span class="sub">por hora · días laborables</span></div>
             </div>
             <div class="widget-b"><div id="ch-hora" style="height:236px"></div><p id="hora-narr" class="wnarr"></p></div>
@@ -441,7 +463,7 @@
       <!-- Cumplimiento de frecuencia -->
       <section class="widget">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=66" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=67" alt="" width="22" height="22"></span>
           <div><h3>Cumplimiento de frecuencia</h3><span class="sub">programado (GTFS) vs observado (GPS)</span></div>
         </div>
         <div class="widget-b"><div id="cump-box"></div><p id="cump-narr" class="wnarr"></p></div>
@@ -450,7 +472,7 @@
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=66" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=67" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -576,7 +598,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=66"></script>
+<script defer src="assets/app_shell.js?v=67"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
