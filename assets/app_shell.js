@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=69`).then(r=>r.json());
-const BUILD = "2026-06-27 19:12";
+const J = n => fetch(`data/${n}?v=70`).then(r=>r.json());
+const BUILD = "2026-06-28 02:44";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -401,14 +401,28 @@ function renderFreqChart(){
 function renderHora(cell){
   if(!chart) chart = echarts.init($("ch-hora"));
   const h = cell.horas||[];
-  const flota = h.map(x=>x?x.b:0), vel = h.map(x=>x?x.v:null);
+  const flota = h.map(x=>x?x.b:0);
+  // FIX bug 1: alinear la línea verde con el KPI klive de Velocidad. En vista SISTEMA
+  // (Gran Concepción, sin filtro de línea/comuna), usamos BASE30.vel/det (mismo método
+  // que el recuadro: AVG 0-80, incluye detenido en tránsito, excl. terminal). Por hora
+  // tomamos el promedio de los 2 bins de 30 min (bin 2h y 2h+1).
+  const sistema = state.linea==="TODAS" && state.comuna==="TODAS";
+  const dt = (typeof DIA!=="undefined" && DIA) ? DIA.dia_tipo : "L";
+  let vel = h.map(x=>x?x.v:null);
+  let det = h.map(x=>x?x.d:null);
+  if(sistema && BASE30 && BASE30[dt]){
+    const bv = BASE30[dt].vel||[], bd = BASE30[dt].det||[];
+    const avg2 = (a,b) => (a==null && b==null) ? null : (a==null?b : b==null?a : (a+b)/2);
+    vel = [...Array(24).keys()].map(hi => avg2(bv[hi*2], bv[hi*2+1]));
+    det = [...Array(24).keys()].map(hi => avg2(bd[hi*2], bd[hi*2+1]));
+  }
   const th = TH();
   chart.setOption({
     textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
     grid:{left:42,right:46,top:34,bottom:28,containLabel:true},
     legend:{data:["Flota (buses)","Velocidad"],textStyle:{color:th.mut},top:0,right:0},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
-      formatter:p=>{const i=p[0].dataIndex,x=h[i]||{};return `${HORAS[i]}<br>Flota: <b>${fmt1(x.b)}</b> buses<br>Velocidad: <b>${fmt1(x.v)}</b> km/h<br>Detenido: ${fmt1(x.d)}%`;}},
+      formatter:p=>{const i=p[0].dataIndex,x=h[i]||{};const v=vel[i],d=det[i];return `${HORAS[i]}<br>Flota: <b>${fmt1(x.b)}</b> buses<br>Velocidad: <b>${v==null?"—":fmt1(v)}</b> km/h<br>Detenido: ${d==null?"—":fmt1(d)+"%"}`;}},
     xAxis:{type:"category",data:HORAS,axisLabel:{color:th.mut,fontSize:10},axisLine:{lineStyle:{color:th.axis}}},
     yAxis:[{type:"value",name:"buses",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
            {type:"value",name:"km/h",position:"right",max:60,axisLabel:{color:th.mut},splitLine:{show:false}}],

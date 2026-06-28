@@ -26,13 +26,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <!-- F4: Leaflet self-hosted (antes desde unpkg.com en <head> sin defer → bloqueaba render) -->
-<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=69"/>
-<script defer src="assets/vendor/leaflet/leaflet.js?v=69"></script>
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=70"/>
+<script defer src="assets/vendor/leaflet/leaflet.js?v=70"></script>
 <!-- Componentes y variables de tema existentes (kpi, ctab, litem, rank-row, cump-row, seg…) -->
-<link rel="stylesheet" href="assets/styles.css?v=69">
-<link rel="stylesheet" href="assets/shell.css?v=69">
+<link rel="stylesheet" href="assets/styles.css?v=70">
+<link rel="stylesheet" href="assets/shell.css?v=70">
 <!-- F4: Tailwind purgado (~12 KB) antes era 280 KB de JS engine vía cdn.tailwindcss.com -->
-<link rel="stylesheet" href="assets/tw.css?v=69">
+<link rel="stylesheet" href="assets/tw.css?v=70">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
@@ -405,7 +405,7 @@
         <!-- MAPA HÉROE (2/3) -->
         <section class="widget xl:col-span-2 flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=69" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=70" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -436,7 +436,7 @@
         <div class="flex flex-col gap-4 xl:max-h-[680px] xl:overflow-y-auto thin-scroll xl:pr-1">
           <section class="widget">
             <div class="widget-h">
-              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=69" alt="" width="22" height="22"></span>
+              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=70" alt="" width="22" height="22"></span>
               <div><h3>Flota y velocidad</h3><span class="sub">por hora · días laborables</span></div>
             </div>
             <div class="widget-b"><div id="ch-hora" style="height:236px"></div><p id="hora-narr" class="wnarr"></p></div>
@@ -477,7 +477,7 @@
       <!-- Cumplimiento de frecuencia -->
       <section class="widget">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=69" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=70" alt="" width="22" height="22"></span>
           <div><h3>Cumplimiento de frecuencia</h3><span class="sub">programado (GTFS) vs observado (GPS)</span></div>
         </div>
         <div class="widget-b"><div id="cump-box"></div><p id="cump-narr" class="wnarr"></p></div>
@@ -486,7 +486,7 @@
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=69" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=70" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -612,7 +612,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=69"></script>
+<script defer src="assets/app_shell.js?v=70"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
