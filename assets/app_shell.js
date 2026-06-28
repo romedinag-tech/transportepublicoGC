@@ -601,8 +601,8 @@ function renderFreqChart(){
     yAxis:{type:"value",name:"despachos/30min",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
     series:[
       {name:`Promedio ${dtl}`,type:"line",data:bvals,smooth:true,symbol:"none",lineStyle:{width:2,color:th.mut,type:"dashed"}},
-      {name:"Observado hoy",type:"line",data:ovals,smooth:true,symbol:"circle",symbolSize:4,connectNulls:false,
-        lineStyle:{width:2.6,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991f"}},
+      {name:"Observado hoy",type:"line",data:ovals,smooth:false,symbol:"circle",symbolSize:6,showSymbol:true,connectNulls:false,
+        lineStyle:{width:2,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991f"}},
     ],
   },true);
   setTimeout(()=>freqChart.resize(),60);
@@ -634,8 +634,8 @@ function renderLineFreqChart(){
     yAxis:{type:"value",name:"despachos/30min",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
     series:[
       {name:`Promedio ${dtl}`,type:"line",data:bvals,smooth:true,symbol:"none",lineStyle:{width:2,color:th.mut,type:"dashed"}},
-      {name:"Observado hoy",type:"line",data:ovals,smooth:true,symbol:"circle",symbolSize:4,connectNulls:false,
-        lineStyle:{width:2.6,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991f"}},
+      {name:"Observado hoy",type:"line",data:ovals,smooth:false,symbol:"circle",symbolSize:6,showSymbol:true,connectNulls:false,
+        lineStyle:{width:2,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991f"}},
     ],
   },true);
   setTimeout(()=>linFreqChart.resize(),60);
