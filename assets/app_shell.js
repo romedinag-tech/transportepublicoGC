@@ -477,14 +477,10 @@ function renderLiveExtras(){
   const c2 = cont.querySelector('.klive[data-k="cob_com"]');
   const c2HTML = liveBoxCobComuna(ex.cob_hog_com);
   if(c2) c2.outerHTML = c2HTML; else cont.insertAdjacentHTML("beforeend", c2HTML);
-  // Card 3: Déficit de buses por línea
-  const c3 = cont.querySelector('.klive[data-k="def_lin"]');
-  const c3HTML = liveBoxDefLineas(ex.def_lineas);
+  // Card 3: Flota por línea (menos + más buses en una sola card)
+  const c3 = cont.querySelector('.klive[data-k="fleet_lin"]');
+  const c3HTML = liveBoxFleetLineas(ex.def_lineas, ex.top_lineas);
   if(c3) c3.outerHTML = c3HTML; else cont.insertAdjacentHTML("beforeend", c3HTML);
-  // Card 4: Líneas con más buses
-  const c4 = cont.querySelector('.klive[data-k="top_lin"]');
-  const c4HTML = liveBoxTopLineas(ex.top_lineas);
-  if(c4) c4.outerHTML = c4HTML; else cont.insertAdjacentHTML("beforeend", c4HTML);
 }
 function liveBoxCobAhora(hog, tot, pct, nb){
   const col = pct==null ? "#64748b" : pct>=60 ? "#34d399" : pct>=30 ? "#fbbf24" : "#f87171";
@@ -536,16 +532,13 @@ function _linFleetRow(d, top){
     `<div class="kcr-row"><div class="kcr-bar"><div class="kcr-fill" style="width:${w}%;background:${col}"></div><span class="bar-pct">${pct.toFixed(0)}%</span></div></div>`+
     `</div>`;
 }
-function liveBoxDefLineas(lst){
-  const rows = lst.map(d=>_linFleetRow(d,false)).join("") || `<div class="sub" style="text-align:center;padding:18px 0">sin datos</div>`;
-  return `<div class="kpi klive" data-k="def_lin"><div class="lab"><span class="ic">📉</span>Líneas con menos buses</div>`+
-    `<div class="kcr-list">${rows}</div>`+
-    `<div class="sub">buses ahora / flota pico</div></div>`;
-}
-function liveBoxTopLineas(lst){
-  const rows = lst.map(d=>_linFleetRow(d,true)).join("") || `<div class="sub" style="text-align:center;padding:18px 0">sin datos</div>`;
-  return `<div class="kpi klive" data-k="top_lin"><div class="lab"><span class="ic">📈</span>Líneas con más buses</div>`+
-    `<div class="kcr-list">${rows}</div>`+
+function liveBoxFleetLineas(def, top){
+  const defRows = def.map(d=>_linFleetRow(d,false)).join("");
+  const topRows = top.map(d=>_linFleetRow(d,true)).join("");
+  const empty = `<div class="sub" style="text-align:center;padding:6px 0">sin datos</div>`;
+  return `<div class="kpi klive" data-k="fleet_lin"><div class="lab"><span class="ic">🚍</span>Flota por línea</div>`+
+    `<div class="kcr-sec">📉 Menos buses</div><div class="kcr-list">${defRows||empty}</div>`+
+    `<div class="kcr-sec">📈 Más buses</div><div class="kcr-list">${topRows||empty}</div>`+
     `<div class="sub">buses ahora / flota pico</div></div>`;
 }
 // Gráfico: frecuencia de salida de terminales — promedio histórico del tipo de día vs observado hoy
