@@ -13,7 +13,7 @@ let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, 
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stops:[]};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", cmpA:null, cmpB:null};
-let chart, csChart, freqChart, linFreqChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
+let csChart, freqChart, linFreqChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
 const PEAK_H = [7,8,9,17,18,19];
@@ -181,7 +181,7 @@ function render(){
 
   const cell = cellOf();
   renderKPIs(cell);
-  renderHora(cell);
+  renderExcesos();
   renderFreqChart();
   renderLineFreqChart();
   renderCobDinLinea();
@@ -664,50 +664,23 @@ function renderLineFreqChart(){
   setTimeout(()=>linFreqChart.resize(),60);
   $("lin-freq-sub").textContent = `línea ${state.linea} · despachos/30 min · promedio ${dtl} vs observado hoy`;
 }
-function renderHora(cell){
-  if(!chart) chart = echarts.init($("ch-hora"));
-  const h = cell.horas||[];
-  const flota = h.map(x=>x?x.b:0);
-  // FIX bug 1: alinear la línea verde con el KPI klive de Velocidad. En vista SISTEMA
-  // (Gran Concepción, sin filtro de línea/comuna), usamos BASE30.vel/det (mismo método
-  // que el recuadro: AVG 0-80, incluye detenido en tránsito, excl. terminal). Por hora
-  // tomamos el promedio de los 2 bins de 30 min (bin 2h y 2h+1).
-  const sistema = state.linea==="TODAS" && state.comuna==="TODAS";
-  const dt = (typeof DIA!=="undefined" && DIA) ? DIA.dia_tipo : "L";
-  let vel = h.map(x=>x?x.v:null);
-  let det = h.map(x=>x?x.d:null);
-  if(sistema && BASE30 && BASE30[dt]){
-    const bv = BASE30[dt].vel||[], bd = BASE30[dt].det||[];
-    const avg2 = (a,b) => (a==null && b==null) ? null : (a==null?b : b==null?a : (a+b)/2);
-    vel = [...Array(24).keys()].map(hi => avg2(bv[hi*2], bv[hi*2+1]));
-    det = [...Array(24).keys()].map(hi => avg2(bd[hi*2], bd[hi*2+1]));
-  }
-  const th = TH();
-  chart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
-    grid:{left:42,right:46,top:34,bottom:28,containLabel:true},
-    legend:{data:["Flota (buses)","Velocidad"],textStyle:{color:th.mut},top:0,right:0},
-    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
-      formatter:p=>{const i=p[0].dataIndex,x=h[i]||{};const v=vel[i],d=det[i];return `${HORAS[i]}<br>Flota: <b>${fmt1(x.b)}</b> buses<br>Velocidad: <b>${v==null?"—":fmt1(v)}</b> km/h<br>Detenido: ${d==null?"—":fmt1(d)+"%"}`;}},
-    xAxis:{type:"category",data:HORAS,axisLabel:{color:th.mut,fontSize:10},axisLine:{lineStyle:{color:th.axis}}},
-    yAxis:[{type:"value",name:"buses",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
-           {type:"value",name:"km/h",position:"right",max:60,axisLabel:{color:th.mut},splitLine:{show:false}}],
-    series:[
-      {name:"Flota (buses)",type:"bar",data:flota,itemStyle:{color:"rgba(56,189,248,.55)",borderRadius:[3,3,0,0]},barWidth:"58%"},
-      {name:"Velocidad",type:"line",yAxisIndex:1,data:vel,smooth:true,symbol:"none",lineStyle:{width:2.5,color:"#34d399"},itemStyle:{color:"#34d399"}}
-    ]
-  }, true);
-  setTimeout(()=>chart.resize(),60);
-  const el=$("hora-narr");
-  if(el){
-    const hb=h.map((x,i)=>[i,x?x.b:0]).filter(x=>x[1]>0);
-    const pkF=hb.length?Math.max(...hb.map(x=>x[1])):0;
-    const hv=h.map((x,i)=>[i,x?x.v:null,x?x.b:0]).filter(x=>x[1]!=null && x[2]>=pkF*0.25);   // solo horas con operación real
-    let t=`Cuántos <b>buses operan cada hora</b> (barras) y la <b>velocidad media</b> (línea), en días laborables. Muestra la punta de servicio y dónde se cae la velocidad por congestión.`;
-    if(hb.length&&hv.length){ const pk=hb.reduce((a,b)=>b[1]>a[1]?b:a), mn=hv.reduce((a,b)=>b[1]<a[1]?b:a);
-      t+=` Punta: <b>${fmt1(pk[1])}</b> buses a las ${HORAS[pk[0]]}; velocidad mínima <b>${fmt1(mn[1])} km/h</b> a las ${HORAS[mn[0]]}.`; }
-    el.innerHTML=t;
-  }
+function renderExcesos(){
+  const el = $("excesos-list"); if(!el) return;
+  const exc = (DIA && DIA.excesos_lin) ? DIA.excesos_lin : {};
+  const sorted = Object.entries(exc).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
+  if(!sorted.length){ el.innerHTML='<div style="text-align:center;padding:18px 0;color:var(--mut)">Sin episodios registrados hoy</div>'; return; }
+  const total = sorted.reduce((s,e)=>s+e[1],0);
+  $("excesos-sub").textContent = `> 80 km/h · ${total} episodios hoy`;
+  const max = sorted[0][1];
+  el.innerHTML = sorted.map(([ln,n])=>{
+    const emp = empresaDe(ln);
+    const nm = emp ? `<span class="lncode">${ln}</span> ${emp}` : `<span class="lncode">${ln}</span>`;
+    const w = Math.round(n/max*100);
+    const col = n>=10 ? "#f87171" : n>=5 ? "#fb923c" : "#fbbf24";
+    return `<div class="kcr kcr--lin">`+
+      `<div class="kcr-nm">${nm}<span class="kcr-vp" style="color:${col}">${n}</span></div>`+
+      `<div class="kcr-row"><div class="kcr-bar"><div class="kcr-fill" style="width:${w}%;background:${col}"></div></div></div></div>`;
+  }).join("");
 }
 
 function ensureMap(){
@@ -1905,6 +1878,6 @@ function renderEvolucion(){
     J("baseline_30min.json").then(d=>{ BASE30=d; loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
     J("cobertura_din_lineas.json").then(d=>{ DINL=d; renderCobDinLinea(); if(state.mapMode==="cover" && state.coverSub==="din") render(); }).catch(()=>{});
     setInterval(loadDia, 60000);                 // dia.json (vivo vs normal), refresco 60 s
-    addEventListener("resize", ()=>{ [chart,csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
+    addEventListener("resize", ()=>{ [csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();

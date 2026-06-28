@@ -455,12 +455,12 @@
 
         <!-- COLUMNA DERECHA: flota/velocidad + ranking (flujo vertical propio, no se aplasta) -->
         <div class="flex flex-col gap-4 xl:max-h-[680px] xl:overflow-y-auto thin-scroll xl:pr-1">
-          <section class="widget">
+          <section class="widget" id="excesos-card">
             <div class="widget-h">
-              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=75" alt="" width="22" height="22"></span>
-              <div><h3>Flota y velocidad</h3><span class="sub">por hora · días laborables</span></div>
+              <span class="ico">⚠️</span>
+              <div><h3>Excesos de velocidad</h3><span class="sub" id="excesos-sub">&gt; 80 km/h · acumulado hoy</span></div>
             </div>
-            <div class="widget-b"><div id="ch-hora" style="height:236px"></div><p id="hora-narr" class="wnarr"></p></div>
+            <div class="widget-b"><div id="excesos-list" style="max-height:236px;overflow-y:auto"></div></div>
           </section>
 
           <section class="widget" id="freq-card" style="display:none">
@@ -653,7 +653,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=79"></script>
+<script defer src="assets/app_shell.js?v=80"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
