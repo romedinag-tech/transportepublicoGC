@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=72`).then(r=>r.json());
-const BUILD = "2026-06-28 03:20";
+const J = n => fetch(`data/${n}?v=73`).then(r=>r.json());
+const BUILD = "2026-06-28 03:33";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -348,9 +348,11 @@ function updateLiveCard(card, s, live, norm, pct, prev){
 function renderLiveKPIs(){
   const base = BASE30[DIA.dia_tipo] || {}, b = DIA.bin;
   const cont = $("kpis2");
-  const cards = cont.querySelectorAll(".klive");
-  // primera vez: crear DOM y disparar count-up desde 0
-  if(cards.length !== LIVE_KPIS.length){
+  // Considerar solo las cards "base" (LIVE_KPIS) — no las extras (cob_now, cob_com, def_lin) que se
+  // agregan después. Antes el conteo total se inflaba a 10 y el path "primera vez" se reactivaba en
+  // cada refresh, borrando las extras.
+  const baseCount = LIVE_KPIS.reduce((n,s)=> n + (cont.querySelector(`.klive[data-k="${s.k}"]`)?1:0), 0);
+  if(baseCount !== LIVE_KPIS.length){
     cont.innerHTML = LIVE_KPIS.map(s=>{
       const live = DIA[s.k], norm = (base[s.k]||[])[b];
       const pct = (norm!=null && norm>0) ? 100*live/norm : null;
@@ -363,6 +365,7 @@ function renderLiveKPIs(){
       if(tn && live!=null) animateNumber(t => { tn.nodeValue = t; }, 0, live, 850, s.f);
       LIVE_PREV[s.k] = live;
     });
+    renderLiveExtras();                                 // 3 KPIs extra también en la primera ejecución
     return;
   }
   // refresh: actualizar in-place y animar desde el valor previo
@@ -373,12 +376,157 @@ function renderLiveKPIs(){
     updateLiveCard(card, s, live, norm, pct, LIVE_PREV[s.k]);
     LIVE_PREV[s.k] = live;
   });
+  renderLiveExtras();                                   // 3 KPIs extra computados client-side
 }
 function loadDia(){
   fetch("https://storage.googleapis.com/gccp-transporte-live/dia.json?t="+Date.now(),{cache:"no-store"})
     .then(r=>r.json()).then(d=>{ DIA=d;
       if(state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS" && BASE30){ renderLiveKPIs(); renderFreqChart(); }
     }).catch(()=>{});
+}
+
+/* ===== KPIs en vivo EXTRA: cobertura instantánea + déficit por línea =====
+   "Foto" en cada refresh de live.json: una manzana está cubierta AHORA si hay ≥1 bus a ≤300 m
+   de su centroide. KPI 1 = % de hogares cubiertos del Gran CCP. KPI 2 = mismo % por comuna.
+   KPI 3 = top-5 líneas con menor (buses_ahora / flota_pico).
+   Costo: cero en cloud — todo se computa en el navegador sobre live.json + cobertura.json. */
+let MANZ_GRID = null;                     // grid espacial: bucket → [{i, cy, cx, hog, com}]
+const COB_BUCKET = 0.003;                 // ~330 m por bucket (suficiente para BUF=300 m con 9 buckets)
+const COB_BUF = 300, COB_BUF2 = COB_BUF*COB_BUF;   // radio de cápsula instantánea
+let TOT_HOG_GLOBAL = 0;
+const TOT_HOG_COM = {};                   // {comuna: total hogares}
+const FLOTA_PICO_LIN = {};                // {linea: flota_pico}
+const COM_ORDER = ["Concepción","Talcahuano","San Pedro de la Paz","Hualpén","Chiguayante","Penco","Hualqui"];
+
+function _pipPoly(la, lo, geom){
+  const polys = geom.type==="Polygon" ? [geom.coordinates] : geom.coordinates;
+  for(const poly of polys){
+    if(pipRing(lo, la, poly[0])){
+      let inHole = false;
+      for(let i=1;i<poly.length;i++){ if(pipRing(lo, la, poly[i])){ inHole=true; break; } }
+      if(!inHole) return true;
+    }
+  }
+  return false;
+}
+function buildManzanaIndex(){
+  if(MANZ_GRID || !COB || !GEO) return;
+  const comunas = (GEO.features||[]).map(f=>({name:f.properties.name, geom:f.geometry}));
+  MANZ_GRID = {};
+  COB.features.forEach((f, i) => {
+    const p = f.properties; if(p.cy==null||p.cx==null) return;
+    if(!p._com){
+      for(const c of comunas){ if(_pipPoly(p.cy, p.cx, c.geom)){ p._com = c.name; break; } }
+    }
+    const k = `${Math.floor(p.cy/COB_BUCKET)}_${Math.floor(p.cx/COB_BUCKET)}`;
+    (MANZ_GRID[k] = MANZ_GRID[k] || []).push({i, cy:p.cy, cx:p.cx, hog:p.hog||0, com:p._com||null});
+    TOT_HOG_GLOBAL += (p.hog||0);
+    if(p._com) TOT_HOG_COM[p._com] = (TOT_HOG_COM[p._com]||0) + (p.hog||0);
+  });
+  if(T && T.cells){
+    Object.entries(T.cells).forEach(([k, v]) => {
+      const m = /^TODAS\|(.+)$/.exec(k); if(!m) return;
+      const fp = ((v||{}).kpi||{}).flota_pico;
+      if(fp) FLOTA_PICO_LIN[m[1]] = fp;
+    });
+  }
+}
+function computeLiveExtras(){
+  if(!LIVE || !LIVE.buses || !MANZ_GRID) return null;
+  const buses = LIVE.buses.filter(b => b[2]);                       // con línea = en servicio
+  const MX = 111320*Math.cos(-36.83*Math.PI/180), MY = 110540;
+  const covered = new Set();
+  for(const b of buses){
+    const la=b[0], lo=b[1];
+    const ky=Math.floor(la/COB_BUCKET), kx=Math.floor(lo/COB_BUCKET);
+    for(let dy=-1; dy<=1; dy++) for(let dx=-1; dx<=1; dx++){
+      const arr = MANZ_GRID[`${ky+dy}_${kx+dx}`]; if(!arr) continue;
+      for(const m of arr){
+        if(covered.has(m.i)) continue;
+        const ex=(m.cx-lo)*MX, ey=(m.cy-la)*MY;
+        if(ex*ex+ey*ey <= COB_BUF2) covered.add(m.i);
+      }
+    }
+  }
+  let cob_hog = 0; const cob_hog_com = {};
+  for(const i of covered){
+    const p = COB.features[i].properties, h = p.hog||0;
+    cob_hog += h;
+    if(p._com) cob_hog_com[p._com] = (cob_hog_com[p._com]||0) + h;
+  }
+  const byLine = {};
+  for(const b of buses){ byLine[b[2]] = (byLine[b[2]]||0) + 1; }
+  const def_lineas = Object.entries(FLOTA_PICO_LIN).map(([L, fp]) => ({
+    L, now: byLine[L]||0, max: fp, pct: 100*(byLine[L]||0)/fp
+  })).filter(d => d.max > 0).sort((a,b) => a.pct - b.pct).slice(0, 5);
+  return { cob_hog, cob_hog_com, def_lineas, n_buses: buses.length };
+}
+function renderLiveExtras(){
+  buildManzanaIndex();
+  const ex = computeLiveExtras(); if(!ex) return;
+  const cont = $("kpis2"); if(!cont) return;
+  // Card 1: Cobertura ahora (gauge estándar)
+  const pct_tot = TOT_HOG_GLOBAL>0 ? 100*ex.cob_hog/TOT_HOG_GLOBAL : null;
+  const c1 = cont.querySelector('.klive[data-k="cob_now"]');
+  const c1HTML = liveBoxCobAhora(ex.cob_hog, TOT_HOG_GLOBAL, pct_tot, ex.n_buses);
+  if(c1) c1.outerHTML = c1HTML; else cont.insertAdjacentHTML("beforeend", c1HTML);
+  // Card 2: Cobertura por comuna (mini-rows)
+  const c2 = cont.querySelector('.klive[data-k="cob_com"]');
+  const c2HTML = liveBoxCobComuna(ex.cob_hog_com);
+  if(c2) c2.outerHTML = c2HTML; else cont.insertAdjacentHTML("beforeend", c2HTML);
+  // Card 3: Déficit de buses por línea
+  const c3 = cont.querySelector('.klive[data-k="def_lin"]');
+  const c3HTML = liveBoxDefLineas(ex.def_lineas);
+  if(c3) c3.outerHTML = c3HTML; else cont.insertAdjacentHTML("beforeend", c3HTML);
+}
+function liveBoxCobAhora(hog, tot, pct, nb){
+  const col = pct==null ? "#64748b" : pct>=60 ? "#34d399" : pct>=30 ? "#fbbf24" : "#f87171";
+  const cx=100, cy=98, r=72;
+  const p = Math.max(0, Math.min(pct==null?0:pct, 100));
+  const a = Math.PI*(1 - p/100);                                  // 0..100 → izq..der
+  const tx=(cx+r*Math.cos(a)).toFixed(1), ty=(cy-r*Math.sin(a)).toFixed(1);
+  const lx=(cx+(r+16)*Math.cos(a)).toFixed(1), ly=(cy-(r+16)*Math.sin(a)).toFixed(1);
+  const valTxt = NF.format(Math.round(hog));
+  const pctTxt = pct==null ? "—" : pct.toFixed(1)+"%";
+  const prog = pct==null ? "" :
+    `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${tx} ${ty}" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round"/>`+
+    `<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`+
+    `<circle cx="${cx}" cy="${cy}" r="4" fill="${col}"/>`+
+    `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" class="g-pct" fill="${col}">${pctTxt}</text>`;
+  return `<div class="kpi klive" data-k="cob_now"><div class="lab"><span class="ic">🏠</span>Cobertura ahora</div>`+
+    `<svg class="gauge" viewBox="-8 -12 216 118">`+
+      `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--track,#2a3550)" stroke-width="7" stroke-linecap="round"/>`+
+      prog+
+      `<text x="${cx}" y="${cy-14}" text-anchor="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2"> hog</tspan></text>`+
+    `</svg>`+
+    `<div class="sub">de <b class="g-norm">${NF.format(tot)}</b> hogares · <b>${nb}</b> buses</div></div>`;
+}
+function liveBoxCobComuna(byCom){
+  const rows = COM_ORDER.map(name => {
+    const tot = TOT_HOG_COM[name]||0, cob = byCom[name]||0;
+    const pct = tot>0 ? 100*cob/tot : null;
+    const col = pct==null ? "#64748b" : pct>=60 ? "#34d399" : pct>=30 ? "#fbbf24" : "#f87171";
+    const w = pct==null ? 0 : Math.min(100, pct);
+    const pctTxt = pct==null ? "—" : pct.toFixed(0)+"%";
+    return `<div class="kcr"><div class="kcr-nm">${name}</div>`+
+      `<div class="kcr-bar"><div class="kcr-fill" style="width:${w}%;background:${col}"></div></div>`+
+      `<div class="kcr-vp" style="color:${col}">${pctTxt}</div></div>`;
+  }).join("");
+  return `<div class="kpi klive" data-k="cob_com"><div class="lab"><span class="ic">🗺️</span>Cobertura por comuna</div>`+
+    `<div class="kcr-list">${rows}</div>`+
+    `<div class="sub">% hogares con ≥1 bus ≤300 m</div></div>`;
+}
+function liveBoxDefLineas(lst){
+  const rows = lst.map(d => {
+    const pct = d.pct, col = pct>=70 ? "#fbbf24" : pct>=40 ? "#fb923c" : "#f87171";
+    const w = Math.min(100, pct);
+    return `<div class="kcr"><div class="kcr-nm"><span class="lncode">${d.L}</span></div>`+
+      `<div class="kcr-bar"><div class="kcr-fill" style="width:${w}%;background:${col}"></div></div>`+
+      `<div class="kcr-vp" style="color:${col}">${d.now}/${Math.round(d.max)}</div></div>`;
+  }).join("") || `<div class="sub" style="text-align:center;padding:18px 0">sin datos</div>`;
+  return `<div class="kpi klive" data-k="def_lin"><div class="lab"><span class="ic">📉</span>Líneas con menos buses</div>`+
+    `<div class="kcr-list">${rows}</div>`+
+    `<div class="sub">buses ahora / flota pico</div></div>`;
 }
 // Gráfico: frecuencia de salida de terminales — promedio histórico del tipo de día vs observado hoy
 // F6: widget de 6 KPIs en vista LÍNEA cuando el modo es Cobertura Dinámica
@@ -586,7 +734,10 @@ function renderOpNow(){
 }
 function loadLive(){
   fetch(LIVE_URL+"?t="+Date.now(),{cache:"no-store"}).then(r=>r.json())
-    .then(d=>{ LIVE=d; drawLiveBuses(); renderOpNow(); }).catch(()=>{});
+    .then(d=>{ LIVE=d; drawLiveBuses(); renderOpNow();
+      // refrescar KPIs extra en cada foto del feed (cobertura instantánea + déficit por línea)
+      if(state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS") renderLiveExtras();
+    }).catch(()=>{});
 }
 // F3: extender L.Canvas para dibujar buses orientados por rumbo (chevron) en lugar de círculos.
 // Mantiene UNA sola capa canvas (mismo perf que circleMarker) y conserva tooltips/eventos.
@@ -1628,7 +1779,9 @@ function renderEvolucion(){
     }).catch(()=>{ const vb=$("vfoot-build"); if(vb) vb.textContent="Visor actualizado: "+BUILD; });
     applyTheme(document.documentElement.dataset.theme==="light" ? "light" : "dark");
     J("comuna_lineas.json").then(d=>{ CLIN=d; buildLineaList($("linea-search")?$("linea-search").value:""); }).catch(()=>{});
-    J("cobertura.json").then(d=>{ COB=d; renderNseGap(); if(state.mapMode!=="live") renderMapa(); }).catch(()=>{});
+    J("cobertura.json").then(d=>{ COB=d; renderNseGap(); if(state.mapMode!=="live") renderMapa();
+      if(LIVE && state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS") renderLiveExtras();
+    }).catch(()=>{});
     J("flota_equidad.json").then(d=>{ EQ=d; renderEquidad(); }).catch(()=>{});
     J("operacion_linea.json").then(d=>{ OP=d; renderOperacion(); renderCalidad(); }).catch(()=>{});
     J("speed_grid_hora.json").then(d=>{ GRID=d; if(state.mapMode==="conges") renderMapa(); }).catch(()=>{});
