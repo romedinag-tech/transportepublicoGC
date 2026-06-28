@@ -667,6 +667,17 @@ function renderLineFreqChart(){
 function renderExcesos(){
   const el = $("excesos-list"); if(!el) return;
   const exc = (DIA && DIA.excesos_lin) ? DIA.excesos_lin : {};
+  const L = state.linea !== "TODAS" ? state.linea : null;
+  if(L){
+    const n = exc[L] || 0;
+    $("excesos-sub").textContent = `> 80 km/h · línea ${L} · hoy`;
+    if(!n){ el.innerHTML='<div style="text-align:center;padding:18px 0;color:var(--mut)">Sin episodios en esta línea hoy</div>'; return; }
+    const emp = empresaDe(L);
+    const nm = emp ? `<span class="lncode">${L}</span> ${emp}` : `<span class="lncode">${L}</span>`;
+    const col = n>=10 ? "#f87171" : n>=5 ? "#fb923c" : "#fbbf24";
+    el.innerHTML = `<div style="text-align:center;padding:14px 0"><span style="font-size:2rem;font-weight:700;color:${col}">${n}</span><div style="color:var(--mut);margin-top:4px">episodios</div></div>`;
+    return;
+  }
   const sorted = Object.entries(exc).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
   if(!sorted.length){ el.innerHTML='<div style="text-align:center;padding:18px 0;color:var(--mut)">Sin episodios registrados hoy</div>'; return; }
   const total = sorted.reduce((s,e)=>s+e[1],0);
