@@ -347,7 +347,9 @@ function updateLiveCard(card, s, live, norm, pct, prev){
 function _liveVal(s, L){
   if(!L) return DIA[s.k];
   if(s.k==="freq") return (DIA.freq_serie_lin||{})[L] ? (DIA.freq_serie_lin[L][DIA.bin]||0) : 0;
-  return ((DIA[s.k+"_lin"]||{})[L]) ?? null;
+  const ld = DIA[s.k+"_lin"];
+  if(!ld) return null;          // dia.json aún no tiene _lin (pre-deploy)
+  return ld[L] ?? 0;            // línea no en dict = 0, no "sin datos"
 }
 function _baseVal(s, base, b, L){
   const noBase = ["freq","inact","descanso"];
