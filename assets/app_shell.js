@@ -215,7 +215,8 @@ const semLow  = (v,g,w) => v<g?"good":v<w?"warning":"critical";
 function renderKPIs(cell){
   const home = state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS";
   const lineView = state.vista==="normal" && state.linea!=="TODAS";
-  if((home || lineView) && DIA && BASE30){ renderLiveKPIs(); return; }
+  const comView = state.vista==="normal" && state.comuna!=="TODAS" && state.linea==="TODAS";
+  if((home || lineView || comView) && DIA && BASE30){ renderLiveKPIs(); return; }
   const k = cell.kpi;
   if(!k){ $("kpis2").innerHTML = `<div class="empty">Sin datos para este ámbito.</div>`; return; }
   const ctx = kpiCard("Líneas", k.n_lineas, "operando en el ámbito", "🚍", "neutral");
@@ -345,18 +346,54 @@ function updateLiveCard(card, s, live, norm, pct, prev){
   }
 }
 function _liveVal(s, L){
-  if(!L) return DIA[s.k];
-  if(s.k==="freq") return (DIA.freq_serie_lin||{})[L] ? (DIA.freq_serie_lin[L][DIA.bin]||0) : 0;
-  const ld = DIA[s.k+"_lin"];
-  if(!ld) return null;          // dia.json aún no tiene _lin (pre-deploy)
-  return ld[L] ?? 0;            // línea no en dict = 0, no "sin datos"
+  if(L){
+    if(s.k==="freq") return (DIA.freq_serie_lin||{})[L] ? (DIA.freq_serie_lin[L][DIA.bin]||0) : 0;
+    const ld = DIA[s.k+"_lin"];
+    if(!ld) return null;
+    return ld[L] ?? 0;
+  }
+  const C = state.comuna!=="TODAS" ? state.comuna : null;
+  if(C){
+    const lines = CLIN[C]||[];
+    if(s.k==="freq"){
+      const fsl = DIA.freq_serie_lin||{};
+      return lines.reduce((sum,l)=>sum+((fsl[l]||[])[DIA.bin]||0),0);
+    }
+    if(s.k==="vel"||s.k==="det"){
+      const ld=DIA[s.k+"_lin"], bld=DIA.buses_op_lin||{};
+      if(!ld) return null;
+      let sw=0,sv=0;
+      for(const l of lines){ const v=ld[l],w=bld[l]||0; if(v!=null&&w>0){sv+=v*w;sw+=w;} }
+      return sw>0 ? Math.round(sv/sw*10)/10 : null;
+    }
+    const ld=DIA[s.k+"_lin"];
+    if(!ld) return null;
+    return lines.reduce((sum,l)=>sum+(ld[l]||0),0);
+  }
+  return DIA[s.k];
 }
 function _baseVal(s, base, b, L){
   const noBase = ["freq","inact","descanso"];
   if(noBase.includes(s.k)) return null;
-  if(!L) return (base[s.k]||[])[b];
-  const bl = base[s.k+"_lin"];
-  return bl && bl[L] ? bl[L][b] : null;
+  if(L){
+    const bl = base[s.k+"_lin"];
+    return bl && bl[L] ? bl[L][b] : null;
+  }
+  const C = state.comuna!=="TODAS" ? state.comuna : null;
+  if(C){
+    const lines = CLIN[C]||[];
+    if(s.k==="vel"||s.k==="det"){
+      const bl=base[s.k+"_lin"], bbl=base.buses_op_lin;
+      if(!bl||!bbl) return null;
+      let sw=0,sv=0;
+      for(const l of lines){ const v=bl[l]?bl[l][b]:null,w=bbl[l]?bbl[l][b]:0; if(v!=null&&w>0){sv+=v*w;sw+=w;} }
+      return sw>0 ? Math.round(sv/sw*10)/10 : null;
+    }
+    const bl=base[s.k+"_lin"];
+    if(!bl) return null;
+    return lines.reduce((sum,l)=>sum+((bl[l]||[])[b]||0),0);
+  }
+  return (base[s.k]||[])[b];
 }
 function renderLiveKPIs(){
   const base = BASE30[DIA.dia_tipo] || {}, b = DIA.bin;
@@ -396,8 +433,7 @@ function loadDia(){
   fetch("https://storage.googleapis.com/gccp-transporte-live/dia.json?t="+Date.now(),{cache:"no-store"})
     .then(r=>r.json()).then(d=>{ DIA=d;
       if(state.vista==="normal" && BASE30){
-        if(state.linea==="TODAS" && state.comuna==="TODAS"){ renderLiveKPIs(); renderFreqChart(); }
-        else if(state.linea!=="TODAS"){ renderLiveKPIs(); renderFreqChart(); }
+        renderLiveKPIs(); renderFreqChart(); renderExcesos();
         renderLineFreqChart();
       }
     }).catch(()=>{});
@@ -605,12 +641,18 @@ function renderFreqChart(){
   const card=$("freq-card"); if(!card) return;
   const home = state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS";
   const lineView = state.vista==="normal" && state.linea!=="TODAS";
-  if((!home && !lineView) || !BASE30 || !DIA || !BASE30[DIA.dia_tipo]){ card.style.display="none"; return; }
+  const comView = state.vista==="normal" && state.comuna!=="TODAS" && state.linea==="TODAS";
+  if((!home && !lineView && !comView) || !BASE30 || !DIA || !BASE30[DIA.dia_tipo]){ card.style.display="none"; return; }
   card.style.display="";
   if(!freqChart) freqChart = echarts.init($("ch-freq"));
   const L = lineView ? state.linea : null;
   const dt=DIA.dia_tipo, bins=BASE30.bins;
-  const serie = L ? ((DIA.freq_serie_lin||{})[L]||[]) : (DIA.freq_serie||[]);
+  let serie;
+  if(L){ serie = (DIA.freq_serie_lin||{})[L]||[]; }
+  else if(comView){
+    const fsl=DIA.freq_serie_lin||{}, lines=CLIN[state.comuna]||[];
+    serie = Array.from({length:48},(_,i)=>lines.reduce((s,l)=>s+((fsl[l]||[])[i]||0),0));
+  } else { serie = DIA.freq_serie||[]; }
   const i0=10, i1=47;
   const x=bins.slice(i0,i1+1);
   const ovals=x.map((_,j)=>{const i=i0+j; return i<=DIA.bin ? (serie[i]||0) : null;});
@@ -629,7 +671,7 @@ function renderFreqChart(){
     ],
   },true);
   setTimeout(()=>freqChart.resize(),60);
-  $("freq-sub").textContent = L ? `despachos/30 min · línea ${L} · observado hoy` : `despachos/30 min · observado hoy`;
+  $("freq-sub").textContent = L ? `despachos/30 min · línea ${L} · observado hoy` : comView ? `despachos/30 min · ${state.comuna} · observado hoy` : `despachos/30 min · observado hoy`;
 }
 
 function renderLineFreqChart(){
@@ -678,10 +720,12 @@ function renderExcesos(){
     el.innerHTML = `<div style="text-align:center;padding:14px 0"><span style="font-size:2rem;font-weight:700;color:${col}">${n}</span><div style="color:var(--mut);margin-top:4px">episodios</div></div>`;
     return;
   }
-  const sorted = Object.entries(exc).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
+  const C = state.comuna !== "TODAS" ? state.comuna : null;
+  const comLines = C ? new Set(CLIN[C]||[]) : null;
+  const sorted = Object.entries(exc).filter(e=>e[1]>0 && (!comLines || comLines.has(e[0]))).sort((a,b)=>b[1]-a[1]);
   if(!sorted.length){ el.innerHTML='<div style="text-align:center;padding:18px 0;color:var(--mut)">Sin episodios registrados hoy</div>'; return; }
   const total = sorted.reduce((s,e)=>s+e[1],0);
-  $("excesos-sub").textContent = `> 80 km/h · ${total} episodios hoy`;
+  $("excesos-sub").textContent = C ? `> 80 km/h · ${total} episodios · ${C}` : `> 80 km/h · ${total} episodios hoy`;
   const max = sorted[0][1];
   el.innerHTML = sorted.map(([ln,n])=>{
     const emp = empresaDe(ln);
