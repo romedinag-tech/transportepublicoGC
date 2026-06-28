@@ -4,8 +4,8 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=70`).then(r=>r.json());
-const BUILD = "2026-06-28 02:44";
+const J = n => fetch(`data/${n}?v=71`).then(r=>r.json());
+const BUILD = "2026-06-28 03:06";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -52,7 +52,16 @@ const empresaDe = ln => { const x=(T.lineas||[]).find(l=>l.linea===ln); return x
 
 /* ---------- menús ---------- */
 const PERIODOS = [["agg","Agregado"],["am","Punta AM"],["md","Mediodía"],["pm","Punta PM"],["off","Fuera punta"],["noche","Noche"]];
-const COVER_SUBS = [["est","Estática"],["of","Oferta"],["od","Oferta/demanda"]];   // dimensiones del modo Cobertura
+const COVER_SUBS = [["est","Estática"],["din","Dinámica"],["od","Oferta/demanda"]];   // 'din' reemplaza 'of' (2026-06-28): modelo cápsula 2 min + 300 m, frac=min(1,f/30)
+let DINL = null;   // cobertura_din_lineas.json — KPIs por línea (cargado en init)
+// _dinValueFor: en vista SISTEMA devuelve P_total de la manzana; en vista LÍNEA el frac_línea uniforme (color uniforme dentro de las manzanas cubiertas)
+function _dinValueFor(p){
+  const per = state.periodo;
+  if(state.linea!=="TODAS"){
+    return (DINL?.lineas?.[state.linea]?.frac?.[per]) ?? null;
+  }
+  return (p.cob_din && p.cob_din[per]!=null) ? p.cob_din[per] : null;
+}
 let ODMAX = null;   // máximo cociente oferta/demanda (referencia 100% para la escala relativa)
 function odMax(){
   if(ODMAX!=null) return ODMAX;
@@ -131,8 +140,10 @@ function render(){
     e.classList.toggle("active", on);
   });
   document.querySelectorAll(".litem").forEach(e=>e.classList.toggle("active", e.dataset.l===state.linea && state.vista==="normal"));
-  const coverDyn = state.mapMode==="cover" && (state.coverSub==="of" || state.coverSub==="od");
-  const periodoRelevante = state.vista==="ranking" || (state.vista==="normal" && state.linea==="TODAS" && (state.mapMode==="conges"||state.mapMode==="wait"||state.mapMode==="bunch"||coverDyn));
+  // Cobertura dinámica también depende del período. El sub-selector está disponible en vista
+  // SISTEMA (sin línea), pero el modo Cobertura+din también aplica en vista de LÍNEA.
+  const coverDyn = state.mapMode==="cover" && (state.coverSub==="din" || state.coverSub==="od");
+  const periodoRelevante = state.vista==="ranking" || (state.vista==="normal" && (state.mapMode==="conges"||state.mapMode==="wait"||state.mapMode==="bunch"||coverDyn));
   // F1: período visible siempre en home (vista normal). Si no aplica al modo actual,
   // se marca data-inactive=1 (opacity .5) — sigue siendo un control de contexto presente.
   const periodoVisible = state.vista==="normal" || state.vista==="ranking";
@@ -140,7 +151,8 @@ function render(){
   $("periodo-sel").dataset.inactive = (periodoVisible && !periodoRelevante) ? "1" : "";
   const purposeRel = state.vista==="normal" && state.linea==="TODAS" && state.mapMode==="wait";
   if($("purpose-sel")) $("purpose-sel").style.display = purposeRel ? "flex" : "none";
-  const coverSubRel = state.vista==="normal" && state.linea==="TODAS" && state.mapMode==="cover";
+  // Sub-selector de cobertura: visible en vista normal con mapMode=cover (sistema o línea)
+  const coverSubRel = state.vista==="normal" && state.mapMode==="cover";
   if($("cover-sub")) $("cover-sub").style.display = coverSubRel ? "flex" : "none";
 
   // VISTAS ESPECIALES (territorio): ranking / comparador de comunas
@@ -171,6 +183,7 @@ function render(){
   renderKPIs(cell);
   renderHora(cell);
   renderFreqChart();
+  renderCobDinLinea();
   renderMapa();
   renderRanking();
   renderCump();
@@ -368,6 +381,43 @@ function loadDia(){
     }).catch(()=>{});
 }
 // Gráfico: frecuencia de salida de terminales — promedio histórico del tipo de día vs observado hoy
+// F6: widget de 6 KPIs en vista LÍNEA cuando el modo es Cobertura Dinámica
+function renderCobDinLinea(){
+  const card = $("cob-din-line"); if(!card) return;
+  const lineActive = state.vista==="normal" && state.linea!=="TODAS";
+  const cdMode = state.mapMode==="cover" && state.coverSub==="din";
+  if(!(lineActive && cdMode) || !DINL){ card.style.display="none"; return; }
+  const L = state.linea, info = DINL.lineas?.[L];
+  if(!info){ card.style.display="none"; return; }
+  card.style.display="";
+  const per = state.periodo;
+  const frac = info.frac?.[per] ?? null;
+  const f = info.f_obs?.[per] ?? null;
+  const H = (f && f>0) ? (60/f) : null;
+  const pct = frac==null ? null : Math.round(frac*100);
+  const hogDin = (info.hog && frac!=null) ? Math.round(info.hog * frac) : null;
+  const nseLoDin = (info.nse_lo && frac!=null) ? Math.round(info.nse_lo * frac) : null;
+  const nseMdDin = (info.nse_md && frac!=null) ? Math.round(info.nse_md * frac) : null;
+  const nseHiDin = (info.nse_hi && frac!=null) ? Math.round(info.nse_hi * frac) : null;
+  const pill = (ic,lab,val,sub) =>
+    `<div class="cdl-pill"><div class="lab">${ic?`<span>${ic}</span>`:""}${lab}</div>`+
+    `<div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`;
+  $("cdl-grid").innerHTML = [
+    pill("🏠","Hogares cubiertos", hogDin==null?"—":NF.format(hogDin), `${pct==null?"—":pct+"%"} del tiempo · base ${NF.format(info.hog)}`),
+    pill("⬇","NSE bajo", nseLoDin==null?"—":NF.format(nseLoDin), `de ${NF.format(info.nse_lo)} hog`),
+    pill("◯","NSE medio", nseMdDin==null?"—":NF.format(nseMdDin), `de ${NF.format(info.nse_md)} hog`),
+    pill("⬆","NSE alto", nseHiDin==null?"—":NF.format(nseHiDin), `de ${NF.format(info.nse_hi)} hog`),
+    pill("📏","Hogares por km", info.hog_por_km==null?"—":NF.format(info.hog_por_km), `línea ${info.km} km`),
+    pill("🔁","Ciclos/bus/día", info.ciclos_bus_dia==null?"—":info.ciclos_bus_dia.toFixed(1), `flota ${info.buses??"—"} · ${info.despachos_dia_L??"—"} desp/día`),
+  ].join("");
+  $("cdl-sub").textContent = `línea ${L} · ${periodoLbl(per)} · f=${f==null?"—":f.toFixed(1)} bus/h · headway ${H==null?"—":H.toFixed(1)+" min"}`;
+  const narr = $("cdl-narr");
+  if(narr){
+    narr.innerHTML = `Modelo <b>cápsula 2 min + 300 m</b>: cada bus cubre su trazado durante ~2 min al pasar. `+
+      `Con <b>${f==null?"—":f.toFixed(1)} bus/h</b> el headway es <b>${H==null?"—":H.toFixed(1)} min</b> → cobertura del <b>${pct==null?"—":pct+"%"}</b> del tiempo en ${periodoLbl(per)}. `+
+      `Los hogares cubiertos dinámicamente son los <b>estáticos × frac</b>; los KPIs por NSE muestran cómo se distribuyen entre terciles (bajo &lt; ${NF.format(DINL.nse_terciles?.lo_lt||0)} / medio &lt; ${NF.format(DINL.nse_terciles?.md_lt||0)} / alto ≥ ${NF.format(DINL.nse_terciles?.md_lt||0)} CLP/m²).`;
+  }
+}
 function renderFreqChart(){
   const card=$("freq-card"); if(!card) return;
   const home = state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS";
@@ -652,7 +702,8 @@ const daccColor = v => v==null ? "#475569" : `hsl(${1.2*Math.max(0,Math.min(v,10
 const tbiColor  = v => v==null ? "#475569" : `hsl(${120-1.2*Math.max(0,Math.min(v,100))},75%,50%)`; // intensidad transbordo: verde 0 -> rojo 100
 const labColor  = v => v==null ? "#475569" : `hsl(${1.2*Math.max(0,Math.min(v,100))},70%,50%)`;   // % empleo alcanzable SIN transbordo (Censo): rojo bajo -> verde alto
 const cobColor  = v => v==null ? "#475569" : `hsl(${1.2*Math.max(0,Math.min(v,100))},70%,50%)`;   // Cobertura estática: % de la manzana a <=300 m de la red (rojo bajo -> verde alto)
-const ofColor   = b => (b==null||b<=0) ? "#7f1d1d" : `hsl(${120*Math.min(b/30,1)},70%,50%)`;       // Cobertura oferta: buses/hora combinados (rojo 0 -> verde >=30 buses/h)
+const ofColor   = b => (b==null||b<=0) ? "#7f1d1d" : `hsl(${120*Math.min(b/30,1)},70%,50%)`;       // Cobertura oferta: buses/hora combinados (rojo 0 -> verde >=30 buses/h) [legacy]
+const dinColor  = p => (p==null) ? "#475569" : `hsl(${120*Math.max(0,Math.min(p,1))},70%,50%)`;     // Cobertura DINÁMICA: P_total 0..1 (rojo 0% -> verde 100%) — modelo cápsula 2 min
 const odColor   = r => (r==null) ? "#475569" : cobColor(100*r/odMax());                            // Cobertura oferta/demanda: cociente NORMALIZado al máximo (100% = mejor cubierta)
 let NSE_LO=null, NSE_HI=null;
 function nseColor(v){
@@ -759,14 +810,17 @@ function drawCoverage(mode){
   if(mode==="det"){ drawDetenciones(); return; }
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!COB) return;
+  // Vista LÍNEA + Cobertura Dinámica: solo manzanas cubiertas por esa línea (color uniforme = frac_linea)
+  const dinLineMode = mode==="cover" && state.coverSub==="din" && state.linea!=="TODAS";
   COB.features.forEach(f=>{
     const p=f.properties;
     if(!inComuna(p.cy, p.cx)) return;
+    if(dinLineMode && !((p.cob_lineas||[]).includes(state.linea))) return;
     const pu = state.purpose||"all";
     const dG = k => (p[k] && typeof p[k]==="object") ? p[k][pu] : p[k];   // lee dacc/ddir/dtr/tbi por propósito (compat)
     let col;
-    if(mode==="cover") col = state.coverSub==="of"                       // Cobertura: Estática / Oferta / Oferta-demanda
-      ? ofColor(p.cob_of ? p.cob_of[state.periodo] : null)
+    if(mode==="cover") col = state.coverSub==="din"                      // Cobertura: Estática / Dinámica / Oferta-demanda
+      ? dinColor(_dinValueFor(p))                                         // P_total (sistema) o frac_linea (vista línea)
       : state.coverSub==="od"
       ? odColor(p.cob_od ? p.cob_od[state.periodo] : null)
       : cobColor(p.cob_est);
@@ -785,8 +839,19 @@ function drawCoverage(mode){
       : "sin dato de viajes-trabajo";
     const tip = (mode==="trans")
       ? `${NF.format(p.hog??0)} hogares<br>${tipLab}`
-      : (mode==="cover" && state.coverSub==="of")
-      ? (()=>{ const b=p.cob_of?p.cob_of[per]:null; return `${NF.format(p.hog??0)} hogares · ${p.cob_nl??0} línea${p.cob_nl===1?"":"s"} · ${periodoLbl(per)}<br>oferta: <b>${b==null?"—":b+" buses/h"}</b> ≈ ${b==null?"—":NF.format(Math.round(b*CAP_SEAT))+" pers/h"} (sentados)`; })()
+      : (mode==="cover" && state.coverSub==="din")
+      ? (()=>{ const v=_dinValueFor(p); const nL=(p.cob_lineas||[]).length;
+          if(state.linea!=="TODAS"){
+            const fL = (DINL?.lineas?.[state.linea]?.frac?.[per]) ?? null;
+            const fObs = (DINL?.lineas?.[state.linea]?.f_obs?.[per]) ?? null;
+            const H = (fObs && fObs>0) ? (60/fObs) : null;
+            return `${NF.format(p.hog??0)} hogares · línea ${state.linea} · ${periodoLbl(per)}<br>`+
+                   `frecuencia: <b>${fObs==null?"—":fObs.toFixed(1)} bus/h</b> · headway ${H==null?"—":H.toFixed(1)+" min"}<br>`+
+                   `cobertura: <b>${fL==null?"—":(fL*100).toFixed(0)+"%"} del tiempo</b>`;
+          }
+          return `${NF.format(p.hog??0)} hogares · ${nL} línea${nL===1?"":"s"} · ${periodoLbl(per)}<br>`+
+                 `cobertura dinámica: <b>${v==null?"—":(v*100).toFixed(0)+"% del tiempo</b> (P_total)"}`;
+        })()
       : (mode==="cover" && state.coverSub==="od")
       ? (()=>{ const r=p.cob_od?p.cob_od[per]:null; const pct=r==null?null:Math.round(100*r/odMax()); return `${NF.format(p.hog??0)} hogares · ${periodoLbl(per)}<br>cobertura oferta/demanda: <b>${pct==null?"sin servicio":pct+"%"}</b> del nivel mejor cubierto`; })()
       : (mode==="cover")
@@ -848,7 +913,7 @@ function setCoverLegend(mode){
   const RYG = `<span class="grad" style="background:linear-gradient(90deg,hsl(120,72%,50%),hsl(60,72%,50%),hsl(0,72%,50%))"></span>`;
   const GYR = `<span class="grad" style="background:linear-gradient(90deg,hsl(0,70%,50%),hsl(60,70%,50%),hsl(120,70%,50%))"></span>`;
   const NEU = `<span class="grad" style="background:#64748b;opacity:.5"></span>`;
-  const txt = (mode==="cover" && state.coverSub==="of") ? [`Cobertura dinámica · oferta · ${periodoLbl(state.periodo)}`,GYR,`<span class='lbls'><i>0</i><i>15</i><i>30+</i></span><span class='par'>buses/hora que pasan a ≤300 m (×27 = pers/h sentados) · cambia con el período</span>`]
+  const txt = (mode==="cover" && state.coverSub==="din") ? [`Cobertura dinámica · ${periodoLbl(state.periodo)}`,GYR,`<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>% del tiempo cubierto por algún bus (modelo cápsula 2 min + 300 m) · cambia con el período</span>`]
     : (mode==="cover" && state.coverSub==="od") ? [`Cobertura oferta/demanda · ${periodoLbl(state.periodo)}`,GYR,`<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>capacidad ÷ viajes generados · 100% = zona residencial mejor cubierta (Talcahuano/San Pedro/Chiguayante), no el centro · reparto por demanda</span>`]
     : mode==="cover" ? ["Cobertura estática (≤300 m de la red)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>% de la manzana dentro del área de influencia 300 m de los recorridos</span>"]
     : mode==="trans" ? ["Transbordo: viajes-trabajo con UNA línea (Censo 2024)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>verde = llega directo con una línea · rojo = exige transbordo o es inalcanzable</span>"]
@@ -951,16 +1016,16 @@ function renderMapa(){
     drawCoverage(state.mapMode);
     const b=$("live-count"), R=(COB&&COB.resumen)||{};
     const M=state.mapMode;
-    const coverTit = state.coverSub==="of" ? `Cobertura dinámica · oferta · ${periodoLbl(state.periodo)}`
+    const coverTit = state.coverSub==="din" ? `Cobertura dinámica · ${periodoLbl(state.periodo)}`
       : state.coverSub==="od" ? `Cobertura oferta/demanda · ${periodoLbl(state.periodo)}` : "Cobertura estática";
     const titulo = {cover:coverTit,trans:"Transbordo",wait:`Espera hacia destinos · ${periodoLbl(state.periodo)}`,
       conges:`Velocidad efectiva por arco · ${periodoLbl(state.periodo)}`, bunch:`Apelotonamiento (bunching) · ${periodoLbl(state.periodo)}`, det:"Congestión y terminales",
       salud:"Accesibilidad a salud en transporte",edu:"Accesibilidad a educación en transporte",nse:"Nivel socioeconómico (avalúo)"}[M];
     // resumen sólo a nivel sistema (COB.resumen es de todo el GC); en comuna, etiqueta de ámbito
-    const ofp = R.cob_of && R.cob_of.por_periodo && R.cob_of.por_periodo[state.periodo];
+    const dinp = R.cob_din && R.cob_din.por_periodo && R.cob_din.por_periodo[state.periodo];
     const odp = R.cob_od && R.cob_od.por_periodo && R.cob_od.por_periodo[state.periodo];
-    const coverBadge = state.coverSub==="of"
-        ? `oferta media ${ofp?ofp.pers_h_sentado:"—"} pers/h (sentados) en ${periodoLbl(state.periodo)} · ${ofp?ofp.buses_h:"—"} buses/h × 27`
+    const coverBadge = state.coverSub==="din"
+        ? `${dinp?dinp.pct_hog_ge_umbral:"—"}% de los hogares con cobertura dinámica ≥50% del tiempo en ${periodoLbl(state.periodo)} · media P_total ${dinp?(dinp.media_p_total*100).toFixed(1)+"%":"—"}`
         : state.coverSub==="od"
         ? `oferta/demanda en ${periodoLbl(state.periodo)} · 100% = zona residencial mejor cubierta (no el centro atractor) · rojo = déficit relativo`
         : `${(R.cob_est&&R.cob_est.pct_hogares_cubiertos)??"—"}% de los hogares a ≤300 m de la red (buffer sobre el recorrido oficial)`;
@@ -1007,9 +1072,9 @@ function renderNarrative(){
   const pu=state.purpose||"all", per=state.periodo, pl=purposeLbl(pu);
   const pe = pu!=="all" ? ` de ${pl}` : "";
   let txt="";
-  if(M==="cover" && state.coverSub==="of"){
-    const v=scopeWavg(p=>p.cob_of&&p.cob_of[per]);
-    txt=`<b>Cobertura dinámica – oferta</b>: la capacidad real que pasa cerca depende de la <b>frecuencia</b>, que varía hora a hora. Por manzana suma los <b>buses/hora observados</b> de las líneas a ≤300 m en <b>${periodoLbl(per)}</b> (× 27 asientos = personas/hora). Verde = mucha oferta; rojo = poca o nula. ${v!=null?`Media en ${amb}: <b>${v.toFixed(0)} buses/h</b> ≈ ${NF.format(Math.round(v*CAP_SEAT))} pers/h. `:""}Compara <b>Punta AM con Noche</b>: aunque el recorrido exista, de noche la frecuencia cae y la cobertura efectiva se desploma.`;
+  if(M==="cover" && state.coverSub==="din"){
+    const v=scopeWavg(p=>p.cob_din&&p.cob_din[per]);
+    txt=`<b>Cobertura dinámica</b>: ¿qué tan seguido pasa un bus cerca de mí? Modelo: cada bus cubre una <b>cápsula de 2 min + 300 m</b> al pasar por su trazado, así que <code>frac = min(1, f/30)</code> donde <code>f</code> es la frecuencia observada en bus/h. Por manzana combina todas las líneas que la cubren (P_total = 1 − Π(1−frac_i)). En <b>${periodoLbl(per)}</b>: verde = el bus pasa casi continuamente; rojo = pasa raramente. ${v!=null?`Media en ${amb}: <b>${(v*100).toFixed(0)}%</b> del tiempo. `:""}Compara <b>Punta AM con Noche</b>: aunque el trazado exista, de noche la frecuencia cae y la cobertura efectiva se desploma.`;
   } else if(M==="cover" && state.coverSub==="od"){
     txt=`<b>Cobertura oferta/demanda</b>: contrasta la <b>capacidad ofrecida</b> con la <b>demanda de viajes-TP</b> que genera cada manzana (hogares × tasa de generación EOD por hora). Para no doble-contar la capacidad compartida del corredor, se <b>reparte por demanda</b>. Se muestra <b>relativo a una zona residencial bien cubierta</b> (Talcahuano/San Pedro/Chiguayante = 100%), <b>no</b> al centro de Concepción — que por ser atractor concentra todas las líneas y distorsionaría la comparación de generación. En <b>${periodoLbl(per)}</b>: verde = bien servida frente a su demanda; rojo = oferta corta. Cruza con la Noche para ver dónde la demanda persiste pero la oferta cae.`;
   } else if(M==="cover"){
@@ -1597,6 +1662,7 @@ function renderEvolucion(){
       if(s && Array.isArray(s.kpis)) LIVE_KPIS = s.kpis.map(o=>({...o, f:(_LIVE_FMT[o.fmt]||_LIVE_FMT.int)}));
     }).catch(()=>{});
     J("baseline_30min.json").then(d=>{ BASE30=d; loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
+    J("cobertura_din_lineas.json").then(d=>{ DINL=d; renderCobDinLinea(); if(state.mapMode==="cover" && state.coverSub==="din") render(); }).catch(()=>{});
     setInterval(loadDia, 60000);                 // dia.json (vivo vs normal), refresco 60 s
     addEventListener("resize", ()=>{ [chart,csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
