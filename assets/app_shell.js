@@ -283,7 +283,7 @@ function liveBox(s, live, norm, pct){
       prog+
       `<text x="${cx}" y="${cy-14}" text-anchor="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2">${s.unit}</tspan></text>`+
     `</svg>`+
-    `<div class="sub">normal: <b class="g-norm">${normTxt}</b>${deltaTxt}</div></div>`;
+    `<div class="sub">${norm!=null ? `normal: <b class="g-norm">${normTxt}</b>${deltaTxt}` : `<span style="color:var(--muted)">${valTxt}${s.unit}</span>`}</div></div>`;
 }
 // F2: animación count-up; respeta prefers-reduced-motion
 const REDUCED_MOTION = matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -355,7 +355,8 @@ function renderLiveKPIs(){
   const baseCount = LIVE_KPIS.reduce((n,s)=> n + (cont.querySelector(`.klive[data-k="${s.k}"]`)?1:0), 0);
   if(baseCount !== LIVE_KPIS.length){
     cont.innerHTML = LIVE_KPIS.map(s=>{
-      const live = DIA[s.k], norm = (base[s.k]||[])[b];
+      const live = DIA[s.k];
+      const norm = s.k==="freq" ? null : (base[s.k]||[])[b];
       const pct = (norm!=null && norm>0) ? 100*live/norm : null;
       return liveBox(s, live, norm, pct);
     }).join("");
@@ -372,7 +373,8 @@ function renderLiveKPIs(){
   // refresh: actualizar in-place y animar desde el valor previo
   LIVE_KPIS.forEach(s=>{
     const card = cont.querySelector(`.klive[data-k="${s.k}"]`); if(!card) return;
-    const live = DIA[s.k], norm = (base[s.k]||[])[b];
+    const live = DIA[s.k];
+    const norm = s.k==="freq" ? null : (base[s.k]||[])[b];
     const pct = (norm!=null && norm>0) ? 100*live/norm : null;
     updateLiveCard(card, s, live, norm, pct, LIVE_PREV[s.k]);
     LIVE_PREV[s.k] = live;
@@ -585,28 +587,26 @@ function renderFreqChart(){
   if(!home || !BASE30 || !DIA || !BASE30[DIA.dia_tipo]){ card.style.display="none"; return; }
   card.style.display="";
   if(!freqChart) freqChart = echarts.init($("ch-freq"));
-  const dt=DIA.dia_tipo, bins=BASE30.bins, base=BASE30[dt].freq||[], serie=DIA.freq_serie||[];
-  const i0=10, i1=47;                                    // 05:00–23:30 (horario de servicio)
+  const dt=DIA.dia_tipo, bins=BASE30.bins, serie=DIA.freq_serie||[];
+  const i0=10, i1=47;
   const x=bins.slice(i0,i1+1);
-  const bvals=base.slice(i0,i1+1);
-  const ovals=x.map((_,j)=>{const i=i0+j; return i<=DIA.bin ? (serie[i]||0) : null;});   // observado solo hasta el bin actual
-  const th=TH(), dtl=dt==="L"?"laborable":dt==="S"?"sábado":"domingo";
+  const ovals=x.map((_,j)=>{const i=i0+j; return i<=DIA.bin ? (serie[i]||0) : null;});
+  const th=TH();
   freqChart.setOption({
     textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
     grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
-    legend:{data:[`Promedio ${dtl}`,"Observado hoy"],textStyle:{color:th.mut},top:0},
+    legend:{show:false},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>{const t=p[0].axisValue; let s=`${t}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${Math.round(x.value)}</b><br>`;}); return s;}},
     xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:3},axisLine:{lineStyle:{color:th.axis}}},
     yAxis:{type:"value",name:"despachos/30min",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
     series:[
-      {name:`Promedio ${dtl}`,type:"line",data:bvals,smooth:true,symbol:"none",lineStyle:{width:2,color:th.mut,type:"dashed"}},
       {name:"Observado hoy",type:"line",data:ovals,smooth:false,symbol:"circle",symbolSize:6,showSymbol:true,connectNulls:false,
         lineStyle:{width:2,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991f"}},
     ],
   },true);
   setTimeout(()=>freqChart.resize(),60);
-  $("freq-sub").textContent = `despachos/30 min · promedio ${dtl} vs observado hoy`;
+  $("freq-sub").textContent = `despachos/30 min · observado hoy`;
 }
 
 function renderLineFreqChart(){
