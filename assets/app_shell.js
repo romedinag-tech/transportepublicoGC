@@ -4,7 +4,7 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=73`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=74`).then(r=>r.json());
 const BUILD = "2026-06-28 03:33";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
@@ -13,7 +13,7 @@ let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, 
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stops:[]};
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", cmpA:null, cmpB:null};
-let chart, csChart, freqChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
+let chart, csChart, freqChart, linFreqChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
 const PEAK_H = [7,8,9,17,18,19];
@@ -183,6 +183,7 @@ function render(){
   renderKPIs(cell);
   renderHora(cell);
   renderFreqChart();
+  renderLineFreqChart();
   renderCobDinLinea();
   renderMapa();
   renderRanking();
@@ -381,7 +382,7 @@ function renderLiveKPIs(){
 function loadDia(){
   fetch("https://storage.googleapis.com/gccp-transporte-live/dia.json?t="+Date.now(),{cache:"no-store"})
     .then(r=>r.json()).then(d=>{ DIA=d;
-      if(state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS" && BASE30){ renderLiveKPIs(); renderFreqChart(); }
+      if(state.vista==="normal" && BASE30){ if(state.linea==="TODAS" && state.comuna==="TODAS"){ renderLiveKPIs(); renderFreqChart(); } renderLineFreqChart(); }
     }).catch(()=>{});
 }
 
@@ -456,10 +457,12 @@ function computeLiveExtras(){
   }
   const byLine = {};
   for(const b of buses){ byLine[b[2]] = (byLine[b[2]]||0) + 1; }
-  const def_lineas = Object.entries(FLOTA_PICO_LIN).map(([L, fp]) => ({
+  const all_lineas = Object.entries(FLOTA_PICO_LIN).map(([L, fp]) => ({
     L, now: byLine[L]||0, max: fp, pct: 100*(byLine[L]||0)/fp
-  })).filter(d => d.max > 0).sort((a,b) => a.pct - b.pct).slice(0, 5);
-  return { cob_hog, cob_hog_com, def_lineas, n_buses: buses.length };
+  })).filter(d => d.max > 0);
+  const def_lineas = all_lineas.slice().sort((a,b) => a.pct - b.pct).filter(d => d.L !== "TODAS").slice(0, 5);
+  const top_lineas = all_lineas.slice().sort((a,b) => b.pct - a.pct).filter(d => d.L !== "TODAS").slice(0, 5);
+  return { cob_hog, cob_hog_com, def_lineas, top_lineas, n_buses: buses.length };
 }
 function renderLiveExtras(){
   buildManzanaIndex();
@@ -478,6 +481,10 @@ function renderLiveExtras(){
   const c3 = cont.querySelector('.klive[data-k="def_lin"]');
   const c3HTML = liveBoxDefLineas(ex.def_lineas);
   if(c3) c3.outerHTML = c3HTML; else cont.insertAdjacentHTML("beforeend", c3HTML);
+  // Card 4: Líneas con más buses
+  const c4 = cont.querySelector('.klive[data-k="top_lin"]');
+  const c4HTML = liveBoxTopLineas(ex.top_lineas);
+  if(c4) c4.outerHTML = c4HTML; else cont.insertAdjacentHTML("beforeend", c4HTML);
 }
 function liveBoxCobAhora(hog, tot, pct, nb){
   const col = pct==null ? "#64748b" : pct>=60 ? "#34d399" : pct>=30 ? "#fbbf24" : "#f87171";
@@ -516,15 +523,28 @@ function liveBoxCobComuna(byCom){
     `<div class="kcr-list">${rows}</div>`+
     `<div class="sub">% hogares con ≥1 bus ≤300 m</div></div>`;
 }
+function _linFleetRow(d, top){
+  const pct = d.pct;
+  const col = top
+    ? (pct>=100 ? "#34d399" : pct>=80 ? "#a3e635" : "#fbbf24")
+    : (pct>=70 ? "#fbbf24" : pct>=40 ? "#fb923c" : "#f87171");
+  const w = Math.min(100, pct);
+  const emp = empresaDe(d.L);
+  const nm = emp ? `<span class="lncode">${d.L}</span> ${emp}` : `<span class="lncode">${d.L}</span>`;
+  return `<div class="kcr kcr--lin">`+
+    `<div class="kcr-nm">${nm}<span class="kcr-vp" style="color:${col}">${d.now}/${Math.round(d.max)}</span></div>`+
+    `<div class="kcr-row"><div class="kcr-bar"><div class="kcr-fill" style="width:${w}%;background:${col}"></div><span class="bar-pct">${pct.toFixed(0)}%</span></div></div>`+
+    `</div>`;
+}
 function liveBoxDefLineas(lst){
-  const rows = lst.map(d => {
-    const pct = d.pct, col = pct>=70 ? "#fbbf24" : pct>=40 ? "#fb923c" : "#f87171";
-    const w = Math.min(100, pct);
-    return `<div class="kcr"><div class="kcr-nm"><span class="lncode">${d.L}</span></div>`+
-      `<div class="kcr-bar"><div class="kcr-fill" style="width:${w}%;background:${col}"></div></div>`+
-      `<div class="kcr-vp" style="color:${col}">${d.now}/${Math.round(d.max)}</div></div>`;
-  }).join("") || `<div class="sub" style="text-align:center;padding:18px 0">sin datos</div>`;
+  const rows = lst.map(d=>_linFleetRow(d,false)).join("") || `<div class="sub" style="text-align:center;padding:18px 0">sin datos</div>`;
   return `<div class="kpi klive" data-k="def_lin"><div class="lab"><span class="ic">📉</span>Líneas con menos buses</div>`+
+    `<div class="kcr-list">${rows}</div>`+
+    `<div class="sub">buses ahora / flota pico</div></div>`;
+}
+function liveBoxTopLineas(lst){
+  const rows = lst.map(d=>_linFleetRow(d,true)).join("") || `<div class="sub" style="text-align:center;padding:18px 0">sin datos</div>`;
+  return `<div class="kpi klive" data-k="top_lin"><div class="lab"><span class="ic">📈</span>Líneas con más buses</div>`+
     `<div class="kcr-list">${rows}</div>`+
     `<div class="sub">buses ahora / flota pico</div></div>`;
 }
@@ -596,6 +616,38 @@ function renderFreqChart(){
   $("freq-sub").textContent = `despachos/30 min · promedio ${dtl} vs observado hoy`;
 }
 
+function renderLineFreqChart(){
+  const card=$("lin-freq-card"); if(!card) return;
+  const lineActive = state.vista==="normal" && state.linea!=="TODAS";
+  if(!lineActive || !BASE30 || !DIA || !BASE30[DIA.dia_tipo]){ card.style.display="none"; return; }
+  const dt=DIA.dia_tipo, fl=BASE30[dt].freq_lin, sl=DIA.freq_serie_lin;
+  const base = fl && fl[state.linea];
+  const serie = sl && sl[state.linea];
+  if(!base && !serie){ card.style.display="none"; return; }
+  card.style.display="";
+  if(!linFreqChart) linFreqChart = echarts.init($("ch-lin-freq"));
+  const bins=BASE30.bins, i0=10, i1=47;
+  const x=bins.slice(i0,i1+1);
+  const bvals = base ? base.slice(i0,i1+1) : x.map(()=>null);
+  const ovals = serie ? x.map((_,j)=>{const i=i0+j; return i<=DIA.bin ? (serie[i]||0) : null;}) : x.map(()=>null);
+  const th=TH(), dtl=dt==="L"?"laborable":dt==="S"?"sábado":"domingo";
+  linFreqChart.setOption({
+    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
+    legend:{data:[`Promedio ${dtl}`,"Observado hoy"],textStyle:{color:th.mut},top:0},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      formatter:p=>{const t=p[0].axisValue; let s=`${t}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${Math.round(x.value)}</b><br>`;}); return s;}},
+    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:3},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"despachos/30min",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    series:[
+      {name:`Promedio ${dtl}`,type:"line",data:bvals,smooth:true,symbol:"none",lineStyle:{width:2,color:th.mut,type:"dashed"}},
+      {name:"Observado hoy",type:"line",data:ovals,smooth:true,symbol:"circle",symbolSize:4,connectNulls:false,
+        lineStyle:{width:2.6,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991f"}},
+    ],
+  },true);
+  setTimeout(()=>linFreqChart.resize(),60);
+  $("lin-freq-sub").textContent = `línea ${state.linea} · despachos/30 min · promedio ${dtl} vs observado hoy`;
+}
 function renderHora(cell){
   if(!chart) chart = echarts.init($("ch-hora"));
   const h = cell.horas||[];

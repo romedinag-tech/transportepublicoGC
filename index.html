@@ -26,13 +26,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <!-- F4: Leaflet self-hosted (antes desde unpkg.com en <head> sin defer → bloqueaba render) -->
-<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=73"/>
-<script defer src="assets/vendor/leaflet/leaflet.js?v=73"></script>
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=75"/>
+<script defer src="assets/vendor/leaflet/leaflet.js?v=75"></script>
 <!-- Componentes y variables de tema existentes (kpi, ctab, litem, rank-row, cump-row, seg…) -->
-<link rel="stylesheet" href="assets/styles.css?v=73">
-<link rel="stylesheet" href="assets/shell.css?v=73">
+<link rel="stylesheet" href="assets/styles.css?v=75">
+<link rel="stylesheet" href="assets/shell.css?v=75">
 <!-- F4: Tailwind purgado (~12 KB) antes era 280 KB de JS engine vía cdn.tailwindcss.com -->
-<link rel="stylesheet" href="assets/tw.css?v=73">
+<link rel="stylesheet" href="assets/tw.css?v=75">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
@@ -223,13 +223,19 @@
     padding:1px 6px;border-radius:5px;font-size:11.5px;background:rgba(255,255,255,.04)}
   /* KPIs en vivo extra: cobertura por comuna + déficit por línea (mismo tamaño que los gauges) */
   .kpi.klive .kcr-list{display:flex;flex-direction:column;gap:1px;margin:3px 0 1px}
-  .kpi.klive .kcr{display:grid;grid-template-columns:78px 1fr 44px;gap:6px;align-items:center;font-size:10.5px;line-height:1.15}
-  .kpi.klive .kcr-nm{color:var(--muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi.klive .kcr{display:grid;grid-template-columns:1fr 50px 36px;gap:4px;align-items:center;font-size:11.5px;line-height:1.15}
+  .kpi.klive .kcr-nm{color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
   .kpi.klive .kcr-nm .lncode{display:inline-block;font-family:var(--mono);font-weight:700;color:var(--tx);
     padding:0 7px;border-radius:5px;background:rgba(255,255,255,.06);min-width:26px;text-align:center;font-size:11px}
   .kpi.klive .kcr-bar{height:5px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden}
   .kpi.klive .kcr-fill{height:100%;border-radius:3px;transition:width .55s cubic-bezier(.4,0,.2,1)}
   .kpi.klive .kcr-vp{font-family:var(--mono);font-weight:700;text-align:right;font-size:11px;font-variant-numeric:tabular-nums}
+  .kpi.klive .kcr--lin{display:flex;flex-direction:column;gap:1px;padding:2px 0}
+  .kpi.klive .kcr--lin .kcr-nm{font-size:11px;display:flex;justify-content:space-between}
+  .kpi.klive .kcr--lin .kcr-row{display:flex;gap:4px;align-items:center}
+  .kpi.klive .kcr--lin .kcr-bar{position:relative;height:12px;border-radius:3px;flex:1}
+  .kpi.klive .kcr--lin .kcr-fill{height:100%;border-radius:3px}
+  .kpi.klive .kcr--lin .bar-pct{position:absolute;left:4px;top:0;height:100%;display:flex;align-items:center;font-size:8.5px;font-weight:700;color:#fff;text-shadow:0 0 3px rgba(0,0,0,.6)}
 </style>
 </head>
 
@@ -360,10 +366,6 @@
     </span>
 
     <div class="ml-auto flex items-center gap-2">
-      <span id="periodo-pill" class="hidden sm:inline-flex items-center gap-1.5 text-[11.5px] font-mono px-2.5 py-1.5 rounded-lg border border-[var(--line2)] text-[var(--muted)] bg-[var(--chip)]">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-        abr 2025 – abr 2026
-      </span>
       <button id="theme-btn" class="themebtn" onclick="toggleTheme()" title="Tema claro/oscuro" aria-label="Tema">☀</button>
       <a href="https://github.com/romedinag-tech/transportepublicoGC" target="_blank" rel="noopener" class="grid place-items-center w-8 h-8 rounded-lg border border-[var(--line2)] text-[var(--muted)] hover:text-[var(--acc)] hover:border-[var(--acc)]" title="GitHub" aria-label="GitHub">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 8.84 21.5c.5.08.66-.22.66-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.57.67.48A10 10 0 0 0 12 2Z"/></svg>
@@ -375,8 +377,6 @@
   <div class="comuna-bar thin-scroll">
     <nav id="comuna-tabs" class="thin-scroll"></nav>
     <div class="cb-aside">
-      <!-- selector de período movido aquí desde undermap-ctrls (F1) -->
-      <div class="periodo-sel" id="periodo-sel" title="Período del día (afecta velocidad/congestión/espera/cobertura dinámica)"></div>
       <!-- pill vivo: resumen "en vivo" balanceando la fila -->
       <span class="cb-live" title="Buses operando en este momento (GTFS-RT)"><span class="dot-live"></span> <b id="hdr-live">—</b> buses operando</span>
     </div>
@@ -421,7 +421,7 @@
         <!-- MAPA HÉROE (2/3) -->
         <section class="widget xl:col-span-2 flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=73" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=75" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -439,8 +439,12 @@
             <!-- Controles del mapa (período/propósito) + relato del KPI, debajo del mapa -->
             <div class="undermap">
               <div class="undermap-ctrls">
+                <span id="periodo-pill" class="inline-flex items-center gap-1.5 text-[11.5px] font-mono px-2.5 py-1.5 rounded-lg border border-[var(--line2)] text-[var(--muted)] bg-[var(--chip)]">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                  abr 2025 – abr 2026
+                </span>
+                <div class="periodo-sel" id="periodo-sel" title="Período del día (afecta velocidad/congestión/espera/cobertura dinámica)"></div>
                 <div class="periodo-sel" id="cover-sub" title="Dimensión de cobertura (estática / oferta dinámica)"></div>
-                <!-- periodo-sel movido a la barra de comunas (F1) -->
                 <div class="periodo-sel" id="purpose-sel" title="Propósito de viaje (repondera por demanda EOD)"></div>
               </div>
               <p id="map-narrative" class="map-narr"></p>
@@ -452,7 +456,7 @@
         <div class="flex flex-col gap-4 xl:max-h-[680px] xl:overflow-y-auto thin-scroll xl:pr-1">
           <section class="widget">
             <div class="widget-h">
-              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=73" alt="" width="22" height="22"></span>
+              <span class="ico ico-png"><img src="assets/brand/ic_gauge.png?v=75" alt="" width="22" height="22"></span>
               <div><h3>Flota y velocidad</h3><span class="sub">por hora · días laborables</span></div>
             </div>
             <div class="widget-b"><div id="ch-hora" style="height:236px"></div><p id="hora-narr" class="wnarr"></p></div>
@@ -464,6 +468,14 @@
               <div><h3>Frecuencia de salida de terminales</h3><span class="sub" id="freq-sub">promedio histórico vs hoy</span></div>
             </div>
             <div class="widget-b"><div id="ch-freq" style="height:212px"></div><p id="freq-narr" class="wnarr"></p></div>
+          </section>
+
+          <section class="widget" id="lin-freq-card" style="display:none">
+            <div class="widget-h">
+              <span class="ico">🟢</span>
+              <div><h3>Frecuencia de salida</h3><span class="sub" id="lin-freq-sub">despachos por línea</span></div>
+            </div>
+            <div class="widget-b"><div id="ch-lin-freq" style="height:212px"></div></div>
           </section>
 
           <!-- F6: Cobertura dinámica por línea — 6 KPIs (vista línea + sub-selector "din") -->
@@ -505,7 +517,7 @@
       <!-- Cumplimiento de frecuencia -->
       <section class="widget">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=73" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=75" alt="" width="22" height="22"></span>
           <div><h3>Cumplimiento de frecuencia</h3><span class="sub">programado (GTFS) vs observado (GPS)</span></div>
         </div>
         <div class="widget-b"><div id="cump-box"></div><p id="cump-narr" class="wnarr"></p></div>
@@ -514,7 +526,7 @@
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=73" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=75" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -640,7 +652,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=73"></script>
+<script defer src="assets/app_shell.js?v=75"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
