@@ -213,14 +213,12 @@ function kpiCard(l,v,s,icon,stt){   // stt = good|warning|critical|neutral
 const semHigh = (v,g,w) => v>=g?"good":v>=w?"warning":"critical";
 const semLow  = (v,g,w) => v<g?"good":v<w?"warning":"critical";
 function renderKPIs(cell){
-  // INICIO (sistema completo): recuadros "ahora vs lo normal" (vivo vs baseline 30 min)
   const home = state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS";
-  if(home && DIA && BASE30){ renderLiveKPIs(); return; }
+  const lineView = state.vista==="normal" && state.linea!=="TODAS";
+  if((home || lineView) && DIA && BASE30){ renderLiveKPIs(); return; }
   const k = cell.kpi;
   if(!k){ $("kpis2").innerHTML = `<div class="empty">Sin datos para este ámbito.</div>`; return; }
-  const ctx = state.linea!=="TODAS"
-      ? kpiCard("Comunas que sirve", k.n_comunas, "presencia territorial", "🗺️", "neutral")
-      : kpiCard("Líneas", k.n_lineas, "operando en el ámbito", "🚍", "neutral");
+  const ctx = kpiCard("Líneas", k.n_lineas, "operando en el ámbito", "🚍", "neutral");
   $("kpis2").innerHTML = [
     kpiCard("Flota en punta", fmt(k.flota_pico), "buses activos máx/hora", "🚍", "neutral"),
     kpiCard("Velocidad media", fmt1(k.vel)+" km/h", "efectiva, en ruta", "⚡", semHigh(k.vel,22,14)),
@@ -346,45 +344,60 @@ function updateLiveCard(card, s, live, norm, pct, prev){
     } else { gDelta.textContent = ""; }
   }
 }
+function _liveVal(s, L){
+  if(!L) return DIA[s.k];
+  if(s.k==="freq") return (DIA.freq_serie_lin||{})[L] ? (DIA.freq_serie_lin[L][DIA.bin]||0) : 0;
+  return ((DIA[s.k+"_lin"]||{})[L]) ?? null;
+}
+function _baseVal(s, base, b, L){
+  const noBase = ["freq","inact","descanso"];
+  if(noBase.includes(s.k)) return null;
+  if(!L) return (base[s.k]||[])[b];
+  const bl = base[s.k+"_lin"];
+  return bl && bl[L] ? bl[L][b] : null;
+}
 function renderLiveKPIs(){
   const base = BASE30[DIA.dia_tipo] || {}, b = DIA.bin;
+  const L = state.linea!=="TODAS" ? state.linea : null;
   const cont = $("kpis2");
-  // Considerar solo las cards "base" (LIVE_KPIS) — no las extras (cob_now, cob_com, def_lin) que se
-  // agregan después. Antes el conteo total se inflaba a 10 y el path "primera vez" se reactivaba en
-  // cada refresh, borrando las extras.
   const baseCount = LIVE_KPIS.reduce((n,s)=> n + (cont.querySelector(`.klive[data-k="${s.k}"]`)?1:0), 0);
-  if(baseCount !== LIVE_KPIS.length){
+  const prevL = cont.dataset.lin || null;
+  if(baseCount !== LIVE_KPIS.length || prevL !== (L||"")){
+    cont.dataset.lin = L||"";
     cont.innerHTML = LIVE_KPIS.map(s=>{
-      const live = DIA[s.k];
-      const norm = s.k==="freq" ? null : (base[s.k]||[])[b];
-      const pct = (norm!=null && norm>0) ? 100*live/norm : null;
+      const live = _liveVal(s, L);
+      const norm = _baseVal(s, base, b, L);
+      const pct = (norm!=null && norm>0 && live!=null) ? 100*live/norm : null;
       return liveBox(s, live, norm, pct);
     }).join("");
     LIVE_KPIS.forEach(s=>{
       const card = cont.querySelector(`.klive[data-k="${s.k}"]`); if(!card) return;
-      const live = DIA[s.k];
+      const live = _liveVal(s, L);
       const vn = card.querySelector('.g-val'), tn = vn && vn.firstChild;
       if(tn && live!=null) animateNumber(t => { tn.nodeValue = t; }, 0, live, 850, s.f);
       LIVE_PREV[s.k] = live;
     });
-    renderLiveExtras();                                 // 3 KPIs extra también en la primera ejecución
+    renderLiveExtras();
     return;
   }
-  // refresh: actualizar in-place y animar desde el valor previo
   LIVE_KPIS.forEach(s=>{
     const card = cont.querySelector(`.klive[data-k="${s.k}"]`); if(!card) return;
-    const live = DIA[s.k];
-    const norm = s.k==="freq" ? null : (base[s.k]||[])[b];
-    const pct = (norm!=null && norm>0) ? 100*live/norm : null;
+    const live = _liveVal(s, L);
+    const norm = _baseVal(s, base, b, L);
+    const pct = (norm!=null && norm>0 && live!=null) ? 100*live/norm : null;
     updateLiveCard(card, s, live, norm, pct, LIVE_PREV[s.k]);
     LIVE_PREV[s.k] = live;
   });
-  renderLiveExtras();                                   // 3 KPIs extra computados client-side
+  renderLiveExtras();
 }
 function loadDia(){
   fetch("https://storage.googleapis.com/gccp-transporte-live/dia.json?t="+Date.now(),{cache:"no-store"})
     .then(r=>r.json()).then(d=>{ DIA=d;
-      if(state.vista==="normal" && BASE30){ if(state.linea==="TODAS" && state.comuna==="TODAS"){ renderLiveKPIs(); renderFreqChart(); } renderLineFreqChart(); }
+      if(state.vista==="normal" && BASE30){
+        if(state.linea==="TODAS" && state.comuna==="TODAS"){ renderLiveKPIs(); renderFreqChart(); }
+        else if(state.linea!=="TODAS"){ renderLiveKPIs(); renderFreqChart(); }
+        renderLineFreqChart();
+      }
     }).catch(()=>{});
 }
 
@@ -434,9 +447,10 @@ function buildManzanaIndex(){
     });
   }
 }
-function computeLiveExtras(){
+function computeLiveExtras(filterL){
   if(!LIVE || !LIVE.buses || !MANZ_GRID) return null;
-  const buses = LIVE.buses.filter(b => b[2]);                       // con línea = en servicio
+  let buses = LIVE.buses.filter(b => b[2]);                         // con línea = en servicio
+  if(filterL) buses = buses.filter(b => b[2]===filterL);
   const MX = 111320*Math.cos(-36.83*Math.PI/180), MY = 110540;
   const covered = new Set();
   for(const b of buses){
@@ -468,21 +482,25 @@ function computeLiveExtras(){
 }
 function renderLiveExtras(){
   buildManzanaIndex();
-  const ex = computeLiveExtras(); if(!ex) return;
+  const L = state.linea!=="TODAS" ? state.linea : null;
+  const ex = computeLiveExtras(L); if(!ex) return;
   const cont = $("kpis2"); if(!cont) return;
-  // Card 1: Cobertura ahora (gauge estándar)
   const pct_tot = TOT_HOG_GLOBAL>0 ? 100*ex.cob_hog/TOT_HOG_GLOBAL : null;
   const c1 = cont.querySelector('.klive[data-k="cob_now"]');
   const c1HTML = liveBoxCobAhora(ex.cob_hog, TOT_HOG_GLOBAL, pct_tot, ex.n_buses);
   if(c1) c1.outerHTML = c1HTML; else cont.insertAdjacentHTML("beforeend", c1HTML);
-  // Card 2: Cobertura por comuna (mini-rows)
   const c2 = cont.querySelector('.klive[data-k="cob_com"]');
   const c2HTML = liveBoxCobComuna(ex.cob_hog_com);
   if(c2) c2.outerHTML = c2HTML; else cont.insertAdjacentHTML("beforeend", c2HTML);
-  // Card 3: Flota por línea (menos + más buses en una sola card)
-  const c3 = cont.querySelector('.klive[data-k="fleet_lin"]');
-  const c3HTML = liveBoxFleetLineas(ex.def_lineas, ex.top_lineas);
-  if(c3) c3.outerHTML = c3HTML; else cont.insertAdjacentHTML("beforeend", c3HTML);
+  // Fleet card: solo en vista sistema (no per-línea)
+  if(!L){
+    const c3 = cont.querySelector('.klive[data-k="fleet_lin"]');
+    const c3HTML = liveBoxFleetLineas(ex.def_lineas, ex.top_lineas);
+    if(c3) c3.outerHTML = c3HTML; else cont.insertAdjacentHTML("beforeend", c3HTML);
+  } else {
+    const c3 = cont.querySelector('.klive[data-k="fleet_lin"]');
+    if(c3) c3.remove();
+  }
 }
 function liveBoxCobAhora(hog, tot, pct, nb){
   const col = pct==null ? "#64748b" : pct>=60 ? "#34d399" : pct>=30 ? "#fbbf24" : "#f87171";
@@ -584,10 +602,13 @@ function renderCobDinLinea(){
 function renderFreqChart(){
   const card=$("freq-card"); if(!card) return;
   const home = state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS";
-  if(!home || !BASE30 || !DIA || !BASE30[DIA.dia_tipo]){ card.style.display="none"; return; }
+  const lineView = state.vista==="normal" && state.linea!=="TODAS";
+  if((!home && !lineView) || !BASE30 || !DIA || !BASE30[DIA.dia_tipo]){ card.style.display="none"; return; }
   card.style.display="";
   if(!freqChart) freqChart = echarts.init($("ch-freq"));
-  const dt=DIA.dia_tipo, bins=BASE30.bins, serie=DIA.freq_serie||[];
+  const L = lineView ? state.linea : null;
+  const dt=DIA.dia_tipo, bins=BASE30.bins;
+  const serie = L ? ((DIA.freq_serie_lin||{})[L]||[]) : (DIA.freq_serie||[]);
   const i0=10, i1=47;
   const x=bins.slice(i0,i1+1);
   const ovals=x.map((_,j)=>{const i=i0+j; return i<=DIA.bin ? (serie[i]||0) : null;});
@@ -606,7 +627,7 @@ function renderFreqChart(){
     ],
   },true);
   setTimeout(()=>freqChart.resize(),60);
-  $("freq-sub").textContent = `despachos/30 min · observado hoy`;
+  $("freq-sub").textContent = L ? `despachos/30 min · línea ${L} · observado hoy` : `despachos/30 min · observado hoy`;
 }
 
 function renderLineFreqChart(){
@@ -775,13 +796,13 @@ function renderOpNow(){
       rows.map(([l,c])=>`<span style="display:inline-block;margin:2px 6px 2px 0;padding:2px 7px;border-radius:999px;background:var(--track);font-size:11px"><b style="font-family:var(--mono)">${l}</b> ${c}</span>`).join("");
   } else $("opnow-lines").innerHTML="";
   const ref = exp ? (isLine ? ` · típico a las ${h}h ≈ <b>${fmt1(exp)}</b> buses (laborable)` : ` · en una hora laborable circulan ≈ <b>${fmt1(exp)}</b> buses distintos por la comuna`) : "";
-  $("opnow-narr").innerHTML = `<b>${operando}</b> buses con servicio ahora${ref}. "En calle" = en movimiento; "en terminal" = parados en cabecera (no es falla); "detenidos en ruta" = semáforo o taco. <span style="color:var(--dim)">Inactivos (flota que no salió hoy) requiere acumular el día en el capturador — pendiente.</span>`;
+  $("opnow-narr").innerHTML = `<b>${operando}</b> buses con servicio ahora${ref}. "En calle" = en movimiento; "en terminal" = parados en cabecera (no es falla); "detenidos en ruta" = semáforo o taco.`;
 }
 function loadLive(){
   fetch(LIVE_URL+"?t="+Date.now(),{cache:"no-store"}).then(r=>r.json())
     .then(d=>{ LIVE=d; drawLiveBuses(); renderOpNow();
       // refrescar KPIs extra en cada foto del feed (cobertura instantánea + déficit por línea)
-      if(state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS") renderLiveExtras();
+      if(state.vista==="normal") renderLiveExtras();
     }).catch(()=>{});
 }
 // F3: extender L.Canvas para dibujar buses orientados por rumbo (chevron) en lugar de círculos.
