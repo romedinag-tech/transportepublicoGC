@@ -675,7 +675,7 @@ function renderFreqChart(){
   const home = state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS";
   const lineView = state.vista==="normal" && state.linea!=="TODAS";
   const comView = state.vista==="normal" && state.comuna!=="TODAS" && state.linea==="TODAS";
-  if((!home && !lineView && !comView) || !BASE30 || !DIA || !BASE30[DIA.dia_tipo]){ card.style.display="none"; return; }
+  if(lineView || (!home && !comView) || !BASE30 || !DIA || !BASE30[DIA.dia_tipo]){ card.style.display="none"; return; }
   card.style.display="";
   if(!freqChart) freqChart = echarts.init($("ch-freq"));
   const L = lineView ? state.linea : null;
