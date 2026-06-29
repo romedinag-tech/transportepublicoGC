@@ -12,10 +12,11 @@ let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — 
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stops:[]};
+let VCICLO=null, vcChart=null, vcPer="agregado", vcSm=0;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", cmpA:null, cmpB:null};
 let csChart, freqChart, linFreqChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
-const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
+const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
 const PEAK_H = [7,8,9,17,18,19];
 
 const CS_DIAS = [["L","Laboral"],["S","Sábado"],["D","Domingo"]];
@@ -199,6 +200,7 @@ function render(){
   renderHeat();
   renderRecorridos();
   renderEvolucion();
+  renderVelCiclo();
 }
 
 // estado semántico: "good"|"warning"|"critical"|"neutral" -> clases de valor y de tarjeta
@@ -453,6 +455,7 @@ function loadDia(){
       if(state.vista==="normal" && BASE30){
         renderLiveKPIs(); renderFreqChart(); renderExcesos();
         renderLineFreqChart();
+        if(state.mapMode==="exc") renderMapa();
       }
     }).catch(()=>{});
 }
@@ -766,6 +769,69 @@ function renderExcesos(){
       `<div class="kcr-nm">${nm}<span class="kcr-vp" style="color:${col}">${n}</span></div>`+
       `<div class="kcr-row"><div class="kcr-bar"><div class="kcr-fill" style="width:${w}%;background:${col}"></div></div></div></div>`;
   }).join("");
+}
+
+function _smooth(arr, w){
+  if(!w||w<2) return arr;
+  const out=[];
+  for(let i=0;i<arr.length;i++){
+    let s=0,n=0;
+    for(let j=Math.max(0,i-Math.floor(w/2));j<=Math.min(arr.length-1,i+Math.floor(w/2));j++){
+      if(arr[j]!=null){s+=arr[j];n++;}
+    }
+    out.push(n>0?Math.round(s/n*10)/10:null);
+  }
+  return out;
+}
+function renderVelCiclo(){
+  const card=$("velciclo-card"); if(!card) return;
+  const lineView = state.vista==="normal" && state.linea!=="TODAS";
+  if(!lineView||!VCICLO){card.style.display="none";return;}
+  const ld=VCICLO.lineas[state.linea];
+  if(!ld){card.style.display="none";return;}
+  card.style.display="";
+  if(!vcChart) vcChart=echarts.init($("ch-velciclo"));
+  const ida=ld.ida, reg=ld.regreso;
+  const iKm=ida?ida.km:[], rKm=reg?reg.km:[];
+  const iV=ida?_smooth(ida.vel[vcPer]||[],vcSm):[];
+  const rV=reg?_smooth(reg.vel[vcPer]||[],vcSm):[];
+  const maxKm=Math.max(iKm.length?iKm[iKm.length-1]:0,rKm.length?rKm[rKm.length-1]:0);
+  vcChart.setOption({
+    tooltip:{trigger:"axis",formatter:p=>{
+      let s=`<b>${p[0].axisValueLabel} km</b>`;
+      p.forEach(x=>{if(x.value!=null)s+=`<br>${x.marker}${x.seriesName}: ${x.value} km/h`;});
+      return s;
+    }},
+    legend:{data:["Ida","Regreso"],textStyle:{color:"var(--fg,#cdd6f4)",fontSize:11},top:0,right:10},
+    grid:{left:40,right:16,top:30,bottom:28},
+    xAxis:{type:"category",data:iKm.length>=rKm.length?iKm:rKm,axisLabel:{formatter:v=>v%5===0||v==0?v+"":"",color:"#8899aa",fontSize:10},name:"km del ciclo",nameLocation:"center",nameGap:18,nameTextStyle:{color:"#8899aa",fontSize:10}},
+    yAxis:{type:"value",name:"km/h",nameTextStyle:{color:"#8899aa",fontSize:10},axisLabel:{color:"#8899aa",fontSize:10},splitLine:{lineStyle:{color:"#2a3550"}},min:0},
+    series:[
+      {name:"Ida",type:"line",data:iV,symbol:"none",lineStyle:{width:2,color:"#22d3ee"},itemStyle:{color:"#22d3ee"},connectNulls:true},
+      {name:"Regreso",type:"line",data:rV,symbol:"none",lineStyle:{width:2,color:"#fb923c"},itemStyle:{color:"#fb923c"},connectNulls:true},
+    ],
+  },true);
+  setTimeout(()=>vcChart.resize(),60);
+  $("vc-sub").textContent=`km/h vs km · línea ${state.linea} · ${VCICLO.labels[vcPer]||vcPer}`;
+}
+function drawExcesosMap(){
+  if(!coverLayer||state.mapMode!=="exc") return;
+  coverLayer.clearLayers();
+  const geo=(DIA&&DIA.excesos_geo)?DIA.excesos_geo:[];
+  if(!geo.length){setCoverLegend("exc");return;}
+  const fL=state.linea!=="TODAS"?state.linea:null;
+  const fC=state.comuna!=="TODAS"?state.comuna:null;
+  let filtered=geo;
+  if(fL) filtered=filtered.filter(e=>e[2]===fL);
+  if(fC) filtered=filtered.filter(e=>inComuna(e[0],e[1]));
+  if(!filtered.length){setCoverLegend("exc");return;}
+  for(const e of filtered){
+    const kmh=e[3], col=kmh>=100?"#dc2626":kmh>=90?"#f87171":"#fbbf24";
+    L.circleMarker([e[0],e[1]],{radius:5,color:col,fillColor:col,fillOpacity:0.8,weight:1})
+      .bindTooltip(`<b>⚠ ${kmh} km/h</b><br>Línea ${e[2]}`,{direction:"top"})
+      .addTo(coverLayer);
+  }
+  setCoverLegend("exc");
 }
 
 function ensureMap(){
@@ -1088,6 +1154,7 @@ function drawCoverage(mode){
   if(mode==="conges"){ drawCongestion(); return; }
   if(mode==="bunch"){ drawBunching(); return; }
   if(mode==="det"){ drawDetenciones(); return; }
+  if(mode==="exc"){ drawExcesosMap(); return; }
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!COB) return;
   const lineMode = state.linea!=="TODAS";
@@ -1207,6 +1274,7 @@ function setCoverLegend(mode){
     : mode==="conges" ? [`Velocidad efectiva · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>≤10</i><i>20</i><i>30+</i></span><span class='par'>incluye el tiempo detenido en tránsito</span>"]
     : mode==="bunch" ? [`Apelotonamiento · ${periodoLbl(state.periodo)} (CV de headways)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(120,75%,50%),hsl(60,75%,50%),hsl(0,75%,50%))"></span>`,"<span class='lbls'><i>regular</i><i></i><i>apelotonado</i></span><span class='par'>CV alto = buses pegados unos a otros</span>"]
     : mode==="det" ? ["Congestión: nodos de demora (sin terminales)",`<span class="grad" style="background:linear-gradient(90deg,hsl(45,85%,52%),hsl(0,85%,52%))"></span>`,"<span class='lbls'><i>menor</i><i>mayor</i></span><span class='par'><b style='color:#22d3ee'>▣</b> terminal · flota por línea al pasar</span>"]
+    : mode==="exc" ? ["Excesos de velocidad (> 80 km/h · hoy)",`<span class="grad" style="background:linear-gradient(90deg,#fbbf24,#f87171,#dc2626)"></span>`,"<span class='lbls'><i>80</i><i>90</i><i>100+</i></span><span class='par'>episodios registrados durante la jornada</span>"]
     : ["NSE (avalúo CLP/m²)",`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
   coverLegend = L.control({position:"bottomleft"});
   coverLegend.onAdd = ()=>{ const d=L.DomUtil.create("div","speedleg"); d.innerHTML=`<b>${txt[0]}</b>${txt[1]}${txt[2]}`; return d; };
@@ -1945,6 +2013,9 @@ function renderEvolucion(){
     Promise.all([J("top_recorridos.json").catch(()=>[]),J("lentos_punta.json").catch(()=>[]),J("regularidad.json").catch(()=>[]),J("corredores.json").catch(()=>[])])
       .then(([t,l,r,c])=>{ REC={top:t,lentos:l,reg:r,corr:c}; renderRecorridos(); });
     J("evolucion_comuna.json").then(d=>{ EVOL=d; renderEvolucion(); }).catch(()=>{});
+    J("vel_ciclo.json").then(d=>{ VCICLO=d; renderVelCiclo(); }).catch(()=>{});
+    document.querySelectorAll(".vc-per").forEach(el=>el.onclick=()=>{ vcPer=el.dataset.p; document.querySelectorAll(".vc-per").forEach(b=>b.classList.toggle("active",b===el)); renderVelCiclo(); });
+    document.querySelectorAll(".vc-sm").forEach(el=>el.onclick=()=>{ vcSm=+el.dataset.s; document.querySelectorAll(".vc-sm").forEach(b=>b.classList.toggle("active",b===el)); renderVelCiclo(); });
     Promise.all([J("variantes_freq.json").catch(()=>null), J("freq_trend.json").catch(()=>null)])
       .then(([vf,vt])=>{ VFREQ=vf; VTREND=vt; renderVarFreq(); });
     J("terminales_linea.json").then(d=>{ TLIN=d; if(state.linea!=="TODAS") renderMapa(); }).catch(()=>{});
@@ -1965,6 +2036,6 @@ function renderEvolucion(){
     J("baseline_30min.json").then(d=>{ BASE30=d; loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
     J("cobertura_din_lineas.json").then(d=>{ DINL=d; renderCobDinLinea(); if(state.mapMode==="cover" && state.coverSub==="din") render(); }).catch(()=>{});
     setInterval(loadDia, 60000);                 // dia.json (vivo vs normal), refresco 60 s
-    addEventListener("resize", ()=>{ [csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
+    addEventListener("resize", ()=>{ [csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart,freqChart,linFreqChart,vcChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();
