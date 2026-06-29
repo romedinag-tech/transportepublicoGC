@@ -46,7 +46,7 @@ function speedColor(v){
 
 /* tema (claro/oscuro): lee variables CSS para que los charts ECharts sigan el tema */
 const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const TH = () => ({tx:cssv("--tx"), mut:cssv("--muted"), axis:cssv("--ch-axis"), grid:cssv("--ch-grid"), tip:cssv("--ch-tip"), tipB:cssv("--line2")});
+const TH = () => ({tx:cssv("--tx"), mut:cssv("--muted"), axis:cssv("--ch-axis"), grid:cssv("--ch-grid"), tip:cssv("--ch-tip"), tipB:cssv("--line2"), font:cssv("--font-ui")||"IBM Plex Sans,system-ui,sans-serif"});
 function applyTheme(t){
   document.documentElement.dataset.theme = t;
   try{ localStorage.setItem("gccp-theme", t); }catch(e){}
@@ -276,7 +276,7 @@ let LIVE_KPIS = [
 ];
 function gaugeColor(pct,dir){
   if(pct==null) return "#64748b";
-  if(dir===0) return "#38bdf8";
+  if(dir===0) return cssv("--ref")||"#6C8FF5";
   const g = dir>0 ? pct : 200-pct;                       // "bondad": alta = mejor
   return g>=95 ? "#34d399" : g>=75 ? "#fbbf24" : "#f87171";
 }
@@ -720,7 +720,7 @@ function renderFreqChart(){
   const ovals=x.map((_,j)=>{const i=i0+j; return i<=DIA.bin ? (serie[i]||0) : null;});
   const th=TH();
   freqChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
     legend:{show:false},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
@@ -758,13 +758,13 @@ function renderLineFreqChart(){
   const legendData=["Laborable","Sábado","Domingo"];
   if(hasLive) legendData.push("Hoy");
   const series=[
-    {name:"Laborable",type:"line",data:vL,smooth:true,symbol:"none",lineStyle:{width:2,color:"#22d3ee"},itemStyle:{color:"#22d3ee"},areaStyle:{color:"#22d3ee12"}},
+    {name:"Laborable",type:"line",data:vL,smooth:true,symbol:"none",lineStyle:{width:2,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"12"}},
     {name:"Sábado",type:"line",data:vS,smooth:true,symbol:"none",lineStyle:{width:2,color:"#a78bfa"},itemStyle:{color:"#a78bfa"}},
     {name:"Domingo",type:"line",data:vD,smooth:true,symbol:"none",lineStyle:{width:2,color:"#fb923c"},itemStyle:{color:"#fb923c"}},
   ];
   if(hasLive) series.push({name:"Hoy",type:"line",data:vHoy,smooth:false,symbol:"circle",symbolSize:5,showSymbol:true,connectNulls:false,lineStyle:{width:2.5,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991a"}});
   linFreqChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
     legend:{data:legendData,textStyle:{color:th.mut},top:0},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
@@ -842,13 +842,13 @@ function renderVelCiclo(){
       p.forEach(x=>{if(x.value!=null)s+=`<br>${x.marker}${x.seriesName}: ${x.value} km/h`;});
       return s;
     }},
-    legend:{data:["Ida","Regreso"],textStyle:{color:"var(--fg,#cdd6f4)",fontSize:11},top:0,right:10},
+    legend:{data:["Ida","Regreso"],textStyle:{color:TH().mut,fontSize:11},top:0,right:10},
     grid:{left:40,right:16,top:30,bottom:28},
-    xAxis:{type:"category",data:iKm.length>=rKm.length?iKm:rKm,axisLabel:{formatter:v=>v%5===0||v==0?v+"":"",color:"#8899aa",fontSize:10},name:"km del ciclo",nameLocation:"center",nameGap:18,nameTextStyle:{color:"#8899aa",fontSize:10}},
-    yAxis:{type:"value",name:"km/h",nameTextStyle:{color:"#8899aa",fontSize:10},axisLabel:{color:"#8899aa",fontSize:10},splitLine:{lineStyle:{color:"#2a3550"}},min:0},
+    xAxis:{type:"category",data:iKm.length>=rKm.length?iKm:rKm,axisLabel:{formatter:v=>v%5===0||v==0?v+"":"",color:TH().mut,fontSize:10},name:"km del ciclo",nameLocation:"center",nameGap:18,nameTextStyle:{color:TH().mut,fontSize:10}},
+    yAxis:{type:"value",name:"km/h",nameTextStyle:{color:TH().mut,fontSize:10},axisLabel:{color:TH().mut,fontSize:10},splitLine:{lineStyle:{color:TH().grid}},min:0},
     series:[
-      {name:"Ida",type:"line",data:iV,symbol:"none",lineStyle:{width:2,color:"#22d3ee"},itemStyle:{color:"#22d3ee"},connectNulls:true},
-      {name:"Regreso",type:"line",data:rV,symbol:"none",lineStyle:{width:2,color:"#fb923c"},itemStyle:{color:"#fb923c"},connectNulls:true},
+      {name:"Ida",type:"line",data:iV,symbol:"none",lineStyle:{width:2,color:cssv("--live")},itemStyle:{color:cssv("--live")},connectNulls:true},
+      {name:"Regreso",type:"line",data:rV,symbol:"none",lineStyle:{width:2,color:cssv("--warn")},itemStyle:{color:cssv("--warn")},connectNulls:true},
     ],
   },true);
   vcChart.off("updateaxispointer"); vcChart.off("globalout");
@@ -954,17 +954,17 @@ function renderOpNow(){
   const ratio = exp ? operando/exp : null;
   $("opnow-title").textContent = isLine ? `Operación en tiempo real · Línea ${state.linea}` : `Operación en tiempo real · ${state.comuna}`;
   const rect=(l,v,s,col)=>`<div class="kpi"><div class="lab">${l}</div><div class="val"${col?` style="color:${col}"`:""}>${v}</div><div class="sub">${s}</div></div>`;
-  let rects = rect("En calle (operando)", calle, "buses en movimiento", "#22d3ee")
+  let rects = rect("En calle (operando)", calle, "buses en movimiento", cssv("--live"))
     + rect("En terminal", term, "parados en cabecera", "#a78bfa")
     + rect("Detenidos en ruta", ruta, "semáforo / taco");
-  if(isCom) rects = rect("Líneas operando", Object.keys(byLine).length, `de ${(CLIN[state.comuna]||[]).length} que operan aquí`, "#38bdf8") + rects;
+  if(isCom) rects = rect("Líneas operando", Object.keys(byLine).length, `de ${(CLIN[state.comuna]||[]).length} que operan aquí`, cssv("--ref")) + rects;
   $("opnow-rects").innerHTML = rects;
   // semáforo SOLO en vista de línea (su flota está toda afuera => instante ≈ hora). En comuna el
   // histórico cuenta los buses distintos de TODA la hora (de paso) y el ratio instantáneo sesga bajo.
   const sem=$("opnow-semaforo");
   if(isLine && ratio!=null){ const c=semColor(ratio); sem.style.cssText=`margin-left:auto;background:${c}22;color:${c}`;
     sem.textContent = ratio>=0.7?`● normal (${Math.round(ratio*100)}%)`:ratio>=0.4?`▲ bajo (${Math.round(ratio*100)}%)`:`▲ muy bajo (${Math.round(ratio*100)}%)`; }
-  else if(isCom){ sem.style.cssText="margin-left:auto;background:#38bdf822;color:#38bdf8"; sem.textContent=`${Object.keys(byLine).length} líneas activas`; }
+  else if(isCom){ const _ref=cssv("--ref"); sem.style.cssText=`margin-left:auto;background:${_ref}22;color:${_ref}`; sem.textContent=`${Object.keys(byLine).length} líneas activas`; }
   else { sem.style.cssText="margin-left:auto;background:#94a1ba22;color:#94a1ba"; sem.textContent="sin referencia"; }
   // desglose por línea (vista comuna)
   if(isCom){ const rows=Object.entries(byLine).sort((a,b)=>b[1]-a[1]);
@@ -1389,7 +1389,7 @@ function renderMapa(){
     if(comActiva && !sel){
       L.geoJSON(f,{style:{color:"rgba(148,161,186,.14)",weight:0.6,fill:false}}).addTo(comunaLayer);   // vecina atenuada
     } else {
-      L.geoJSON(f,{style:{color:sel?"#38bdf8":"rgba(148,161,186,.4)",weight:sel?2.6:1,fill:sel,fillColor:"#38bdf8",fillOpacity:sel?0.05:0}}).addTo(comunaLayer);
+      L.geoJSON(f,{style:{color:sel?cssv("--ref"):"rgba(148,161,186,.4)",weight:sel?2.6:1,fill:sel,fillColor:cssv("--ref"),fillOpacity:sel?0.05:0}}).addTo(comunaLayer);
     }
   });
   let bounds=[];
@@ -1406,14 +1406,14 @@ function renderMapa(){
           L.polyline([p[i],p[i+1]],{color:speedColor(sv),weight:4,opacity:0.92}).addTo(routeLayer);
         }
       } else {
-        L.polyline(p,{color:"#38bdf8",weight:2.5,opacity:0.65}).addTo(routeLayer);
+        L.polyline(p,{color:cssv("--ref"),weight:2.5,opacity:0.65}).addTo(routeLayer);
       }
       bounds.push(...p);
     });
     const ps = PAR[state.linea]||[];
     ps.forEach(s=>{
       L.circleMarker([s[0],s[1]],{radius:_isLive?3.2:2.5,color:"#0b1220",weight:_isLive?1:0.8,
-        fillColor:_isLive?"#e2e8f0":"#38bdf8",fillOpacity:_isLive?0.95:0.8})
+        fillColor:_isLive?"#e2e8f0":cssv("--ref"),fillOpacity:_isLive?0.95:0.8})
         .bindTooltip(s[2],{direction:"top"}).addTo(stopLayer);
     });
     if(_isLive){
@@ -1426,7 +1426,7 @@ function renderMapa(){
               `<b>Terminal · Línea ${state.linea}</b><br>${NF.format(t.det)} pulsos detenidos · ${t.buses} buses<br>intensidad ${t.intens} (reposo por bus/día)<br><span style="color:#fbbf24">se excluye del análisis en ruta</span>`,
               {sticky:true,direction:"top"}).addTo(routeLayer);
           } else {
-            L.circleMarker([t.lat,t.lon],{radius:6,weight:2,color:"#38bdf8",fillColor:"#0b1220",fillOpacity:.5})
+            L.circleMarker([t.lat,t.lon],{radius:6,weight:2,color:cssv("--ref"),fillColor:"#0b1220",fillOpacity:.5})
               .bindTooltip(`Cabecera de ruta · Línea ${state.linea}`,{direction:"top"}).addTo(routeLayer);
           }
         });
@@ -1453,7 +1453,7 @@ function renderMapa(){
     drawCoverage(state.mapMode);
     // en modos de red, redibujar recorrido sobre la capa territorial para que se vea encima
     if(state.linea!=="TODAS" && GEOM[state.linea]){
-      GEOM[state.linea].forEach(s=>{ L.polyline(s.p,{color:"#38bdf8",weight:3,opacity:0.85}).addTo(liveLayer); });
+      GEOM[state.linea].forEach(s=>{ L.polyline(s.p,{color:cssv("--ref"),weight:3,opacity:0.85}).addTo(liveLayer); });
     }
     const b=$("live-count"), R=(COB&&COB.resumen)||{};
     const M=state.mapMode;
@@ -1847,7 +1847,7 @@ function renderCumpSem(){
   const ys = serie.map(p=>p[state.csVar]);
   const pr = (L.prog||{})[state.csDia]||{};
   // color por cumplimiento si es %
-  const colorOf = y => !vc.pct||y==null ? "#38bdf8" : y>=120?"#22d3ee":y>=95?"#34d399":y>=80?"#fbbf24":"#fb7185";
+  const colorOf = y => !vc.pct||y==null ? cssv("--ref") : y>=120?cssv("--live"):y>=95?"#34d399":y>=80?cssv("--warn"):"#fb7185";
   const pts = ys.map((y,i)=>({value:y, itemStyle:{color:colorOf(y)}}));
   if(!csChart) csChart = echarts.init($("cs-chart"));
   const th = TH();
@@ -1856,7 +1856,7 @@ function renderCumpSem(){
       {yAxis:100,lineStyle:{color:"rgba(52,211,153,.5)"},label:{formatter:"100%",color:"#34d399",position:"insideEndTop",fontSize:10}}
     ]} : undefined;
   csChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:46,right:20,top:18,bottom:54,containLabel:true},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>{const i=p[0].dataIndex,d=serie[i];return `Semana ${d.wk}<br>${vc.lbl}: <b>${d[state.csVar]??"—"}${vc.suf}</b><br>`+
@@ -1865,8 +1865,8 @@ function renderCumpSem(){
     yAxis:{type:"value",name:vc.pct?"%":vc.lbl,min:0,max:vc.pct?(Math.max(120,Math.ceil((Math.max(...ys.filter(v=>v!=null))||100)/20)*20)):null,
       axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
     series:[{type:"line",data:pts,smooth:false,symbol:"circle",symbolSize:5,
-      lineStyle:{width:2,color:"rgba(56,189,248,.5)"},
-      areaStyle:vc.pct?{color:"rgba(56,189,248,.06)"}:undefined,
+      lineStyle:{width:2,color:cssv("--ref")+"80"},
+      areaStyle:vc.pct?{color:cssv("--ref")+"10"}:undefined,
       markLine:markLines}]
   }, true);
   setTimeout(()=>csChart.resize(),60);
@@ -1886,7 +1886,7 @@ function renderEquidad(){
   const th=TH();
   if(!eqChart) eqChart=echarts.init($("eq-chart"));
   eqChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:44,right:16,top:18,bottom:34,containLabel:true},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>`${Math.round(p[0].value[0]*100)}% de los buses<br>concentra el <b>${Math.round((p[0].value[1])*100)}%</b> del trabajo`},
@@ -1936,7 +1936,7 @@ function renderNseGap(){
   const th=TH();
   if(!nseChart) nseChart=echarts.init($("nse-chart"));
   nseChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:42,right:46,top:30,bottom:24,containLabel:true},
     legend:{data:["% en desierto","Acceso medio"],textStyle:{color:th.mut},top:0,right:0},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx}},
@@ -1946,7 +1946,7 @@ function renderNseGap(){
            {type:"value",name:"min",position:"right",axisLabel:{color:th.mut},splitLine:{show:false}}],
     series:[
       {name:"% en desierto",type:"bar",data:desierto,barWidth:"46%",itemStyle:{color:"#fb7185",borderRadius:[4,4,0,0]}},
-      {name:"Acceso medio",type:"line",yAxisIndex:1,data:acceso,smooth:true,symbol:"circle",symbolSize:7,lineStyle:{width:2.5,color:"#38bdf8"},itemStyle:{color:"#38bdf8"}}
+      {name:"Acceso medio",type:"line",yAxisIndex:1,data:acceso,smooth:true,symbol:"circle",symbolSize:7,lineStyle:{width:2.5,color:cssv("--ref")},itemStyle:{color:cssv("--ref")}}
     ]
   }, true);
   setTimeout(()=>nseChart.resize(),60);
@@ -1987,10 +1987,10 @@ function renderVarFreq(){
 }
 function drawVarCharts(){
   const th=TH(), v=VFREQ.variantes[curVar]; if(!v) return;
-  const xs=VFREQ.horas.map(h=>h+"h"), COLP=["#22d3ee","#38bdf8","#fbbf24","#a78bfa","#fb7185"];
+  const xs=VFREQ.horas.map(h=>h+"h"), COLP=[cssv("--live"),cssv("--ref"),cssv("--warn"),"#a78bfa","#fb7185"];
   if(varProfChart) varProfChart.dispose(); varProfChart=echarts.init($("var-prof-chart"));
   varProfChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:36,right:12,top:34,bottom:22,containLabel:true},
     legend:{type:"scroll",top:0,textStyle:{color:th.mut,fontSize:10},itemWidth:12,itemHeight:8},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx}},
@@ -2005,13 +2005,13 @@ function drawVarCharts(){
     const xs2=VTREND.meses.map(mesLbl3);
     if(varTrendChart) varTrendChart.dispose(); varTrendChart=echarts.init($("var-trend-chart"));
     varTrendChart.setOption({
-      textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+      textStyle:{fontFamily:th.font,color:th.tx},
       grid:{left:36,right:12,top:34,bottom:22,containLabel:true},
       legend:{top:0,textStyle:{color:th.mut,fontSize:10},itemWidth:12,itemHeight:8},
       tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx}},
       xAxis:{type:"category",data:xs2,axisLabel:{color:th.mut,fontSize:9},axisLine:{lineStyle:{color:th.axis}}},
       yAxis:{type:"value",name:"desp/día",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
-      series:[ vt?{name:"Variante "+curVar,type:"line",data:vt.dd,smooth:true,symbol:"circle",symbolSize:5,connectNulls:true,lineStyle:{width:2.6,color:"#22d3ee"},itemStyle:{color:"#22d3ee"}}:null,
+      series:[ vt?{name:"Variante "+curVar,type:"line",data:vt.dd,smooth:true,symbol:"circle",symbolSize:5,connectNulls:true,lineStyle:{width:2.6,color:cssv("--live")},itemStyle:{color:cssv("--live")}}:null,
                lt?{name:"Línea "+state.linea,type:"line",data:lt.dd,smooth:true,symbol:"none",connectNulls:true,lineStyle:{width:2,color:"#94a1ba",type:"dashed"},itemStyle:{color:"#94a1ba"}}:null ].filter(Boolean)
     },true);
     setTimeout(()=>varTrendChart.resize(),60);
@@ -2081,7 +2081,7 @@ function renderRankingView(){
   const best = vk==="pct_det" ? rows[0] : rows[rows.length-1];
   const mx=Math.max(...rows.map(r=>r.v));
   rankChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:8,right:60,top:10,bottom:18,containLabel:true},
     tooltip:{trigger:"axis",axisPointer:{type:"shadow"},backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>`${p[0].name}<br><b>${fmt1(p[0].value)}</b> ${vdef[2]}`},
@@ -2109,7 +2109,7 @@ function renderComparador(){
      <div class="widget-b"><div id="cmp-grid" class="grid2" style="margin-bottom:14px"></div><div id="cmp-chart" style="height:280px"></div></div></section>`;
   $("cmpA").onchange=e=>{state.cmpA=e.target.value;render();};
   $("cmpB").onchange=e=>{state.cmpB=e.target.value;render();};
-  const col=["#38bdf8","#fb923c"];
+  const col=[cssv("--ref"),cssv("--warn")];
   const card=(comuna,ci)=>{
     const k=(T.cells||{})[`${comuna}|TODAS`]; const kpi=k&&k.kpi||{};
     return `<div style="border:1px solid var(--line);border-radius:12px;padding:14px">
@@ -2122,7 +2122,7 @@ function renderComparador(){
   const th=TH(); if(cmpChart) cmpChart.dispose(); cmpChart=echarts.init($("cmp-chart"));
   const prof=comuna=>{const k=(T.cells||{})[`${comuna}|TODAS`];return k&&k.horas?k.horas.map(h=>h?h.v:null):[];};
   cmpChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:38,right:16,top:30,bottom:24,containLabel:true},
     legend:{data:[state.cmpA,state.cmpB],textStyle:{color:th.mut},top:0},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx}},
@@ -2148,7 +2148,7 @@ function renderEmpresas(){
   d=d.sort((a,b)=>b.buses-a.buses).slice(0,18); const th=TH();
   if(empresasChart) empresasChart.dispose(); empresasChart=echarts.init($("empresas-chart"));
   empresasChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:8,right:52,top:8,bottom:16,containLabel:true},
     tooltip:{trigger:"axis",axisPointer:{type:"shadow"},backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>{const x=d[p[0].dataIndex];return `<b>${x.fantasia}</b> (L${x.linea})<br>${x.razon_social}<br>Buses: <b>${x.buses}</b> · ${(x.pulsos/1e6).toFixed(1)} M pulsos<br>Vel ${x.vel} km/h · ${x.comunas}`;}},
@@ -2181,7 +2181,7 @@ function renderHeat(){
     maxv=Math.max(...DOWH.map(x=>x.prom));
   }
   heatChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:54,right:20,top:12,bottom:44,containLabel:true},
     tooltip:{position:"top",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>`${yCats[p.data[1]]} · ${HORAS[p.data[0]]}<br>Flota: <b>${fmt1(p.data[2])}</b> buses`},
@@ -2211,10 +2211,10 @@ function renderRecorridos(){
   else if(rv==="reg"){ rows=REC.reg.slice().sort((a,b)=>b.cv-a.cv).slice(0,15).map(x=>({n:x.recorrido,v:Math.round(x.cv*1000)/10})); unit="% CV"; slow=true; foot="Mayor variabilidad de la oferta entre días (CV) = servicio menos regular."; }
   else { rows=REC.corr.slice().sort((a,b)=>a.vel_kmh-b.vel_kmh).slice(0,15).map(x=>({n:x.corredor,v:x.vel_kmh})); unit="km/h"; slow=true; foot="Ejes viales con menor velocidad de circulación de buses."; }
   const isCV = unit==="% CV";
-  const colorOf = v => !slow ? "#38bdf8" : isCV ? `hsl(${(1-Math.min(v/40,1))*120},70%,50%)` : `hsl(${Math.min(v/35,1)*120},70%,50%)`;
+  const colorOf = v => !slow ? cssv("--ref") : isCV ? `hsl(${(1-Math.min(v/40,1))*120},70%,50%)` : `hsl(${Math.min(v/35,1)*120},70%,50%)`;
   const th=TH(); if(recChart) recChart.dispose(); recChart=echarts.init($("rec-chart"));
   recChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:8,right:58,top:8,bottom:16,containLabel:true},
     tooltip:{trigger:"axis",axisPointer:{type:"shadow"},backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>`${p[0].name}<br><b>${fmt1(p[0].value)}</b> ${unit}`},
@@ -2248,7 +2248,7 @@ function renderEvolucion(){
   const col = delta==null||Math.abs(delta)<0.2 ? "#94a1ba" : mejor ? "#34d399" : "#fb7185";
   const th=TH(); if(evolChart) evolChart.dispose(); evolChart=echarts.init($("evol-chart"));
   evolChart.setOption({
-    textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
+    textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:40,right:18,top:16,bottom:24,containLabel:true},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>`${p[0].name}<br>${vdef[1]}: <b>${p[0].value==null?"—":fmt1(p[0].value)} ${vdef[2]}</b>`},

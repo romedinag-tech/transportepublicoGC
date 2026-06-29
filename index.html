@@ -21,243 +21,244 @@
 <meta name="twitter:title" content="Centro de Mando · Transporte Gran Concepción">
 <meta name="twitter:description" content="Analítica en vivo del transporte público del Gran Concepción.">
 <meta name="twitter:image" content="https://romedinag-tech.github.io/transportepublicoGC/assets/og.png">
-<meta name="theme-color" content="#0a0e1a">
+<meta name="theme-color" content="#060912">
+<!-- Fonts: Space Grotesk (display), IBM Plex Sans (UI), IBM Plex Mono (data) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<!-- F4: Leaflet self-hosted (antes desde unpkg.com en <head> sin defer → bloqueaba render) -->
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Design tokens: single source of truth for color/type/space (loaded FIRST) -->
+<link rel="stylesheet" href="assets/css/tokens.css?v=89">
+<!-- Leaflet self-hosted -->
 <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=75"/>
 <script defer src="assets/vendor/leaflet/leaflet.js?v=75"></script>
-<!-- Componentes y variables de tema existentes (kpi, ctab, litem, rank-row, cump-row, seg…) -->
-<link rel="stylesheet" href="assets/styles.css?v=75">
-<link rel="stylesheet" href="assets/shell.css?v=75">
-<!-- F4: Tailwind purgado (~12 KB) antes era 280 KB de JS engine vía cdn.tailwindcss.com -->
-<link rel="stylesheet" href="assets/tw.css?v=75">
+<!-- Component styles (consume tokens via legacy bridge vars) -->
+<link rel="stylesheet" href="assets/styles.css?v=89">
+<link rel="stylesheet" href="assets/shell.css?v=89">
+<!-- Tailwind purged utilities (~12 KB static, no runtime recompilation) -->
+<link rel="stylesheet" href="assets/tw.css?v=89">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
-  /* ===== Chrome del centro de mando (usa las variables de tema -> respeta claro/oscuro) ===== */
+  /* ===== Chrome del centro de mando ===== */
   html,body{height:100%}
-  .thin-scroll::-webkit-scrollbar{width:9px;height:9px}
-  .thin-scroll::-webkit-scrollbar-thumb{background:var(--line2);border-radius:5px}
-  .thin-scroll::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+  .thin-scroll::-webkit-scrollbar{width:7px;height:7px}
+  .thin-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+  .thin-scroll::-webkit-scrollbar-thumb:hover{background:var(--text-lo)}
   .thin-scroll::-webkit-scrollbar-track{background:transparent}
 
-  /* Widget modular: panel con borde sutil de 1px y profundidad por sombra difuminada */
-  .widget{position:relative;border:1px solid var(--line);border-radius:18px;
-    background:linear-gradient(180deg,var(--panel),var(--panel2));
-    box-shadow:0 18px 40px -24px rgba(0,0,0,.55);overflow:hidden}
+  /* ── Widget — glass panel with edge highlight ── */
+  .widget{position:relative;border:1px solid var(--line);border-radius:var(--r-widget);
+    background:var(--grad-panel);box-shadow:var(--shadow-widget);overflow:hidden;
+    contain:layout style;transition:box-shadow var(--dur-base) var(--ease)}
   .widget::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;
-    background:linear-gradient(90deg,transparent,rgba(56,189,248,.5),transparent);opacity:.5}
-  .widget-h{display:flex;align-items:center;gap:9px;padding:12px 15px;border-bottom:1px solid var(--line)}
+    background:linear-gradient(90deg,transparent 10%,rgba(52,225,196,.4) 50%,transparent 90%);opacity:.5}
+  .widget::after{content:"";position:absolute;inset:0;background:var(--grad-shine);pointer-events:none;border-radius:inherit}
+  .widget:hover{box-shadow:var(--shadow-hover)}
+  .widget-h{display:flex;align-items:center;gap:var(--s2);padding:var(--s3) var(--s4);border-bottom:1px solid var(--line)}
   .widget-h .ico{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;
-    background:rgba(56,189,248,.12);color:var(--acc);flex:none}
+    background:rgba(52,225,196,.10);color:var(--live);flex:none;font-size:15px}
   .widget-h .ico.ico-png{background:transparent;width:26px;height:26px}
-  .widget-h .ico-png img{display:block;width:22px;height:22px;filter:drop-shadow(0 0 5px rgba(34,211,238,.45))}
-  .widget-h h3{font-size:12.5px;font-weight:600;letter-spacing:.01em}
-  .widget-h .sub{font-size:11px;color:var(--dim)}
-  .widget-b{padding:13px 15px}
+  .widget-h .ico-png img{display:block;width:22px;height:22px;filter:drop-shadow(0 0 5px rgba(52,225,196,.4))}
+  .widget-h h3{font-family:var(--font-display);font-size:var(--fs-widget-title);font-weight:600;letter-spacing:-.01em}
+  .widget-h .sub{font-size:var(--fs-widget-sub);color:var(--dim)}
+  .widget-b{padding:var(--s3) var(--s4)}
 
-  /* Indicador "en vivo": punto verde parpadeante */
-  .dot-live{width:8px;height:8px;border-radius:50%;background:var(--acc2);animation:pulsering 2s infinite}
+  /* ── Live indicator ── */
+  .dot-live{width:8px;height:8px;border-radius:50%;background:var(--live);animation:pulsering 2s infinite}
   .status{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
-  /* F5+: mini panel router con 3 LEDs asincrónicos — sensación de conexión activa */
+  /* Router LEDs */
   .tb-router{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;
     border:1px solid var(--line);background:rgba(0,0,0,.25);flex:none}
   .tb-led{display:block;width:6px;height:6px;border-radius:50%;background:#1f2937}
-  .tb-led--link{background:#34d399;box-shadow:0 0 5px rgba(52,211,153,.7);animation:ledLink 2.4s ease-in-out infinite}
-  .tb-led--rx  {background:#22d3ee;box-shadow:0 0 5px rgba(34,211,238,.65);animation:ledRx 0.9s steps(1,end) infinite;animation-delay:.18s}
-  .tb-led--tx  {background:#fbbf24;box-shadow:0 0 5px rgba(251,191,36,.6);animation:ledTx 1.7s steps(1,end) infinite;animation-delay:.55s}
-  /* link: latido suave, casi siempre encendido (power) */
+  .tb-led--link{background:var(--live);box-shadow:0 0 5px rgba(52,225,196,.7);animation:ledLink 2.4s ease-in-out infinite}
+  .tb-led--rx  {background:var(--ref);box-shadow:0 0 5px rgba(108,143,245,.65);animation:ledRx 0.9s steps(1,end) infinite;animation-delay:.18s}
+  .tb-led--tx  {background:var(--warn);box-shadow:0 0 5px rgba(244,183,64,.6);animation:ledTx 1.7s steps(1,end) infinite;animation-delay:.55s}
   @keyframes ledLink { 0%,100% {opacity:1} 50% {opacity:.45} }
-  /* rx: parpadeo rápido irregular (descarga de datos) */
   @keyframes ledRx { 0%,30%,60% {opacity:1} 31%,59%,100% {opacity:.15} }
-  /* tx: parpadeo más espaciado (envío) */
   @keyframes ledTx { 0%,12% {opacity:1} 13%,49% {opacity:.18} 50%,55% {opacity:1} 56%,100% {opacity:.18} }
   @media (prefers-reduced-motion: reduce){
     .tb-led--link,.tb-led--rx,.tb-led--tx{animation:none;opacity:.85}
   }
-  /* F2: identidad del logo y pill grande en topbar */
-  .tb-logo{filter:drop-shadow(0 2px 10px rgba(34,211,238,.35)) drop-shadow(0 0 2px rgba(52,211,153,.18));flex:none}
-  .tb-pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;
-    border:1px solid rgba(56,189,248,.32);background:linear-gradient(90deg,rgba(34,211,238,.10),rgba(52,211,153,.10));
-    box-shadow:0 0 0 1px rgba(34,211,238,.10) inset,0 4px 14px -8px rgba(34,211,238,.45)}
-  .tb-pill-val{font:700 17px/1 var(--mono);color:var(--tx);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  /* Logo + pill */
+  .tb-logo{filter:drop-shadow(0 2px 10px rgba(52,225,196,.3)) drop-shadow(0 0 2px rgba(108,143,245,.15));flex:none}
+  .tb-pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:var(--r-pill);
+    border:1px solid rgba(52,225,196,.25);background:linear-gradient(90deg,rgba(52,225,196,.08),rgba(108,143,245,.06));
+    box-shadow:0 0 0 1px rgba(52,225,196,.08) inset,0 4px 14px -8px rgba(52,225,196,.35)}
+  .tb-pill-val{font:700 17px/1 var(--font-data);color:var(--tx);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
   .tb-pill-lbl{font-size:11px;color:var(--muted);letter-spacing:.04em}
-  /* F2: latido/data-flow sutil en topbar (línea inferior animada) */
+  /* Dataflow line */
   @keyframes tbDataflow {
-    0%   { background-position:-100% 0; opacity:.0 }
-    18%  { opacity:.55 }
-    100% { background-position:200% 0; opacity:.0 }
+    0%   { background-position:-100% 0; opacity:0 }
+    18%  { opacity:.5 }
+    100% { background-position:200% 0; opacity:0 }
   }
   header.relative-flow::after{
     content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;pointer-events:none;
-    background:linear-gradient(90deg,transparent 0%,transparent 30%,#22d3ee 50%,transparent 70%,transparent 100%);
+    background:linear-gradient(90deg,transparent 0%,transparent 30%,var(--live) 50%,transparent 70%,transparent 100%);
     background-size:50% 100%;animation:tbDataflow 6s linear infinite
   }
   @media (prefers-reduced-motion: reduce) {
     header.relative-flow::after{display:none}
-    .dot-live{animation:none;background:var(--acc2)}
+    .dot-live{animation:none;background:var(--live)}
   }
 
-  /* Badge de tendencia (▲/▼) */
-  .trend{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;font-family:var(--mono);
-    padding:2px 7px;border-radius:999px}
-  .trend.up{color:var(--acc2);background:rgba(52,211,153,.12)}
-  .trend.down{color:var(--danger);background:rgba(251,113,133,.12)}
+  /* ── Trend badge ── */
+  .trend{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;font-family:var(--font-data);
+    padding:2px 7px;border-radius:var(--r-pill)}
+  .trend.up{color:var(--live);background:rgba(52,225,196,.12)}
+  .trend.down{color:var(--alert);background:rgba(255,93,115,.12)}
 
-  /* El MAPA como héroe: marco con esquinas tipo HUD y glow interior */
+  /* ── Map hero ── */
   .map-hero{position:relative;border-radius:14px;overflow:hidden;
-    box-shadow:inset 0 0 0 1px var(--line),inset 0 0 70px -30px rgba(34,211,238,.35)}
-  .map-hero .corner{position:absolute;width:18px;height:18px;border-color:rgba(34,211,238,.7);z-index:500;pointer-events:none}
+    box-shadow:inset 0 0 0 1px var(--line),inset 0 0 60px -25px rgba(52,225,196,.2)}
+  .map-hero .corner{position:absolute;width:18px;height:18px;border-color:rgba(52,225,196,.6);z-index:500;pointer-events:none}
   .map-hero .c-tl{top:9px;left:9px;border-top:2px solid;border-left:2px solid;border-top-left-radius:5px}
   .map-hero .c-tr{top:9px;right:9px;border-top:2px solid;border-right:2px solid;border-top-right-radius:5px}
   .map-hero .c-bl{bottom:9px;left:9px;border-bottom:2px solid;border-left:2px solid;border-bottom-left-radius:5px}
   .map-hero .c-br{bottom:9px;right:9px;border-bottom:2px solid;border-right:2px solid;border-bottom-right-radius:5px}
-  /* Controles + relato debajo del mapa */
-  .undermap{margin-top:10px}
+  .undermap{margin-top:var(--s3)}
   .undermap-ctrls{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
   .undermap-ctrls:empty{display:none}
-  .map-narr{margin-top:9px;font-size:12px;line-height:1.55;color:var(--muted);
-    border-left:2px solid var(--acc);padding:2px 0 2px 11px}
+  .map-narr{margin-top:var(--s2);font-size:var(--fs-caption);line-height:1.55;color:var(--muted);
+    border-left:2px solid var(--live);padding:2px 0 2px 11px}
   .map-narr:empty{display:none}
   .map-narr b{color:var(--tx);font-weight:600}
-  /* Relato breve bajo cada widget/gráfico */
-  .wnarr{font-size:11px;line-height:1.5;color:var(--muted);border-left:2px solid var(--line2);
-    padding:1px 0 1px 9px;margin-top:9px}
+  .wnarr{font-size:11px;line-height:1.5;color:var(--muted);border-left:2px solid var(--line);
+    padding:1px 0 1px 9px;margin-top:var(--s2)}
   .wnarr:empty{display:none}
   .wnarr b{color:var(--tx);font-weight:600}
 
-  /* ===== Mapa base oscuro + datos neón =====
-     app_shell.js arranca con CARTO Dark Matter (tiles oscuras). Sobre ese lienzo:
-       · recorrido coloreado por velocidad (rojo→amarillo→verde, ya implementado)
-       · paraderos en blanco, comuna activa en cyan (#38bdf8)
-     Para que los buses/rutas "neón" resalten más, los puntos GPS van en cyan/naranja.
-     Aquí estilizamos los controles y tooltips de Leaflet a modo HUD oscuro: */
-  .leaflet-container{background:#0a0f1c}
+  /* ── Leaflet HUD ── */
+  .leaflet-container{background:var(--bg-void)}
   .leaflet-tooltip,.leaflet-popup-content-wrapper{background:var(--topbar)!important;color:var(--tx)!important;
-    border:1px solid var(--line2)!important;border-radius:9px!important;backdrop-filter:blur(10px);
-    box-shadow:0 10px 30px -8px rgba(0,0,0,.6)!important;font-family:var(--sans);font-size:11.5px;font-weight:500}
-  .leaflet-tooltip-top:before{border-top-color:var(--line2)!important}
+    border:1px solid var(--line)!important;border-radius:var(--r-control)!important;backdrop-filter:blur(10px);
+    box-shadow:0 10px 30px -8px rgba(0,0,0,.6)!important;font-family:var(--font-ui);font-size:11.5px;font-weight:500}
+  .leaflet-tooltip-top:before{border-top-color:var(--line)!important}
   .term-ic{background:none!important;border:none!important}
-  .term-box{display:inline-block;font:700 11px/1 var(--sans);color:#0b1220;background:#22d3ee;
-    border:1.5px solid #0e7490;border-radius:5px;padding:3px 6px;white-space:nowrap;
+  .term-box{display:inline-block;font:700 11px/1 var(--font-ui);color:var(--bg-void);background:var(--live);
+    border:1.5px solid rgba(0,0,0,.3);border-radius:5px;padding:3px 6px;white-space:nowrap;
     box-shadow:0 2px 8px -2px rgba(0,0,0,.7);letter-spacing:.02em}
-  .leaflet-popup-tip{background:var(--topbar)!important;border:1px solid var(--line2)!important}
-  .leaflet-bar a,.leaflet-control-layers{background:var(--panel)!important;color:var(--tx)!important;border-color:var(--line)!important}
-  .leaflet-bar a:hover{background:var(--panel2)!important;color:var(--acc)!important}
-  .leaflet-control-attribution{background:rgba(10,15,28,.6)!important;color:var(--dim)!important}
+  .leaflet-popup-tip{background:var(--topbar)!important;border:1px solid var(--line)!important}
+  .leaflet-bar a,.leaflet-control-layers{background:var(--surface-1)!important;color:var(--tx)!important;border-color:var(--line)!important}
+  .leaflet-bar a:hover{background:var(--surface-2)!important;color:var(--live)!important}
+  .leaflet-control-attribution{background:rgba(6,9,18,.6)!important;color:var(--dim)!important}
   .leaflet-control-attribution a{color:var(--muted)!important}
+  .map-tip{font-family:var(--font-ui)}
+  .map-tip .l{font-family:var(--font-data);font-weight:700;color:var(--live)}
+  .map-tip .v{font-family:var(--font-data);color:var(--tx)}
 
-  /* Maqueta de tooltip de mapa (referencia de estilo para popups de bus/ruta) */
-  .map-tip{font-family:var(--sans)}
-  .map-tip .l{font-family:var(--mono);font-weight:700;color:var(--acc)}
-  .map-tip .v{font-family:var(--mono);color:var(--tx)}
-
-  /* Sidebar colapsable con transición suave */
-  #sidebar{transition:width .26s cubic-bezier(.4,0,.2,1),opacity .2s,padding .26s}
+  /* ── Sidebar collapse ── */
+  #sidebar{transition:width var(--dur-base) var(--ease),opacity var(--dur-fast),padding var(--dur-base)}
   #sidebar.side-collapsed{width:0!important;min-width:0;padding-left:0;padding-right:0;opacity:0;border:none;overflow:hidden}
 
-  /* Microinteracciones */
-  .hovo{transition:transform .18s ease,border-color .18s ease,color .18s ease}
+  /* ── Micro-interactions ── */
+  .hovo{transition:transform var(--dur-fast) var(--ease),border-color var(--dur-fast),color var(--dur-fast)}
   .hovo:hover{transform:translateY(-2px)}
-  a,button{transition:color .16s ease,background .16s ease,border-color .16s ease}
+  a,button{transition:color var(--dur-fast),background var(--dur-fast),border-color var(--dur-fast)}
   .vfoot{border-top:1px solid var(--line)}
-  /* Charts a alto/ancho completo de su widget */
   #ch-hora,#cs-chart{width:100%}
 
-  /* ===== Barra superior de comunas (territorio) ===== */
-  .comuna-bar{display:flex;align-items:center;gap:6px;padding:8px 14px;white-space:nowrap;
+  /* ── Entrance animations (Phase 5) ── */
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .widget{animation:fadeUp var(--dur-slow) var(--ease) both}
+  .widget:nth-child(2){animation-delay:60ms}
+  .widget:nth-child(3){animation-delay:120ms}
+  .widget:nth-child(4){animation-delay:180ms}
+  @media (prefers-reduced-motion: reduce){
+    .widget{animation:none}
+  }
+
+  /* ── Comuna bar ── */
+  .comuna-bar{display:flex;align-items:center;gap:6px;padding:var(--s2) var(--s3);white-space:nowrap;
     border-bottom:1px solid var(--line);background:var(--topbar);backdrop-filter:blur(8px);flex:none;z-index:40}
   .comuna-bar #comuna-tabs{flex:1;min-width:0;overflow-x:auto;display:flex;align-items:center;gap:3px}
   .comuna-bar .ctab{flex:none}
-  .comuna-bar .vsep{width:1px;height:20px;background:var(--line2);margin:0 7px;flex:none}
-  .comuna-bar .ctab.special{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line2)}
-  .comuna-bar .ctab.special.active{border-color:var(--acc)}
-  /* F1: aside derecho de la barra (período + resumen vivo) */
+  .comuna-bar .vsep{width:1px;height:20px;background:var(--line);margin:0 7px;flex:none}
+  .comuna-bar .ctab.special{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line)}
+  .comuna-bar .ctab.special.active{border-color:var(--live)}
   .comuna-bar .cb-aside{display:flex;align-items:center;gap:10px;flex:none;border-left:1px solid var(--line);padding-left:12px;margin-left:6px}
-  .comuna-bar .cb-live{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);
-    padding:5px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--chip)}
-  .comuna-bar .cb-live b{color:var(--tx);font-family:var(--mono);font-weight:700}
-  /* selector de período del día (congestión) */
+  .comuna-bar .cb-live{display:inline-flex;align-items:center;gap:7px;font-size:var(--fs-caption);color:var(--muted);
+    padding:5px 11px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--chip)}
+  .comuna-bar .cb-live b{color:var(--tx);font-family:var(--font-data);font-weight:700}
   .periodo-sel{display:inline-flex;align-items:center;gap:6px;flex:none}
   .periodo-sel .lbl{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
   .periodo-sel[data-inactive="1"]{opacity:.5}
-  /* KPIs contextuales por línea (cobertura / detenciones / bunching) */
-  .linea-kpis{margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
-  .linea-kpis .lk{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:10px 12px;
-    transition:border-color .2s}
-  .linea-kpis .lk .lab{font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:5px;letter-spacing:.02em}
-  .linea-kpis .lk .val{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--tx);margin-top:2px;line-height:1.05}
-  .linea-kpis .lk .sub{font-size:10.5px;color:var(--dim);margin-top:1px}
-  .linea-kpis .lk.b-bajo{border-left:3px solid #fb923c}
-  .linea-kpis .lk.b-med{border-left:3px solid #94a3b8}
-  .linea-kpis .lk.b-alto{border-left:3px solid #2dd4bf}
-  .linea-kpis .lk.b-tot{border-left:3px solid #38bdf8}
-  .linea-kpis .lk.b-eff{border-left:3px solid #34d399}
-  .linea-kpis .lk.b-cic{border-left:3px solid #a78bfa}
-  /* tabla comparativa de cobertura / bunching */
-  .cover-table{margin-top:12px;max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:12px;
-    background:linear-gradient(180deg,var(--panel),var(--panel2))}
-  .cover-table table{border-collapse:collapse;width:100%;font-size:12px;font-family:var(--sans)}
+  /* ── Line KPIs (under map) ── */
+  .linea-kpis{margin-top:var(--s3);display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--s2)}
+  .linea-kpis .lk{background:var(--grad-panel);border:1px solid var(--line);border-radius:var(--r-control);padding:10px 12px;
+    box-shadow:var(--shadow-card);position:relative;overflow:hidden;transition:border-color var(--dur-fast)}
+  .linea-kpis .lk::before{content:"";position:absolute;inset:0;background:var(--grad-shine);pointer-events:none;border-radius:inherit}
+  .linea-kpis .lk .lab{font-size:var(--fs-micro);color:var(--muted);display:flex;align-items:center;gap:5px;letter-spacing:.02em}
+  .linea-kpis .lk .val{font-family:var(--font-data);font-size:22px;font-weight:700;color:var(--tx);margin-top:2px;line-height:1.05}
+  .linea-kpis .lk .sub{font-size:var(--fs-micro);color:var(--dim);margin-top:1px}
+  .linea-kpis .lk.b-bajo{border-left:3px solid var(--warn)}
+  .linea-kpis .lk.b-med{border-left:3px solid var(--text-mid)}
+  .linea-kpis .lk.b-alto{border-left:3px solid var(--live)}
+  .linea-kpis .lk.b-tot{border-left:3px solid var(--ref)}
+  .linea-kpis .lk.b-eff{border-left:3px solid var(--live)}
+  .linea-kpis .lk.b-cic{border-left:3px solid var(--violet)}
+  /* ── Cover table ── */
+  .cover-table{margin-top:var(--s3);max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:var(--r-control);
+    background:var(--grad-panel);box-shadow:var(--shadow-card)}
+  .cover-table table{border-collapse:collapse;width:100%;font-size:var(--fs-caption);font-family:var(--font-ui)}
   .cover-table th,.cover-table td{padding:6px 12px;text-align:right;white-space:nowrap}
   .cover-table thead th{position:sticky;top:0;background:var(--topbar);color:var(--muted);font-weight:600;
-    border-bottom:2px solid var(--line);z-index:1;font-size:11px}
+    border-bottom:2px solid var(--line);z-index:1;font-size:11px;backdrop-filter:blur(8px)}
   .cover-table th.l,.cover-table td.l{text-align:left}
-  .cover-table tbody td{border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px}
-  .cover-table tbody tr.grpsep td{border-top:2px solid var(--line2)}
-  .cover-table tbody tr:hover td{outline:1px solid rgba(56,189,248,.35);outline-offset:-1px}
-  .cover-table .lh{font-weight:600;color:var(--tx);font-family:var(--sans)}
-  .cover-table .cap{padding:8px 12px;font-size:11px;line-height:1.5;color:var(--muted);
-    border-bottom:1px solid var(--line)}
-  .cover-table .grp{color:var(--acc);font-weight:700;font-family:var(--mono);font-size:13px}
+  .cover-table tbody td{border-bottom:1px solid var(--line-soft);font-family:var(--font-data);font-size:var(--fs-caption)}
+  .cover-table tbody tr.grpsep td{border-top:2px solid var(--line)}
+  .cover-table tbody tr:hover td{background:var(--hover)}
+  .cover-table .lh{font-weight:600;color:var(--tx);font-family:var(--font-ui)}
+  .cover-table .cap{padding:8px 12px;font-size:11px;line-height:1.5;color:var(--muted);border-bottom:1px solid var(--line)}
+  .cover-table .grp{color:var(--live);font-weight:700;font-family:var(--font-data);font-size:13px}
 
-  /* ===== HERO intro: red neuronal animada ===== */
-  #hero-splash{position:fixed;inset:0;z-index:9999;background:radial-gradient(120% 120% at 50% 40%,#0e1730,#070b16 70%);
+  /* ── Hero splash ── */
+  #hero-splash{position:fixed;inset:0;z-index:9999;background:radial-gradient(120% 120% at 50% 40%,var(--surface-1),var(--bg-void) 70%);
     display:grid;place-items:center;overflow:hidden;transition:opacity .85s ease}
   #hero-splash.gone{opacity:0;pointer-events:none}
   #hero-canvas{position:absolute;inset:0;width:100%;height:100%;opacity:.9}
-  .hero-content{position:relative;z-index:2;text-align:center;padding:20px;animation:heroIn 1s ease both}
+  .hero-content{position:relative;z-index:2;text-align:center;padding:var(--s5);animation:heroIn 1s ease both}
   @keyframes heroIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
   .hero-logo{width:62px;height:62px;border-radius:16px;margin:0 auto 22px;display:grid;place-items:center;
-    color:#06121f;font-weight:800;font-size:24px;background:linear-gradient(135deg,#22d3ee,#34d399);
-    box-shadow:0 0 40px rgba(34,211,238,.5)}
-  .hero-content h1{font-family:var(--sans);font-size:clamp(24px,4.6vw,50px);font-weight:800;line-height:1.08;letter-spacing:.02em;
-    background:linear-gradient(120deg,#e8eef8,#7dd3fc 55%,#34d399);-webkit-background-clip:text;background-clip:text;color:transparent;
-    text-shadow:0 2px 40px rgba(34,211,238,.15)}
-  .hero-content p{margin-top:14px;font-family:var(--mono);font-size:clamp(10px,1.4vw,13px);letter-spacing:.32em;color:#7dd3fc;text-transform:uppercase}
-  .hero-load{width:190px;height:3px;margin:26px auto 0;border-radius:3px;background:rgba(125,211,252,.14);overflow:hidden}
-  .hero-load span{display:block;height:100%;width:38%;border-radius:3px;background:linear-gradient(90deg,#22d3ee,#34d399);animation:heroSweep 1.15s cubic-bezier(.5,0,.5,1) infinite}
+    color:var(--bg-void);font-weight:800;font-size:24px;background:var(--grad-brand);
+    box-shadow:0 0 40px rgba(52,225,196,.45)}
+  .hero-content h1{font-family:var(--font-display);font-size:clamp(24px,4.6vw,50px);font-weight:800;line-height:1.08;letter-spacing:.02em;
+    background:linear-gradient(120deg,var(--text-hi),var(--ref) 55%,var(--live));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero-content p{margin-top:14px;font-family:var(--font-data);font-size:clamp(10px,1.4vw,13px);letter-spacing:.32em;color:var(--ref);text-transform:uppercase}
+  .hero-load{width:190px;height:3px;margin:26px auto 0;border-radius:3px;background:rgba(108,143,245,.14);overflow:hidden}
+  .hero-load span{display:block;height:100%;width:38%;border-radius:3px;background:var(--grad-brand);animation:heroSweep 1.15s cubic-bezier(.5,0,.5,1) infinite}
   @keyframes heroSweep{0%{transform:translateX(-130%)}100%{transform:translateX(360%)}}
   .hero-skip{margin-top:18px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);opacity:.7}
-  /* F6: pills del widget Cobertura dinámica de la línea */
-  #cdl-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  /* CDL pills */
+  #cdl-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s2)}
   @media(min-width:768px){ #cdl-grid{grid-template-columns:repeat(3,1fr)} }
-  .cdl-pill{padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:rgba(255,255,255,.02)}
+  .cdl-pill{padding:9px 11px;border:1px solid var(--line);border-radius:var(--r-control);background:rgba(255,255,255,.02);
+    box-shadow:var(--shadow-card);position:relative;overflow:hidden}
+  .cdl-pill::before{content:"";position:absolute;inset:0;background:var(--grad-shine);pointer-events:none;border-radius:inherit}
   .cdl-pill .lab{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px}
-  .cdl-pill .val{font:700 18px/1.1 var(--mono);color:var(--tx);margin-top:4px;letter-spacing:-.01em}
+  .cdl-pill .val{font:700 18px/1.1 var(--font-data);color:var(--tx);margin-top:4px;letter-spacing:-.01em}
   .cdl-pill .sub{font-size:11px;color:var(--dim);margin-top:2px}
-  /* F1: recuadros del inicio — más compactos, baseline legible, delta semántico claro */
+  /* ── KPI gauges ── */
   .kpi.klive{padding:11px 13px 9px}
-  .kpi.klive .lab{justify-content:center;text-align:center;font-size:var(--fs-kpi-lab,11px);
+  .kpi.klive .lab{justify-content:center;text-align:center;font-size:var(--fs-kpi-lab);
     text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
   .kpi.klive .gauge{width:100%;height:auto;display:block;margin:2px 0 0}
-  .kpi.klive .g-val{font:700 var(--fs-kpi-val,24px)/1 "JetBrains Mono",monospace;fill:var(--tx,#e6edf7);letter-spacing:-.01em}
-  .kpi.klive .g-unit{font-size:var(--fs-kpi-unit,12px);font-weight:500;fill:var(--muted)}
-  .kpi.klive .g-pct{font:700 var(--fs-kpi-pct,16px)/1 "Inter",sans-serif}
-  .kpi.klive .sub{margin-top:3px;font-size:var(--fs-kpi-sub,13px);color:var(--muted);text-align:center;line-height:1.35}
-  .kpi.klive .sub .g-norm{font-family:var(--mono);color:var(--tx);font-weight:600}
-  .kpi.klive .sub .g-delta{display:inline-block;margin-left:6px;font-family:var(--mono);font-weight:700;
+  .kpi.klive .g-val{font:700 var(--fs-kpi-val)/1 var(--font-data);fill:var(--text-hi);letter-spacing:-.01em}
+  .kpi.klive .g-unit{font-size:var(--fs-kpi-unit);font-weight:500;fill:var(--text-mid)}
+  .kpi.klive .g-pct{font:700 var(--fs-kpi-pct)/1 var(--font-ui)}
+  .kpi.klive .sub{margin-top:3px;font-size:var(--fs-kpi-sub);color:var(--muted);text-align:center;line-height:1.35}
+  .kpi.klive .sub .g-norm{font-family:var(--font-data);color:var(--tx);font-weight:600}
+  .kpi.klive .sub .g-delta{display:inline-block;margin-left:6px;font-family:var(--font-data);font-weight:700;
     padding:1px 6px;border-radius:5px;font-size:11.5px;background:rgba(255,255,255,.04)}
-  /* KPIs en vivo extra: cobertura por comuna + déficit por línea (mismo tamaño que los gauges) */
+  /* KPI lists */
   .kpi.klive .kcr-list{display:flex;flex-direction:column;gap:1px;margin:3px 0 1px}
   .kpi.klive .kcr{display:grid;grid-template-columns:1fr 50px 36px;gap:4px;align-items:center;font-size:11.5px;line-height:1.15}
-  .kpi.klive .kcr-nm{color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
-  .kpi.klive .kcr-nm .lncode{display:inline-block;font-family:var(--mono);font-weight:700;color:var(--tx);
+  .kpi.klive .kcr-nm{color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:var(--fs-caption)}
+  .kpi.klive .kcr-nm .lncode{display:inline-block;font-family:var(--font-data);font-weight:700;color:var(--tx);
     padding:0 7px;border-radius:5px;background:rgba(255,255,255,.06);min-width:26px;text-align:center;font-size:11px}
   .kpi.klive .kcr-bar{height:5px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden}
-  .kpi.klive .kcr-fill{height:100%;border-radius:3px;transition:width .55s cubic-bezier(.4,0,.2,1)}
-  .kpi.klive .kcr-vp{font-family:var(--mono);font-weight:700;text-align:right;font-size:11px;font-variant-numeric:tabular-nums}
+  .kpi.klive .kcr-fill{height:100%;border-radius:3px;transition:width .55s var(--ease)}
+  .kpi.klive .kcr-vp{font-family:var(--font-data);font-weight:700;text-align:right;font-size:11px;font-variant-numeric:tabular-nums}
   .kpi.klive .kcr--lin{display:flex;flex-direction:column;gap:1px;padding:2px 0}
   .kpi.klive .kcr--lin .kcr-nm{font-size:11px;display:flex;justify-content:space-between}
   .kpi.klive .kcr--lin .kcr-row{display:flex;gap:4px;align-items:center}
@@ -276,7 +277,7 @@
     <h1 style="font-size:18px;margin-bottom:10px;color:#22d3ee">Centro de Mando · Transporte Gran Concepción</h1>
     <p style="font-size:14px;color:#93a1ba;margin-bottom:14px">Este visor requiere JavaScript activado para mostrar los mapas en vivo, los KPIs y los gráficos interactivos sobre los 302 millones de registros GPS del sistema.</p>
     <p style="font-size:13px;color:#64718c">Para ver capturas estáticas y la metodología del proyecto, visita el repositorio:<br>
-      <a href="https://github.com/romedinag-tech/transportepublicoGC" style="color:#38bdf8">github.com/romedinag-tech/transportepublicoGC</a>
+      <a href="https://github.com/romedinag-tech/transportepublicoGC" style="color:var(--ref,#6C8FF5)">github.com/romedinag-tech/transportepublicoGC</a>
     </p>
   </div>
 </noscript>
@@ -309,10 +310,10 @@
     for(var i=0;i<nodes.length;i++){ var a=nodes[i]; a.x+=a.vx; a.y+=a.vy;
       if(a.x<0){a.x=0;a.vx*=-1;} if(a.x>W){a.x=W;a.vx*=-1;} if(a.y<0){a.y=0;a.vy*=-1;} if(a.y>H){a.y=H;a.vy*=-1;}
       for(var j=i+1;j<nodes.length;j++){ var b=nodes[j],dx=a.x-b.x,dy=a.y-b.y,d=Math.sqrt(dx*dx+dy*dy);
-        if(d<DIST){ var o=(1-d/DIST); ctx.strokeStyle='rgba(56,189,248,'+(o*0.5)+')'; ctx.lineWidth=o*1.1+0.2;
+        if(d<DIST){ var o=(1-d/DIST); ctx.strokeStyle='rgba(108,143,245,'+(o*0.5)+')'; ctx.lineWidth=o*1.1+0.2;
           ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } } }
-    ctx.shadowBlur=8; ctx.shadowColor='#22d3ee';
-    for(var k=0;k<nodes.length;k++){ var p=nodes[k]; ctx.beginPath(); ctx.fillStyle='rgba(34,211,238,.92)'; ctx.arc(p.x,p.y,1.7,0,6.283); ctx.fill(); }
+    ctx.shadowBlur=8; ctx.shadowColor='#34E1C4';
+    for(var k=0;k<nodes.length;k++){ var p=nodes[k]; ctx.beginPath(); ctx.fillStyle='rgba(52,225,196,.92)'; ctx.arc(p.x,p.y,1.7,0,6.283); ctx.fill(); }
     ctx.shadowBlur=0;
     if(!reduce && tick%11===0 && nodes.length>2){
       var a2=nodes[(Math.random()*nodes.length)|0], near=null, best=DIST;
@@ -709,7 +710,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=87"></script>
+<script defer src="assets/app_shell.js?v=89"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

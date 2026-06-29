@@ -1,0 +1,146 @@
+/* ═══════════════════════════════════════════════════════════════════
+   TOKENS — Centro de Mando · Transporte Gran Concepcion
+   Single source of truth for color, type, space, motion.
+   Loaded FIRST; all other CSS consumes these, never raw hex.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Surfaces — ink-navy layers, NOT flat black ── */
+  --bg-void:    #060912;
+  --bg-base:    #0B1020;
+  --surface-1:  #121A30;
+  --surface-2:  #19223C;
+  --line:       #233152;
+  --line-soft:  #1A2440;
+
+  /* ── Text ── */
+  --text-hi:    #EAF0FB;
+  --text-mid:   #9DAAC6;
+  --text-lo:    #5E6B89;
+
+  /* ── Semantic signals — each color does ONE job ── */
+  --live:   #34E1C4;  /* teal: operating now / healthy / online */
+  --ref:    #6C8FF5;  /* indigo: baseline / historical */
+  --warn:   #F4B740;  /* amber: speed excess / watch */
+  --alert:  #FF5D73;  /* coral: non-compliance / critical */
+
+  --accent: var(--live);
+
+  /* ── Typography — 3 roles ── */
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-ui:      "IBM Plex Sans", system-ui, sans-serif;
+  --font-data:    "IBM Plex Mono", ui-monospace, monospace;
+
+  /* ── Type scale ── */
+  --fs-display:  clamp(22px, 2.4vw, 28px);
+  --fs-title:    15px;
+  --fs-body:     13.5px;
+  --fs-caption:  12px;
+  --fs-micro:    10.5px;
+  --fs-widget-title: 13px;
+  --fs-widget-sub:   11px;
+  --fs-kpi-lab:  11px;
+  --fs-kpi-val:  24px;
+  --fs-kpi-unit: 12px;
+  --fs-kpi-pct:  16px;
+  --fs-kpi-sub:  13px;
+  --fs-litem:    13.5px;
+  --fs-ctab:     13px;
+  --fs-seg:      12px;
+
+  /* ── Space (base 4 px) ── */
+  --s1: 4px;  --s2: 8px;  --s3: 12px;  --s4: 16px;
+  --s5: 20px; --s6: 24px; --s8: 32px;  --s10: 40px; --s12: 48px;
+
+  /* ── Radii ── */
+  --r-card:    16px;
+  --r-widget:  18px;
+  --r-control: 10px;
+  --r-pill:    999px;
+
+  /* ── Shadows (elevation) ── */
+  --shadow-card:   0 2px 8px -2px rgba(0,0,0,.35), 0 1px 2px -1px rgba(0,0,0,.2);
+  --shadow-widget: 0 18px 40px -24px rgba(0,0,0,.55), 0 2px 6px -2px rgba(0,0,0,.25);
+  --shadow-hover:  0 12px 32px -8px rgba(0,0,0,.5);
+  --shadow-glow-live:  0 0 20px -4px rgba(52,225,196,.25);
+  --shadow-glow-alert: 0 0 20px -4px rgba(255,93,115,.25);
+
+  /* ── Motion ── */
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 500ms;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --ease-bounce: cubic-bezier(.34, 1.4, .64, 1);
+
+  /* ── Gradients ── */
+  --grad-brand: linear-gradient(135deg, var(--live), var(--ref));
+  --grad-panel: linear-gradient(180deg, var(--surface-1), var(--surface-2));
+  --grad-shine: linear-gradient(180deg, rgba(255,255,255,.04) 0%, transparent 40%);
+}
+
+/* ─── Bridge: map new tokens → legacy variable names ─── */
+:root {
+  --bg:      var(--bg-void);
+  --bg2:     var(--bg-base);
+  --panel:   var(--surface-1);
+  --panel2:  var(--surface-2);
+  --topbar:  rgba(11, 16, 32, .92);
+  --tx:      var(--text-hi);
+  --muted:   var(--text-mid);
+  --dim:     var(--text-lo);
+  --acc:     var(--accent);
+  --acc2:    var(--live);
+  --danger:  var(--alert);
+  --violet:  #a78bfa;
+  --hover:   rgba(255,255,255,.04);
+  --track:   var(--line-soft);
+  --chip:    rgba(18, 26, 48, .7);
+  --glow1:   rgba(52, 225, 196, .12);
+  --glow2:   rgba(108, 143, 245, .08);
+  --ch-grid: var(--line-soft);
+  --ch-axis: var(--text-lo);
+  --ch-tip:  var(--surface-2);
+  --line2:   var(--line);
+  --radius:  var(--r-card);
+  --radius-sm: var(--r-control);
+  --sans:  var(--font-ui);
+  --mono:  var(--font-data);
+}
+
+/* ─── Light theme ─── */
+:root[data-theme="light"] {
+  --bg-void:    #F4F6FA;
+  --bg-base:    #FFFFFF;
+  --surface-1:  #F0F2F7;
+  --surface-2:  #E6E9F0;
+  --line:       #D1D5DE;
+  --line-soft:  #E2E5EC;
+
+  --text-hi:    #1A202C;
+  --text-mid:   #4A5568;
+  --text-lo:    #8492A6;
+
+  --live:   #0D9B84;
+  --ref:    #4A6FE3;
+  --warn:   #D4920A;
+  --alert:  #E04358;
+
+  --topbar: rgba(255, 255, 255, .9);
+  --hover:  rgba(15,23,42,.04);
+  --chip:   rgba(240, 242, 247, .85);
+  --glow1:  rgba(13, 155, 132, .08);
+  --glow2:  rgba(74, 111, 227, .06);
+  --shadow-card:   0 2px 8px -2px rgba(0,0,0,.08), 0 1px 2px -1px rgba(0,0,0,.04);
+  --shadow-widget: 0 4px 16px -8px rgba(0,0,0,.1), 0 1px 3px -1px rgba(0,0,0,.06);
+  --shadow-hover:  0 8px 24px -6px rgba(0,0,0,.12);
+  --grad-shine: linear-gradient(180deg, rgba(255,255,255,.6) 0%, transparent 40%);
+}
+
+/* ─── Reduced motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
+}
