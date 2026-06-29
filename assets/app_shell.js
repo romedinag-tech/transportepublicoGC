@@ -722,23 +722,30 @@ function renderLineFreqChart(){
   const vL=fL?fL.slice(i0,i1+1):x.map(()=>null);
   const vS=fS?fS.slice(i0,i1+1):x.map(()=>null);
   const vD=fD?fD.slice(i0,i1+1):x.map(()=>null);
+  const liveSerie=(DIA&&DIA.freq_serie_lin||{})[state.linea];
+  const vHoy=liveSerie?x.map((_,j)=>{const i=i0+j; return (DIA&&i<=DIA.bin)?(liveSerie[i]||0):null;}):x.map(()=>null);
+  const hasLive=vHoy.some(v=>v!=null&&v>0);
   const th=TH();
+  const legendData=["Laborable","Sábado","Domingo"];
+  if(hasLive) legendData.push("Hoy");
+  const series=[
+    {name:"Laborable",type:"line",data:vL,smooth:true,symbol:"none",lineStyle:{width:2,color:"#22d3ee"},itemStyle:{color:"#22d3ee"},areaStyle:{color:"#22d3ee12"}},
+    {name:"Sábado",type:"line",data:vS,smooth:true,symbol:"none",lineStyle:{width:2,color:"#a78bfa"},itemStyle:{color:"#a78bfa"}},
+    {name:"Domingo",type:"line",data:vD,smooth:true,symbol:"none",lineStyle:{width:2,color:"#fb923c"},itemStyle:{color:"#fb923c"}},
+  ];
+  if(hasLive) series.push({name:"Hoy",type:"line",data:vHoy,smooth:false,symbol:"circle",symbolSize:5,showSymbol:true,connectNulls:false,lineStyle:{width:2.5,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991a"}});
   linFreqChart.setOption({
     textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
     grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
-    legend:{data:["Laborable","Sábado","Domingo"],textStyle:{color:th.mut},top:0},
+    legend:{data:legendData,textStyle:{color:th.mut},top:0},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>{const t=p[0].axisValue; let s=`${t}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${x.value.toFixed(1)}</b><br>`;}); return s;}},
     xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:3},axisLine:{lineStyle:{color:th.axis}}},
     yAxis:{type:"value",name:"despachos/30min",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
-    series:[
-      {name:"Laborable",type:"line",data:vL,smooth:true,symbol:"none",lineStyle:{width:2,color:"#22d3ee"},itemStyle:{color:"#22d3ee"},areaStyle:{color:"#22d3ee12"}},
-      {name:"Sábado",type:"line",data:vS,smooth:true,symbol:"none",lineStyle:{width:2,color:"#a78bfa"},itemStyle:{color:"#a78bfa"}},
-      {name:"Domingo",type:"line",data:vD,smooth:true,symbol:"none",lineStyle:{width:2,color:"#fb923c"},itemStyle:{color:"#fb923c"}},
-    ],
+    series:series,
   },true);
   setTimeout(()=>linFreqChart.resize(),60);
-  $("lin-freq-sub").textContent = `línea ${state.linea} · despachos/30 min · perfil empírico por tipo de día`;
+  $("lin-freq-sub").textContent = `línea ${state.linea} · despachos/30 min · perfil empírico`+(hasLive?" + observado hoy":" por tipo de día");
 }
 function renderExcesos(){
   const el = $("excesos-list"); if(!el) return;

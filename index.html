@@ -454,7 +454,7 @@
         </section>
 
         <!-- COLUMNA DERECHA: flota/velocidad + ranking (flujo vertical propio, no se aplasta) -->
-        <div class="flex flex-col gap-4 xl:max-h-[680px] xl:overflow-y-auto thin-scroll xl:pr-1">
+        <div class="flex flex-col gap-4 thin-scroll xl:pr-1">
           <section class="widget" id="excesos-card">
             <div class="widget-h">
               <span class="ico">⚠️</span>
@@ -677,7 +677,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=84"></script>
+<script defer src="assets/app_shell.js?v=85"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
