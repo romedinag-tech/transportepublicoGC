@@ -13,11 +13,20 @@ let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, 
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stops:[]};
 let VCICLO=null, vcChart=null, vcPer="agregado", vcSm=0;
-let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", cmpA:null, cmpB:null};
+let DETP=null, CLINE={lineas:[]}, BUNCH=null, BUNCHA=null, CICLO=null;
+let _nseTerciles=null;
+let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", cmpA:null, cmpB:null};
 let csChart, freqChart, linFreqChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
 const PEAK_H = [7,8,9,17,18,19];
+const PERIODOS = [["agg","Agregado"],["am","Punta AM"],["md","Mediodía"],["pm","Punta PM"],["off","Fuera punta"],["noche","Noche"]];
+const PERIODO_H = {agg:[6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22], am:[7,8,9], md:[12,13,14], pm:[17,18,19], off:[10,11,15,16,20,21,22], noche:[21,22,23]};
+const periodoLbl = p => (PERIODOS.find(x=>x[0]===p)||["","Agregado"])[1];
+const SENTIDOS = [["amb","Ambos"],["0","Ida"],["1","Regreso"]];
+const DET_TIPOS = [["cong","Congestión"],["par","Paraderos"]];
+const nseColors = {0:"#fb923c", 1:"#94a3b8", 2:"#2dd4bf"};
+const nseLabel = n => n===0?"NSE bajo":n===1?"NSE medio":n===2?"NSE alto":"sin dato NSE";
 
 const CS_DIAS = [["L","Laboral"],["S","Sábado"],["D","Domingo"]];
 const CS_VARS = [
@@ -52,7 +61,6 @@ const cellOf = () => (T.cells[`${state.comuna}|${state.linea}`] || {kpi:null, ho
 const empresaDe = ln => { const x=(T.lineas||[]).find(l=>l.linea===ln); return x?x.empresa:""; };
 
 /* ---------- menús ---------- */
-const PERIODOS = [["agg","Agregado"],["am","Punta AM"],["md","Mediodía"],["pm","Punta PM"],["off","Fuera punta"],["noche","Noche"]];
 const COVER_SUBS = [["est","Estática"],["din","Dinámica"],["od","Oferta/demanda"]];   // 'din' reemplaza 'of' (2026-06-28): modelo cápsula 2 min + 300 m, frac=min(1,f/30)
 let DINL = null;   // cobertura_din_lineas.json — KPIs por línea (cargado en init)
 // _dinValueFor: en vista SISTEMA devuelve P_total de la manzana; en vista LÍNEA el frac_línea uniforme (color uniforme dentro de las manzanas cubiertas)
@@ -72,8 +80,6 @@ function odMax(){
   ODMAX = ref || 1; return ODMAX;
 }
 const CAP_SEAT = 27;   // capacidad sentada del bus en Concepción (para personas/hora)
-const PERIODO_H = {agg:[6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22], am:[7,8,9], md:[12,13,14], pm:[17,18,19], off:[10,11,15,16,20,21,22], noche:[21,22,23]};
-const periodoLbl = p => (PERIODOS.find(x=>x[0]===p)||["","Agregado"])[1];
 const PURPOSES = [["all","Todos"],["trab","Trabajo"],["est","Estudio"],["sal","Salud"],["otr","Otros"]];
 const PURP_FIELD = {all:"viajes",trab:"trabajo",est:"estudio",sal:"salud",otr:"otros"};
 const purposeLbl = p => (PURPOSES.find(x=>x[0]===p)||["","Todos"])[1];
@@ -115,6 +121,22 @@ function buildPurpose(){
     box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.p===state.purpose));
     if(["cover","trans","wait"].includes(state.mapMode)) render(); });
 }
+function buildSentido(){
+  const box=$("sentido-sel"); if(!box) return;
+  box.innerHTML = `<span class="lbl">Sentido</span><div class="seg">`+
+    SENTIDOS.map(([k,l])=>`<b data-p="${k}" class="${state.sentido===k?"on":""}">${l}</b>`).join("")+`</div>`;
+  box.querySelectorAll("b").forEach(el=>el.onclick=()=>{ state.sentido=el.dataset.p;
+    box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.p===state.sentido));
+    if(["conges","bunch","cover","det"].includes(state.mapMode)) render(); });
+}
+function buildDettipo(){
+  const box=$("dettipo-sel"); if(!box) return;
+  box.innerHTML = `<span class="lbl">Detención</span><div class="seg">`+
+    DET_TIPOS.map(([k,l])=>`<b data-p="${k}" class="${state.detTipo===k?"on":""}">${l}</b>`).join("")+`</div>`;
+  box.querySelectorAll("b").forEach(el=>el.onclick=()=>{ state.detTipo=el.dataset.p;
+    box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.p===state.detTipo));
+    if(state.mapMode==="det") render(); });
+}
 function buildLineaList(filter=""){
   const f = filter.trim().toLowerCase();
   const setC = (state.comuna!=="TODAS" && CLIN[state.comuna]) ? new Set(CLIN[state.comuna]) : null;
@@ -155,6 +177,10 @@ function render(){
   // Sub-selector de cobertura: visible en vista normal con mapMode=cover (sistema o línea)
   const coverSubRel = state.vista==="normal" && state.mapMode==="cover";
   if($("cover-sub")) $("cover-sub").style.display = coverSubRel ? "flex" : "none";
+  const sentidoRel = state.vista==="normal" && (["conges","bunch"].includes(state.mapMode) || (state.linea!=="TODAS" && ["cover","det"].includes(state.mapMode)));
+  if($("sentido-sel")) $("sentido-sel").style.display = sentidoRel ? "flex" : "none";
+  const dettipoRel = state.vista==="normal" && state.mapMode==="det";
+  if($("dettipo-sel")) $("dettipo-sel").style.display = dettipoRel ? "flex" : "none";
 
   // VISTAS ESPECIALES (territorio): ranking / comparador de comunas
   if(state.vista==="ranking" || state.vista==="comparador"){
@@ -187,6 +213,9 @@ function render(){
   renderLineFreqChart();
   renderCobDinLinea();
   renderMapa();
+  renderLineaKpis();
+  renderCoverTable();
+  renderBunchTable();
   renderRanking();
   renderCump();
   renderCumpSem();
@@ -1128,9 +1157,16 @@ function congDetColor(t){ // t=0..1 (severidad) -> ámbar a rojo
 }
 function drawDetenciones(){
   if(!coverLayer) return; coverLayer.clearLayers();
-  const cong = (DET2||[]).filter(d=>inComuna(d.la,d.lo));
+  let cong = (DET2||[]).filter(d=>inComuna(d.la,d.lo));
   let terms = ((TERM&&TERM.terminales)||[]).filter(t=>inComuna(t.la,t.lo));
   if(state.linea!=="TODAS") terms = terms.filter(t=>(t.lineas||[]).some(l=>l.linea===state.linea));
+  if(state.linea!=="TODAS" && GEOM && GEOM[state.linea]){
+    const MX2=111320*Math.cos(-36.83*Math.PI/180), MY2=110540, R=400;
+    const allPts=[]; (GEOM[state.linea]||[]).forEach(r=>(r.p||[]).forEach(p=>allPts.push(p)));
+    cong = cong.filter(d=>allPts.some(p=>{ const dx=(d.lo-p[1])*MX2, dy=(d.la-p[0])*MY2; return dx*dx+dy*dy < R*R; }));
+  }
+  if(state.detTipo==="cong") cong = cong.filter(d=>(d.tipo||"").includes("demora"));
+  else cong = cong.filter(d=>!(d.tipo||"").includes("demora"));
   // congestión: nodos reales de demora (terminales ya excluidos en el dato)
   if(cong.length){
     const mx=Math.max(...cong.map(d=>d.det));
@@ -1153,6 +1189,27 @@ function drawDetenciones(){
 }
 function drawBunching(){
   if(!coverLayer) return; coverLayer.clearLayers();
+  // Per-line arco view
+  if(state.linea!=="TODAS" && BUNCHA && BUNCHA.lineas && BUNCHA.lineas[state.linea] && GEOM && GEOM[state.linea]){
+    const lb=state.linea, sen=state.sentido==="amb"?"0":state.sentido;
+    const arcos = (BUNCHA.lineas[lb]||{})[sen]||[];
+    const routes = GEOM[lb]||[];
+    const mainR = routes.find(r=>r.s===+sen) || routes[0];
+    if(mainR && mainR.p && arcos.length){
+      const pts=mainR.p, per=state.periodo, lbl=periodoLbl(per);
+      const MX=111320*Math.cos(-36.83*Math.PI/180), MY=110540;
+      let cum=0; const dists=[0];
+      for(let i=1;i<pts.length;i++){ const dx=(pts[i][1]-pts[i-1][1])*MX, dy=(pts[i][0]-pts[i-1][0])*MY; cum+=Math.sqrt(dx*dx+dy*dy); dists.push(cum); }
+      const ptAt = m=>{ for(let i=1;i<dists.length;i++){ if(dists[i]>=m){ const t=(m-dists[i-1])/(dists[i]-dists[i-1]); return [pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t, pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t]; } } return pts[pts.length-1]; };
+      arcos.forEach(arc=>{
+        const d=arc.per[per]; if(!d||d.cv==null) return;
+        const pA=ptAt(arc.a), pB=ptAt(arc.b);
+        L.polyline([pA,pB],{renderer:coverCanvas,color:cvColor(d.cv),weight:5,opacity:.88,lineCap:"round"})
+          .bindTooltip(`Arco ${arc.a}–${arc.b} m · ${lbl}<br>CV <b>${d.cv.toFixed(2)}</b> · headway ${d.headway} min · ${d.n} obs<br>${d.cv>0.7?"apelotonado":d.cv>0.5?"regularidad media":"regular"}`,{sticky:true}).addTo(coverLayer);
+      });
+    }
+    setCoverLegend("bunch"); return;
+  }
   const per = RFREQ && RFREQ.per && RFREQ.per[state.periodo];
   if(!CONGRED || !CONGRED.roads || !per){ setCoverLegend("bunch"); return; }
   const CV = per.cv, F = per.f, lbl = periodoLbl(state.periodo);
@@ -1191,7 +1248,7 @@ function drawCoverage(mode){
       ? dinColor(_dinValueFor(p))                                         // P_total (sistema) o frac_linea (vista línea)
       : state.coverSub==="od"
       ? odColor(p.cob_od ? p.cob_od[state.periodo] : null)
-      : cobColor(p.cob_est);
+      : lineMode ? (nseColors[nseTercil(p.nse)]||"#64748b") : cobColor(p.cob_est);
     else if(mode==="trans") col = labColor(p.lab ? p.lab.dir : null);    // TRANSBORDO: % de viajes-trabajo con UNA sola línea (Censo); verde=directo, rojo=exige transbordo/inalcanzable
     else if(mode==="wait") col = waitColor(p.waitd ? p.waitd[pu][state.periodo] : null);
     else if(mode==="salud") col = accSColor(p.salud);
@@ -1222,6 +1279,8 @@ function drawCoverage(mode){
         })()
       : (mode==="cover" && state.coverSub==="od")
       ? (()=>{ const r=p.cob_od?p.cob_od[per]:null; const pct=r==null?null:Math.round(100*r/odMax()); return `${NF.format(p.hog??0)} hogares · ${periodoLbl(per)}<br>cobertura oferta/demanda: <b>${pct==null?"sin servicio":pct+"%"}</b> del nivel mejor cubierto`; })()
+      : (mode==="cover" && lineMode)
+      ? `${NF.format(p.hog??0)} hogares · línea ${state.linea}<br>NSE: <b>${nseLabel(nseTercil(p.nse))}</b> · avalúo ${NF.format(p.nse||0)} CLP/m²`
       : (mode==="cover")
       ? `${NF.format(p.hog??0)} hogares · acceso ${p.acc} min<br>cobertura estática: <b>${p.cob_est??"—"}%</b> de la manzana a ≤300 m de la red`
       : (mode==="wait")
@@ -1287,6 +1346,7 @@ function setCoverLegend(mode){
   const NEU = `<span class="grad" style="background:#64748b;opacity:.5"></span>`;
   const txt = (mode==="cover" && state.coverSub==="din") ? [`Cobertura dinámica · ${periodoLbl(state.periodo)}`,GYR,`<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>% del tiempo cubierto por algún bus (modelo cápsula 2 min + 300 m) · cambia con el período</span>`]
     : (mode==="cover" && state.coverSub==="od") ? [`Cobertura oferta/demanda · ${periodoLbl(state.periodo)}`,GYR,`<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>capacidad ÷ viajes generados · 100% = zona residencial mejor cubierta (Talcahuano/San Pedro/Chiguayante), no el centro · reparto por demanda</span>`]
+    : (mode==="cover" && state.linea!=="TODAS") ? [`NSE hogares cubiertos · Línea ${state.linea}`,`<span class="grad" style="background:linear-gradient(90deg,#fb923c 33%,#94a3b8 33% 66%,#2dd4bf 66%)"></span>`,"<span class='lbls'><i>bajo</i><i>medio</i><i>alto</i></span><span class='par'>terciles de avalúo fiscal del suelo (CLP/m²) — solo manzanas cubiertas a ≤300 m</span>"]
     : mode==="cover" ? ["Cobertura estática (≤300 m de la red)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>% de la manzana dentro del área de influencia 300 m de los recorridos</span>"]
     : mode==="trans" ? ["Transbordo: viajes-trabajo con UNA línea (Censo 2024)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>verde = llega directo con una línea · rojo = exige transbordo o es inalcanzable</span>"]
     : mode==="wait" ? [`Espera hacia destinos · ${periodoLbl(state.periodo)} (min)`,RYG,"<span class='lbls'><i>0</i><i>3</i><i>6+</i></span><span class='par'>manzana = espera a destinos · ● paradero = espera ahí (hover)</span>"]
@@ -1441,6 +1501,210 @@ function scopeWavg(getter){            // promedio ponderado por viviendas sobre
     if(state.linea!=="TODAS" && !((p.cob_lineas||[]).includes(state.linea))) continue;
     const v=getter(p); if(v==null) continue; const w=p.n||1; sw+=v*w; n+=w; }
   return n? sw/n : null;
+}
+/* ---------- NSE terciles (clasificar avalúo continuo en bajo/medio/alto) ---------- */
+function nseTercil(v){
+  if(v==null||v<=0) return -1;
+  if(!_nseTerciles&&COB&&COB.features){
+    const vs=COB.features.map(f=>f.properties.nse).filter(x=>x!=null&&x>0).sort((a,b)=>a-b);
+    if(vs.length>10){ _nseTerciles=[vs[Math.floor(vs.length*.333)], vs[Math.floor(vs.length*.667)]]; }
+    else _nseTerciles=[50000,70000];
+  }
+  if(!_nseTerciles) return -1;
+  return v<=_nseTerciles[0]?0:v<=_nseTerciles[1]?1:2;
+}
+/* ---------- KPIs contextuales bajo el mapa (por línea: cover/det/bunch) ---------- */
+function renderLineaKpis(){
+  const el=$("linea-kpis"); if(!el) return;
+  const mode=state.mapMode;
+  // DETENCIONES
+  if(state.linea!=="TODAS" && state.vista==="normal" && mode==="det" && DETP&&DETP.lineas){
+    const lb=state.linea, sen=state.sentido==="amb"?"amb":state.sentido;
+    const d = DETP.lineas[lb] || {};
+    const sd = d[sen] || d.amb || {};
+    const sdL = sd.L || {};
+    const det = sdL[state.periodo];
+    const dAm=sdL.am, dPm=sdL.pm, dNoche=sdL.noche, dAgg=sdL.agg;
+    let sis=null; const all=Object.values(DETP.lineas).map(x=>{const s=x[sen]||x.amb||{}; return (s.L||{})[state.periodo];}).filter(v=>v!=null);
+    if(all.length) sis = +(all.reduce((a,b)=>a+b,0)/all.length).toFixed(1);
+    const lbl = v => v==null?"":(v<5?"Bajo":v<15?"Medio":v<25?"Alto":"Muy alto");
+    const bg = v => v==null?"":`background:hsla(${Math.max(0,Math.min(1,1-(v-5)/30))*120},75%,45%,.4)`;
+    const card=(cls,l,v,s,st="")=>`<div class="lk ${cls}" style="${st}"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
+    const senL = sen==="amb"?"Ida+Regreso":(sen==="0"?"Ida":"Regreso");
+    el.style.display="grid";
+    el.innerHTML = [
+      card("b-tot",`🛑 % tiempo detenido (${periodoLbl(state.periodo)})`, det!=null?det.toFixed(1)+"%":"—", `${lbl(det)} · ${senL} · en ruta (excl. terminal)`, bg(det)),
+      card("b-eff","Vs. sistema", (det!=null&&sis!=null)?((det-sis)>=0?"+":"")+(det-sis).toFixed(1):"—", sis!=null?`sistema ${sis}% · ${det!=null&&det<sis?"mejor":"peor"}`:"—"),
+      card("b-bajo","% AM punta", dAm!=null?dAm.toFixed(1)+"%":"—", lbl(dAm), bg(dAm)),
+      card("b-med","% PM punta", dPm!=null?dPm.toFixed(1)+"%":"—", lbl(dPm), bg(dPm)),
+      card("b-alto","% Noche", dNoche!=null?dNoche.toFixed(1)+"%":"—", lbl(dNoche), bg(dNoche)),
+      card("b-cic","% Agregado día", dAgg!=null?dAgg.toFixed(1)+"%":"—", lbl(dAgg), bg(dAgg)),
+    ].join("");
+    return;
+  }
+  // BUNCHING
+  if(state.linea!=="TODAS" && state.vista==="normal" && mode==="bunch" && BUNCH&&BUNCH.lineas){
+    const lb=state.linea, dia="L";
+    const d = BUNCH.lineas[lb] && BUNCH.lineas[lb][dia] || {};
+    const per=state.periodo, dp=d[per]||{};
+    const cv=dp.cv, hw=dp.headway, n=dp.n;
+    const dAm=(d.am||{}).cv, dPm=(d.pm||{}).cv, dNoche=(d.noche||{}).cv;
+    let sisCv=null; const all=Object.values(BUNCH.lineas).map(x=>(x[dia]||{})[per]).filter(x=>x&&x.cv!=null).map(x=>x.cv);
+    if(all.length) sisCv=+(all.reduce((a,b)=>a+b,0)/all.length).toFixed(3);
+    const cvLbl = v => v==null?"—":(v<0.5?"Regular":v<0.8?"Medio":"Apelotonado");
+    const cvBg = v => v==null?"":`background:hsla(${Math.max(0,Math.min(1,1-(v-0.3)/0.7))*120},75%,45%,.4)`;
+    const card=(cls,l,v,s,st="")=>`<div class="lk ${cls}" style="${st}"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
+    el.style.display="grid";
+    el.innerHTML = [
+      card("b-tot",`📊 CV headways (${periodoLbl(per)})`, cv!=null?cv.toFixed(2):"—", `${cvLbl(cv)} · ${n||0} intervalos`, cvBg(cv)),
+      card("b-eff","⏱️ Headway medio", hw!=null?hw.toFixed(1)+" min":"—", `intervalo entre buses (${periodoLbl(per)})`),
+      card("b-bajo","Vs. sistema", sisCv!=null?(cv!=null?((cv-sisCv)>=0?"+":"")+(cv-sisCv).toFixed(2):"—"):"—",
+        sisCv!=null?`sistema ${sisCv.toFixed(2)} · ${cv!=null&&cv<sisCv?"mejor":"peor"}`:"sin referencia", ""),
+      card("b-med","CV AM punta", dAm!=null?dAm.toFixed(2):"—", cvLbl(dAm), cvBg(dAm)),
+      card("b-alto","CV PM punta", dPm!=null?dPm.toFixed(2):"—", cvLbl(dPm), cvBg(dPm)),
+      card("b-cic","CV Noche", dNoche!=null?dNoche.toFixed(2):"—", cvLbl(dNoche), cvBg(dNoche)),
+    ].join("");
+    return;
+  }
+  // COMUNA: DETENCIONES (aggregate lines in that comuna)
+  const comView = state.linea==="TODAS" && state.comuna!=="TODAS" && state.vista==="normal";
+  const comLines = comView && CLIN ? (CLIN[state.comuna]||[]) : [];
+  if(comView && mode==="det" && DETP&&DETP.lineas && comLines.length){
+    const sen=state.sentido==="amb"?"amb":state.sentido, per=state.periodo;
+    const vals = comLines.map(lb=>{const d=DETP.lineas[lb]; if(!d)return null; const s=d[sen]||d.amb||{}; return (s.L||{})[per];}).filter(v=>v!=null);
+    const det = vals.length ? +(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : null;
+    const vAm = comLines.map(lb=>{const d=DETP.lineas[lb]; if(!d)return null; const s=d[sen]||d.amb||{}; return (s.L||{}).am;}).filter(v=>v!=null);
+    const vPm = comLines.map(lb=>{const d=DETP.lineas[lb]; if(!d)return null; const s=d[sen]||d.amb||{}; return (s.L||{}).pm;}).filter(v=>v!=null);
+    const vNoc = comLines.map(lb=>{const d=DETP.lineas[lb]; if(!d)return null; const s=d[sen]||d.amb||{}; return (s.L||{}).noche;}).filter(v=>v!=null);
+    const avg = a => a.length ? +(a.reduce((x,y)=>x+y,0)/a.length).toFixed(1) : null;
+    const dAm=avg(vAm), dPm=avg(vPm), dNoche=avg(vNoc);
+    const allSis=Object.values(DETP.lineas).map(x=>{const s=x[sen]||x.amb||{}; return (s.L||{})[per];}).filter(v=>v!=null);
+    const sis = allSis.length ? +(allSis.reduce((a,b)=>a+b,0)/allSis.length).toFixed(1) : null;
+    const lbl = v => v==null?"":(v<5?"Bajo":v<15?"Medio":v<25?"Alto":"Muy alto");
+    const bg = v => v==null?"":`background:hsla(${Math.max(0,Math.min(1,1-(v-5)/30))*120},75%,45%,.4)`;
+    const card=(cls,l,v,s,st="")=>`<div class="lk ${cls}" style="${st}"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
+    el.style.display="grid";
+    el.innerHTML = [
+      card("b-tot",`🛑 % detenido comuna (${periodoLbl(per)})`, det!=null?det+"%":"—", `promedio ${comLines.length} líneas · ${state.comuna}`, bg(det)),
+      card("b-eff","Vs. sistema", (det!=null&&sis!=null)?((det-sis)>=0?"+":"")+(det-sis).toFixed(1):"—", sis!=null?`sistema ${sis}%`:"—"),
+      card("b-bajo","% AM punta", dAm!=null?dAm+"%":"—", lbl(dAm), bg(dAm)),
+      card("b-med","% PM punta", dPm!=null?dPm+"%":"—", lbl(dPm), bg(dPm)),
+      card("b-alto","% Noche", dNoche!=null?dNoche+"%":"—", lbl(dNoche), bg(dNoche)),
+      card("b-cic","Líneas", comLines.length+"", `que operan en ${state.comuna}`),
+    ].join("");
+    return;
+  }
+  // COMUNA: BUNCHING
+  if(comView && mode==="bunch" && BUNCH&&BUNCH.lineas && comLines.length){
+    const dia="L", per=state.periodo;
+    const vals = comLines.map(lb=>(BUNCH.lineas[lb]&&(BUNCH.lineas[lb][dia]||{})[per])||null).filter(x=>x&&x.cv!=null);
+    const cv = vals.length ? +(vals.reduce((a,b)=>a+b.cv,0)/vals.length).toFixed(2) : null;
+    const hw = vals.length ? +(vals.reduce((a,b)=>a+b.headway,0)/vals.length).toFixed(1) : null;
+    const allSis=Object.values(BUNCH.lineas).map(x=>(x[dia]||{})[per]).filter(x=>x&&x.cv!=null).map(x=>x.cv);
+    const sisCv = allSis.length ? +(allSis.reduce((a,b)=>a+b,0)/allSis.length).toFixed(3) : null;
+    const cvLbl = v => v==null?"—":(v<0.5?"Regular":v<0.8?"Medio":"Apelotonado");
+    const cvBg = v => v==null?"":`background:hsla(${Math.max(0,Math.min(1,1-(v-0.3)/0.7))*120},75%,45%,.4)`;
+    const card=(cls,l,v,s,st="")=>`<div class="lk ${cls}" style="${st}"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
+    el.style.display="grid";
+    el.innerHTML = [
+      card("b-tot",`📊 CV comuna (${periodoLbl(per)})`, cv??"—", `${cvLbl(+cv)} · promedio ${vals.length} líneas`, cvBg(+cv)),
+      card("b-eff","⏱️ Headway medio", hw!=null?hw+" min":"—", `promedio en ${state.comuna}`),
+      card("b-bajo","Vs. sistema", sisCv!=null?(cv!=null?((cv-sisCv)>=0?"+":"")+(cv-sisCv).toFixed(2):"—"):"—",
+        sisCv!=null?`sistema ${sisCv.toFixed(2)}`:"—", ""),
+      card("b-med","Líneas evaluadas", vals.length+"", `de ${comLines.length} que operan`),
+      card("b-alto","", "",""),
+      card("b-cic","", "",""),
+    ].join("");
+    return;
+  }
+  // COBERTURA ESTÁTICA (per-line OR per-comuna)
+  const showCoverLine = state.linea!=="TODAS" && state.vista==="normal" && mode==="cover" && state.coverSub==="est" && COB && COB.features;
+  const showCoverCom = comView && mode==="cover" && state.coverSub==="est" && COB && COB.features;
+  if(!showCoverLine && !showCoverCom){ el.style.display="none"; el.innerHTML=""; return; }
+  let hog=0, hbaj=0, hmed=0, halt=0, nMz=0;
+  COB.features.forEach(f=>{ const p=f.properties;
+    if(showCoverLine && !(p.cob_lineas||[]).includes(state.linea)) return;
+    if(showCoverCom && !inComuna(p.cy, p.cx)) return;
+    nMz++; const h=p.hog||0; hog+=h;
+    const t=nseTercil(p.nse);
+    if(t===0) hbaj+=h; else if(t===1) hmed+=h; else if(t===2) halt+=h;
+  });
+  let ext=null, tc=null, flota=null;
+  if(showCoverLine){
+    const row = (CLINE.lineas||[]).find(r=>r.linea===state.linea && r.rec===state.linea)
+                || (CLINE.lineas||[]).find(r=>r.linea===state.linea);
+    ext = row ? row.ext_km : null;
+    const ci = CICLO && CICLO.lineas && CICLO.lineas[state.linea];
+    tc = ci ? ci.tc : null;
+    flota = ci ? ci.flota_total : null;
+  }
+  const ciclos = (tc && flota && tc>0) ? (960/tc).toFixed(1) : null;
+  const hogkm = ext ? Math.round(hog/ext) : null;
+  const pct = n => hog ? Math.round(100*n/hog) : 0;
+  const t1 = _nseTerciles ? _nseTerciles[0] : null;
+  const t2 = _nseTerciles ? _nseTerciles[1] : null;
+  const card=(cls,l,v,s)=>`<div class="lk ${cls}"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
+  el.style.display="grid";
+  const scope = showCoverLine ? `buffer 300 m · línea ${state.linea}` : `manzanas en ${state.comuna}`;
+  el.innerHTML = [
+    card("b-tot","🏠 Hogares cubiertos", NF.format(hog), `${nMz} manzanas · ${scope}`),
+    card("b-bajo","NSE bajo", NF.format(hbaj), `${pct(hbaj)}% · ≤ ${t1?NF.format(t1):"—"} CLP/m²`),
+    card("b-med","NSE medio", NF.format(hmed), `${pct(hmed)}% · entre terciles`),
+    card("b-alto","NSE alto", NF.format(halt), `${pct(halt)}% · > ${t2?NF.format(t2):"—"} CLP/m²`),
+    card("b-eff","📏 Hog. por km", hogkm!=null?NF.format(hogkm):"—", ext?`extensión ${ext} km (ida)`:(showCoverCom?`${comLines.length} líneas en comuna`:"")),
+    card("b-cic","🔁 Ciclos/bus/día", ciclos??"—", tc?`tiempo de ciclo ${Math.round(tc)} min · ${flota||"—"} buses`:(showCoverCom?"—":"")),
+  ].join("");
+}
+/* ---------- Tabla de cobertura por recorrido (vista sistema + cover) ---------- */
+function renderCoverTable(){
+  const el=$("cover-table"); if(!el) return;
+  let rows=(CLINE&&CLINE.lineas)||[];
+  if(state.mapMode!=="cover" || state.coverSub!=="est" || state.vista!=="normal" || state.linea!=="TODAS" || !rows.length){ el.style.display="none"; el.innerHTML=""; return; }
+  if(state.comuna!=="TODAS" && CLIN && CLIN[state.comuna]){ const s=new Set(CLIN[state.comuna]); rows=rows.filter(r=>s.has(r.linea)); }
+  el.style.display="";
+  const mx=k=>Math.max(1,...rows.map(r=>r[k]||0));
+  const mH=mx("hog"), mHK=mx("hog_km"), mE=mx("ext_km");
+  const heat=(v,m,rgb)=>`style="background:rgba(${rgb},${(m?Math.min(0.6,(v/m)*0.6):0).toFixed(2)})"`;
+  const seg=(v,tot,rgb)=>`style="background:rgba(${rgb},${(tot?Math.min(0.66,(v/tot)*0.66):0).toFixed(2)})"`;
+  const velBg=v=>v?`style="background:hsla(${(Math.max(0,Math.min((v-12)/7,1))*120).toFixed(0)},70%,45%,.42)"`:'';
+  let html=`<div class="cap">Cobertura de hogares por recorrido (manzanas Censo a ≤300 m del trazado). <b>Vel</b> = velocidad operacional (rojo lento / verde rápido). <b>Hog/km</b> = hogares ÷ extensión. NSE por avalúo: <b style="color:#fb923c">bajo</b> · <b style="color:#94a3b8">medio</b> · <b style="color:#2dd4bf">alto</b> (terciles).</div>`;
+  html+=`<table><thead><tr><th class="l">Línea</th><th class="l">Rec</th><th>Ext<br>(km)</th><th>Vel<br>(km/h)</th><th>Hogares</th><th>Hog/km</th><th>NSE<br>bajo</th><th>NSE<br>medio</th><th>NSE<br>alto</th></tr></thead><tbody>`;
+  let prev=null;
+  rows.forEach(r=>{
+    const tot=(r.hog_baj+r.hog_med+r.hog_alt)||1;
+    const nl=r.linea!==prev; const sep=nl?' class="grpsep"':'';
+    html+=`<tr${sep}><td class="l grp">${nl?r.linea:''}</td><td class="l lh">${r.rec}</td>`+
+      `<td ${heat(r.ext_km,mE,'148,163,184')}>${r.ext_km}</td>`+
+      `<td ${velBg(r.vel)}><b>${r.vel??'—'}</b></td>`+
+      `<td ${heat(r.hog,mH,'56,189,248')}>${NF.format(r.hog)}</td>`+
+      `<td ${heat(r.hog_km,mHK,'52,211,153')}><b>${NF.format(r.hog_km)}</b></td>`+
+      `<td ${seg(r.hog_baj,tot,'251,146,60')}>${NF.format(r.hog_baj)}</td>`+
+      `<td ${seg(r.hog_med,tot,'148,163,184')}>${NF.format(r.hog_med)}</td>`+
+      `<td ${seg(r.hog_alt,tot,'45,212,191')}>${NF.format(r.hog_alt)}</td></tr>`;
+    prev=r.linea;
+  });
+  el.innerHTML=html+`</tbody></table>`;
+}
+/* ---------- Tabla de bunching CV por línea × período (vista sistema + bunch) ---------- */
+function renderBunchTable(){
+  const el=$("cover-table"); if(!el) return;
+  if(state.mapMode!=="bunch" || state.vista!=="normal" || state.linea!=="TODAS" || !BUNCH||!BUNCH.lineas){ return; }
+  const periodos = ["am","md","pm","off","noche","agg"];
+  let lineas = Object.keys(BUNCH.lineas).sort((a,b)=>(a[0]>='0'&&a[0]<='9'?+a:1e9)-(b[0]>='0'&&b[0]<='9'?+b:1e9));
+  if(state.comuna!=="TODAS" && CLIN && CLIN[state.comuna]){ const s=new Set(CLIN[state.comuna]); lineas=lineas.filter(l=>s.has(l)); }
+  const cvCell = cv => { if(cv==null) return `<td style="color:var(--dim)">—</td>`;
+    const hue = Math.max(0,Math.min(1, 1-(cv-0.3)/0.7))*120;
+    return `<td style="background:hsla(${hue},75%,45%,.45);font-weight:600">${cv.toFixed(2)}</td>`; };
+  let html=`<div class="cap"><b>Bunching</b> · CV de los headways de salida por línea × período (laboral). <b>Verde</b> regular (≤0.5) · <b>amarillo</b> medio · <b>rojo</b> apelotonado (≥0.8). Headway medio (min) entre paréntesis.</div>`;
+  html+=`<table><thead><tr><th class="l">Línea</th>${periodos.map(p=>`<th>${periodoLbl(p)}</th>`).join("")}</tr></thead><tbody>`;
+  lineas.forEach(lb=>{
+    html+=`<tr><td class="l grp">${lb}</td>`;
+    periodos.forEach(p=>{ const d=(BUNCH.lineas[lb].L||{})[p]||{};
+      html += cvCell(d.cv).replace("</td>", ` <span style="color:var(--dim);font-weight:400">(${d.headway??"—"})</span></td>`); });
+    html+=`</tr>`;
+  });
+  el.innerHTML = html+`</tbody></table>`;
+  el.style.display="";
 }
 function renderNarrative(){
   const el=$("map-narrative"); if(!el) return;
@@ -2040,8 +2304,13 @@ function renderEvolucion(){
     Promise.all([J("variantes_freq.json").catch(()=>null), J("freq_trend.json").catch(()=>null)])
       .then(([vf,vt])=>{ VFREQ=vf; VTREND=vt; renderVarFreq(); });
     J("terminales_linea.json").then(d=>{ TLIN=d; if(state.linea!=="TODAS") renderMapa(); }).catch(()=>{});
+    J("det_periodo.json").then(d=>{ DETP=d; if(state.mapMode==="det") render(); }).catch(()=>{});
+    J("cobertura_lineas.json").then(d=>{ CLINE=d; if(state.mapMode==="cover") render(); }).catch(()=>{});
+    J("bunching.json").then(d=>{ BUNCH=d; if(state.mapMode==="bunch") render(); }).catch(()=>{});
+    J("bunching_arco.json").then(d=>{ BUNCHA=d; if(state.mapMode==="bunch"&&state.linea!=="TODAS") renderMapa(); }).catch(()=>{});
+    J("ciclo.json").then(d=>{ CICLO=d; }).catch(()=>{});
     buildMapModes();
-    buildPeriodo(); buildPurpose(); buildCoverSub();
+    buildPeriodo(); buildPurpose(); buildCoverSub(); buildSentido(); buildDettipo();
     buildComunaTabs();
     buildLineaList();
     $("linea-search").addEventListener("input", e=>buildLineaList(e.target.value));

@@ -183,6 +183,34 @@
   .periodo-sel{display:inline-flex;align-items:center;gap:6px;flex:none}
   .periodo-sel .lbl{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
   .periodo-sel[data-inactive="1"]{opacity:.5}
+  /* KPIs contextuales por línea (cobertura / detenciones / bunching) */
+  .linea-kpis{margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+  .linea-kpis .lk{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:10px 12px;
+    transition:border-color .2s}
+  .linea-kpis .lk .lab{font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:5px;letter-spacing:.02em}
+  .linea-kpis .lk .val{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--tx);margin-top:2px;line-height:1.05}
+  .linea-kpis .lk .sub{font-size:10.5px;color:var(--dim);margin-top:1px}
+  .linea-kpis .lk.b-bajo{border-left:3px solid #fb923c}
+  .linea-kpis .lk.b-med{border-left:3px solid #94a3b8}
+  .linea-kpis .lk.b-alto{border-left:3px solid #2dd4bf}
+  .linea-kpis .lk.b-tot{border-left:3px solid #38bdf8}
+  .linea-kpis .lk.b-eff{border-left:3px solid #34d399}
+  .linea-kpis .lk.b-cic{border-left:3px solid #a78bfa}
+  /* tabla comparativa de cobertura / bunching */
+  .cover-table{margin-top:12px;max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:12px;
+    background:linear-gradient(180deg,var(--panel),var(--panel2))}
+  .cover-table table{border-collapse:collapse;width:100%;font-size:12px;font-family:var(--sans)}
+  .cover-table th,.cover-table td{padding:6px 12px;text-align:right;white-space:nowrap}
+  .cover-table thead th{position:sticky;top:0;background:var(--topbar);color:var(--muted);font-weight:600;
+    border-bottom:2px solid var(--line);z-index:1;font-size:11px}
+  .cover-table th.l,.cover-table td.l{text-align:left}
+  .cover-table tbody td{border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px}
+  .cover-table tbody tr.grpsep td{border-top:2px solid var(--line2)}
+  .cover-table tbody tr:hover td{outline:1px solid rgba(56,189,248,.35);outline-offset:-1px}
+  .cover-table .lh{font-weight:600;color:var(--tx);font-family:var(--sans)}
+  .cover-table .cap{padding:8px 12px;font-size:11px;line-height:1.5;color:var(--muted);
+    border-bottom:1px solid var(--line)}
+  .cover-table .grp{color:var(--acc);font-weight:700;font-family:var(--mono);font-size:13px}
 
   /* ===== HERO intro: red neuronal animada ===== */
   #hero-splash{position:fixed;inset:0;z-index:9999;background:radial-gradient(120% 120% at 50% 40%,#0e1730,#070b16 70%);
@@ -446,9 +474,13 @@
                 </span>
                 <div class="periodo-sel" id="periodo-sel" title="Período del día (afecta velocidad/congestión/espera/cobertura dinámica)"></div>
                 <div class="periodo-sel" id="cover-sub" title="Dimensión de cobertura (estática / oferta dinámica)"></div>
+                <div class="periodo-sel" id="sentido-sel" title="Sentido de circulación (ida/regreso analizados por separado)"></div>
+                <div class="periodo-sel" id="dettipo-sel" title="Detención: congestión en tránsito (semáforos/tacos) vs detención de servicio en paraderos"></div>
                 <div class="periodo-sel" id="purpose-sel" title="Propósito de viaje (repondera por demanda EOD)"></div>
               </div>
               <p id="map-narrative" class="map-narr"></p>
+              <div id="linea-kpis" class="linea-kpis" style="display:none"></div>
+              <div id="cover-table" class="cover-table" style="display:none"></div>
             </div>
           </div>
         </section>
@@ -677,7 +709,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=85"></script>
+<script defer src="assets/app_shell.js?v=87"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
