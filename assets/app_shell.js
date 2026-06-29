@@ -710,34 +710,35 @@ function renderFreqChart(){
 function renderLineFreqChart(){
   const card=$("lin-freq-card"); if(!card) return;
   const lineActive = state.vista==="normal" && state.linea!=="TODAS";
-  if(!lineActive || !BASE30 || !DIA || !BASE30[DIA.dia_tipo]){ card.style.display="none"; return; }
-  const dt=DIA.dia_tipo, fl=BASE30[dt].freq_lin, sl=DIA.freq_serie_lin;
-  const base = fl && fl[state.linea];
-  const serie = sl && sl[state.linea];
-  if(!base && !serie){ card.style.display="none"; return; }
+  if(!lineActive || !BASE30){ card.style.display="none"; return; }
+  const bins=BASE30.bins, i0=10, i1=47;
+  const fL=(BASE30.L&&BASE30.L.freq_lin||{})[state.linea];
+  const fS=(BASE30.S&&BASE30.S.freq_lin||{})[state.linea];
+  const fD=(BASE30.D&&BASE30.D.freq_lin||{})[state.linea];
+  if(!fL&&!fS&&!fD){ card.style.display="none"; return; }
   card.style.display="";
   if(!linFreqChart) linFreqChart = echarts.init($("ch-lin-freq"));
-  const bins=BASE30.bins, i0=10, i1=47;
   const x=bins.slice(i0,i1+1);
-  const bvals = base ? base.slice(i0,i1+1) : x.map(()=>null);
-  const ovals = serie ? x.map((_,j)=>{const i=i0+j; return i<=DIA.bin ? (serie[i]||0) : null;}) : x.map(()=>null);
-  const th=TH(), dtl=dt==="L"?"laborable":dt==="S"?"sábado":"domingo";
+  const vL=fL?fL.slice(i0,i1+1):x.map(()=>null);
+  const vS=fS?fS.slice(i0,i1+1):x.map(()=>null);
+  const vD=fD?fD.slice(i0,i1+1):x.map(()=>null);
+  const th=TH();
   linFreqChart.setOption({
     textStyle:{fontFamily:"Inter,sans-serif",color:th.tx},
     grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
-    legend:{data:[`Promedio ${dtl}`,"Observado hoy"],textStyle:{color:th.mut},top:0},
+    legend:{data:["Laborable","Sábado","Domingo"],textStyle:{color:th.mut},top:0},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
-      formatter:p=>{const t=p[0].axisValue; let s=`${t}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${Math.round(x.value)}</b><br>`;}); return s;}},
+      formatter:p=>{const t=p[0].axisValue; let s=`${t}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${x.value.toFixed(1)}</b><br>`;}); return s;}},
     xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:3},axisLine:{lineStyle:{color:th.axis}}},
     yAxis:{type:"value",name:"despachos/30min",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
     series:[
-      {name:`Promedio ${dtl}`,type:"line",data:bvals,smooth:true,symbol:"none",lineStyle:{width:2,color:th.mut,type:"dashed"}},
-      {name:"Observado hoy",type:"line",data:ovals,smooth:false,symbol:"circle",symbolSize:6,showSymbol:true,connectNulls:false,
-        lineStyle:{width:2,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991f"}},
+      {name:"Laborable",type:"line",data:vL,smooth:true,symbol:"none",lineStyle:{width:2,color:"#22d3ee"},itemStyle:{color:"#22d3ee"},areaStyle:{color:"#22d3ee12"}},
+      {name:"Sábado",type:"line",data:vS,smooth:true,symbol:"none",lineStyle:{width:2,color:"#a78bfa"},itemStyle:{color:"#a78bfa"}},
+      {name:"Domingo",type:"line",data:vD,smooth:true,symbol:"none",lineStyle:{width:2,color:"#fb923c"},itemStyle:{color:"#fb923c"}},
     ],
   },true);
   setTimeout(()=>linFreqChart.resize(),60);
-  $("lin-freq-sub").textContent = `línea ${state.linea} · despachos/30 min · promedio ${dtl} vs observado hoy`;
+  $("lin-freq-sub").textContent = `línea ${state.linea} · despachos/30 min · perfil empírico por tipo de día`;
 }
 function renderExcesos(){
   const el = $("excesos-list"); if(!el) return;
@@ -783,16 +784,19 @@ function _smooth(arr, w){
   }
   return out;
 }
+let _vcMarker=null;
+function _vcClearMarker(){ if(_vcMarker&&lmap){lmap.removeLayer(_vcMarker);_vcMarker=null;} }
 function renderVelCiclo(){
   const card=$("velciclo-card"); if(!card) return;
   const lineView = state.vista==="normal" && state.linea!=="TODAS";
-  if(!lineView||!VCICLO){card.style.display="none";return;}
+  if(!lineView||!VCICLO){card.style.display="none";_vcClearMarker();return;}
   const ld=VCICLO.lineas[state.linea];
-  if(!ld){card.style.display="none";return;}
+  if(!ld){card.style.display="none";_vcClearMarker();return;}
   card.style.display="";
   if(!vcChart) vcChart=echarts.init($("ch-velciclo"));
   const ida=ld.ida, reg=ld.regreso;
   const iKm=ida?ida.km:[], rKm=reg?reg.km:[];
+  const iCoords=ida?ida.coords:[], rCoords=reg?reg.coords:[];
   const iV=ida?_smooth(ida.vel[vcPer]||[],vcSm):[];
   const rV=reg?_smooth(reg.vel[vcPer]||[],vcSm):[];
   const maxKm=Math.max(iKm.length?iKm[iKm.length-1]:0,rKm.length?rKm[rKm.length-1]:0);
@@ -811,6 +815,16 @@ function renderVelCiclo(){
       {name:"Regreso",type:"line",data:rV,symbol:"none",lineStyle:{width:2,color:"#fb923c"},itemStyle:{color:"#fb923c"},connectNulls:true},
     ],
   },true);
+  vcChart.off("updateaxispointer"); vcChart.off("globalout");
+  vcChart.on("updateaxispointer",function(e){
+    if(!lmap||!e.axesInfo||!e.axesInfo.length) return;
+    const idx=e.axesInfo[0].value;
+    const c = (iCoords[idx]) || (rCoords[idx]);
+    if(!c){_vcClearMarker();return;}
+    if(_vcMarker) _vcMarker.setLatLng([c[0],c[1]]);
+    else { _vcMarker=L.circleMarker([c[0],c[1]],{radius:8,color:"#fff",fillColor:"#f43f5e",fillOpacity:1,weight:2}).addTo(lmap); }
+  });
+  vcChart.on("globalout",_vcClearMarker);
   setTimeout(()=>vcChart.resize(),60);
   $("vc-sub").textContent=`km/h vs km · línea ${state.linea} · ${VCICLO.labels[vcPer]||vcPer}`;
 }
