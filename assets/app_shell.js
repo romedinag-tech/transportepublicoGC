@@ -345,6 +345,27 @@ function updateLiveCard(card, s, live, norm, pct, prev){
     } else { gDelta.textContent = ""; }
   }
 }
+let _comGPSdata=null, _comGPStag="";
+function _comGPS(){
+  const C = state.comuna!=="TODAS" ? state.comuna : null;
+  if(!C||!LIVE||!LIVE.buses) return null;
+  const tag=C+"|"+(LIVE.snapshot_utc||"");
+  if(_comGPSdata&&_comGPStag===tag) return _comGPSdata;
+  const buses=LIVE.buses.filter(b=>b[2]&&inComuna(b[0],b[1]));
+  const n=buses.length;
+  if(!n){_comGPSdata={buses_op:0,vel:null,det:null,term:0};_comGPStag=tag;return _comGPSdata;}
+  let sumSpd=0,nMov=0,stopped=0,atTerm=0;
+  for(const b of buses){
+    if(b[4]){nMov++;sumSpd+=b[3];}
+    else if(nearTerminal(b[0],b[1],b[2])){atTerm++;}
+    else{stopped++;}
+  }
+  const vel=nMov>0?Math.round(sumSpd/nMov*10)/10:null;
+  const inRoute=nMov+stopped;
+  const det=inRoute>0?Math.round(1000*stopped/inRoute)/10:null;
+  _comGPSdata={buses_op:n,vel,det,term:atTerm};_comGPStag=tag;
+  return _comGPSdata;
+}
 function _liveVal(s, L){
   if(L){
     if(s.k==="freq") return (DIA.freq_serie_lin||{})[L] ? (DIA.freq_serie_lin[L][DIA.bin]||0) : 0;
@@ -354,17 +375,13 @@ function _liveVal(s, L){
   }
   const C = state.comuna!=="TODAS" ? state.comuna : null;
   if(C){
+    if(s.k==="buses_op"||s.k==="vel"||s.k==="det"||s.k==="term"){
+      const gps=_comGPS(); return gps?gps[s.k]:null;
+    }
     const lines = CLIN[C]||[];
     if(s.k==="freq"){
       const fsl = DIA.freq_serie_lin||{};
       return lines.reduce((sum,l)=>sum+((fsl[l]||[])[DIA.bin]||0),0);
-    }
-    if(s.k==="vel"||s.k==="det"){
-      const ld=DIA[s.k+"_lin"], bld=DIA.buses_op_lin||{};
-      if(!ld) return null;
-      let sw=0,sv=0;
-      for(const l of lines){ const v=ld[l],w=bld[l]||0; if(v!=null&&w>0){sv+=v*w;sw+=w;} }
-      return sw>0 ? Math.round(sv/sw*10)/10 : null;
     }
     const ld=DIA[s.k+"_lin"];
     if(!ld) return null;
@@ -381,6 +398,7 @@ function _baseVal(s, base, b, L){
   }
   const C = state.comuna!=="TODAS" ? state.comuna : null;
   if(C){
+    if(s.k==="buses_op"||s.k==="term") return null;
     const lines = CLIN[C]||[];
     if(s.k==="vel"||s.k==="det"){
       const bl=base[s.k+"_lin"], bbl=base.buses_op_lin;
@@ -521,8 +539,21 @@ function computeLiveExtras(filterL){
 function renderLiveExtras(){
   buildManzanaIndex();
   const L = state.linea!=="TODAS" ? state.linea : null;
+  const C = state.comuna!=="TODAS" ? state.comuna : null;
   const ex = computeLiveExtras(L); if(!ex) return;
   const cont = $("kpis2"); if(!cont) return;
+  if(C){
+    const comHog = ex.cob_hog_com[C]||0, comTot = TOT_HOG_COM[C]||0;
+    const pct = comTot>0 ? 100*comHog/comTot : null;
+    const gps = _comGPS();
+    const nb = gps ? gps.buses_op : 0;
+    const c1 = cont.querySelector('.klive[data-k="cob_now"]');
+    const c1HTML = liveBoxCobAhora(comHog, comTot, pct, nb);
+    if(c1) c1.outerHTML = c1HTML; else cont.insertAdjacentHTML("beforeend", c1HTML);
+    const c2 = cont.querySelector('.klive[data-k="cob_com"]'); if(c2) c2.remove();
+    const c3 = cont.querySelector('.klive[data-k="fleet_lin"]'); if(c3) c3.remove();
+    return;
+  }
   const pct_tot = TOT_HOG_GLOBAL>0 ? 100*ex.cob_hog/TOT_HOG_GLOBAL : null;
   const c1 = cont.querySelector('.klive[data-k="cob_now"]');
   const c1HTML = liveBoxCobAhora(ex.cob_hog, TOT_HOG_GLOBAL, pct_tot, ex.n_buses);
@@ -530,7 +561,6 @@ function renderLiveExtras(){
   const c2 = cont.querySelector('.klive[data-k="cob_com"]');
   const c2HTML = liveBoxCobComuna(ex.cob_hog_com);
   if(c2) c2.outerHTML = c2HTML; else cont.insertAdjacentHTML("beforeend", c2HTML);
-  // Fleet card: solo en vista sistema (no per-línea)
   if(!L){
     const c3 = cont.querySelector('.klive[data-k="fleet_lin"]');
     const c3HTML = liveBoxFleetLineas(ex.def_lineas, ex.top_lineas);
@@ -830,9 +860,11 @@ function renderOpNow(){
 }
 function loadLive(){
   fetch(LIVE_URL+"?t="+Date.now(),{cache:"no-store"}).then(r=>r.json())
-    .then(d=>{ LIVE=d; drawLiveBuses(); renderOpNow();
-      // refrescar KPIs extra en cada foto del feed (cobertura instantánea + déficit por línea)
-      if(state.vista==="normal") renderLiveExtras();
+    .then(d=>{ LIVE=d; _comGPSdata=null; drawLiveBuses(); renderOpNow();
+      if(state.vista==="normal"){
+        renderLiveExtras();
+        if(state.comuna!=="TODAS" && DIA && BASE30) renderLiveKPIs();
+      }
     }).catch(()=>{});
 }
 // F3: extender L.Canvas para dibujar buses orientados por rumbo (chevron) en lugar de círculos.
