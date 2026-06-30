@@ -310,17 +310,18 @@ function liveBox(s, live, norm, pct){
   const tx=(cx+r*Math.cos(a)).toFixed(1), ty=(cy-r*Math.sin(a)).toFixed(1);
   const lx=(cx+(r+16)*Math.cos(a)).toFixed(1), ly=(cy-(r+16)*Math.sin(a)).toFixed(1);
   const valTxt = live==null ? "—" : s.f(live);
-  const pctTxt = pct==null ? "—" : Math.round(pct)+"%";
+  const pctTxt = pct==null ? "—" : (pct>300 ? "300%+" : Math.round(pct)+"%");   // cap visual
   const normTxt = norm==null ? "—" : s.f(norm)+s.unit;
   // delta semántico: ▲ mejor, ▼ peor, = igual (según dir del KPI)
   let deltaTxt = "", deltaCol = "var(--muted)";
   if(pct!=null && s.dir!==0){
     const diff = Math.round(pct-100);
     const arrow = diff>2 ? "▲" : diff<-2 ? "▼" : "=";
+    const diffTxt = Math.abs(diff)>200 ? (diff>0?"+200%+":"-200%+") : `${diff>=0?"+":""}${diff}%`;
     deltaCol = gaugeColor(pct, s.dir);
-    deltaTxt = `<span class="g-delta" style="color:${deltaCol}">${arrow} ${diff>=0?"+":""}${diff}%</span>`;
+    deltaTxt = `<span class="g-delta" style="color:${deltaCol}">${arrow} ${diffTxt}</span>`;
   } else if(pct!=null){
-    deltaTxt = `<span class="g-delta" style="color:${col}">${pctTxt}</span>`;
+    deltaTxt = `<span class="g-delta" style="color:${col}"> · ${pctTxt}</span>`;
   }
   const prog = pct==null ? "" :
     `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${tx} ${ty}" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round"/>`+
@@ -420,8 +421,8 @@ function _comGPS(){
   return _comGPSdata;
 }
 function _liveVal(s, L){
-  // freq vivo: señal por bloques (trip_id->shape, robusta para tracking). Sin comparación al baseline
-  // (ver _baseVal): el método de EXPEDICIONES en vivo aún se calibra.
+  // freq vivo: señal por bloques (dato disponible). Sin comparación al baseline (ver _baseVal):
+  // el método de EXPEDICIONES en vivo (freq_trm) está en calibración.
   if(L){
     if(s.k==="freq") return (DIA.freq_blk_serie_lin||{})[L] ? (DIA.freq_blk_serie_lin[L][DIA.bin]||0) : 0;
     const ld = DIA[s.k+"_lin"];
@@ -448,7 +449,7 @@ function _liveVal(s, L){
 function _baseVal(s, base, b, L){
   // freq: baseline por RUNS ya corregido, pero el VIVO de expediciones aún se calibra (map-matcher
   // pierde lock en corredores; trip_id se resetea a mitad). Sin comparación % hasta tener vivo robusto.
-  const noBase = ["freq","inact","descanso","term"];   // term: baseline mal escalado (reestimar); freq: vivo en calibración
+  const noBase = ["freq"];   // freq: vivo (expediciones por tramos) en calibración; muestra solo perfil normal
   if(noBase.includes(s.k)) return null;
   if(L){
     const bl = base[s.k+"_lin"];
@@ -742,13 +743,13 @@ function renderFreqChart(){
   const L = lineView ? state.linea : null;
   const dt=DIA.dia_tipo, bins=BASE30.bins;
   const bd=BASE30[dt]||{};
-  let serie, bserie;                                       // serie vivo (expediciones) + baseline (runs)
+  let serie, bserie;                                       // serie vivo (expediciones por tramos) + baseline (runs)
   if(comView){
-    const fsl=DIA.freq_mm_serie_lin||{}, lines=CLIN[state.comuna]||[];
+    const fsl=DIA.freq_trm_serie_lin||{}, lines=CLIN[state.comuna]||[];
     serie = Array.from({length:48},(_,i)=>lines.reduce((s,l)=>s+((fsl[l]||[])[i]||0),0));
     const bfl=bd.freq_lin||{};
     bserie = Array.from({length:48},(_,i)=>lines.reduce((s,l)=>s+((bfl[l]||[])[i]||0),0));
-  } else { serie = DIA.freq_mm_serie||[]; bserie = bd.freq||[]; }
+  } else { serie = DIA.freq_trm_serie||[]; bserie = bd.freq||[]; }
   const i0=10, i1=47;
   const x=bins.slice(i0,i1+1);
   const ovals=x.map((_,j)=>{const i=i0+j; return i<=DIA.bin ? (serie[i]||0) : null;});
@@ -768,7 +769,7 @@ function renderFreqChart(){
     ],
   },true);
   setTimeout(()=>freqChart.resize(),60);
-  $("freq-sub").textContent = (comView ? `${state.comuna} · ` : "") + `expediciones/30 min · perfil normal (histórico por expediciones)`;
+  $("freq-sub").textContent = (comView ? `${state.comuna} · ` : "") + `expediciones/30 min · perfil normal (histórico)`;
 }
 
 function renderLineFreqChart(){
@@ -786,7 +787,7 @@ function renderLineFreqChart(){
   const vL=fL?fL.slice(i0,i1+1):x.map(()=>null);
   const vS=fS?fS.slice(i0,i1+1):x.map(()=>null);
   const vD=fD?fD.slice(i0,i1+1):x.map(()=>null);
-  const liveSerie=null;   // "Hoy" desactivado en freq hasta tener vivo robusto (expediciones); muestra perfil L/S/D
+  const liveSerie=null;   // "Hoy" desactivado en freq (vivo por expediciones en calibración); muestra perfil L/S/D
   const vHoy=liveSerie?x.map((_,j)=>{const i=i0+j; return (DIA&&i<=DIA.bin)?(liveSerie[i]||0):null;}):x.map(()=>null);
   const hasLive=vHoy.some(v=>v!=null&&v>0);
   const th=TH();
@@ -906,7 +907,7 @@ function drawExcesosMap(){
   if(!geo.length){setCoverLegend("exc");return;}
   const fL=state.linea!=="TODAS"?state.linea:null;
   const fC=state.comuna!=="TODAS"?state.comuna:null;
-  let filtered=geo;
+  let filtered=geo.filter(e=>e[3]<=110);   // descartar artefactos GPS (vel imposible para bus)
   if(fL) filtered=filtered.filter(e=>e[2]===fL);
   if(fC) filtered=filtered.filter(e=>inComuna(e[0],e[1]));
   if(!filtered.length){setCoverLegend("exc");return;}
