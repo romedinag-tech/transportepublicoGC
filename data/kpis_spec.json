@@ -8,7 +8,7 @@
     {"k":"inact",    "lab":"Sin operar hoy",        "ic":"💤",  "dir":-1, "unit":"",       "fmt":"int",   "group":"flota"},
     {"k":"vel",      "lab":"Velocidad media",       "ic":"⚡",  "dir": 1, "unit":" km/h",  "fmt":"dec1",  "group":"calidad"},
     {"k":"det",      "lab":"Tiempo detenido",       "ic":"🛑",  "dir":-1, "unit":" %",     "fmt":"dec1",  "group":"calidad"},
-    {"k":"freq",     "lab":"Frecuencia terminales", "ic":"🟢",  "dir": 1, "unit":"/30min", "fmt":"int",   "group":"calidad"}
+    {"k":"freq",     "lab":"Frecuencia",            "ic":"🟢",  "dir": 1, "unit":"/30min", "fmt":"int",   "group":"calidad"}
   ],
   "_glosario": {
     "k":     "clave en dia.json (vivo) y baseline_30min.json (histórico)",

@@ -420,8 +420,10 @@ function _comGPS(){
   return _comGPSdata;
 }
 function _liveVal(s, L){
+  // freq vivo: señal por bloques (trip_id->shape, robusta para tracking). Sin comparación al baseline
+  // (ver _baseVal): el método de EXPEDICIONES en vivo aún se calibra.
   if(L){
-    if(s.k==="freq") return (DIA.freq_serie_lin||{})[L] ? (DIA.freq_serie_lin[L][DIA.bin]||0) : 0;
+    if(s.k==="freq") return (DIA.freq_blk_serie_lin||{})[L] ? (DIA.freq_blk_serie_lin[L][DIA.bin]||0) : 0;
     const ld = DIA[s.k+"_lin"];
     if(!ld) return null;
     return ld[L] ?? 0;
@@ -433,17 +435,20 @@ function _liveVal(s, L){
     }
     const lines = CLIN[C]||[];
     if(s.k==="freq"){
-      const fsl = DIA.freq_serie_lin||{};
+      const fsl = DIA.freq_blk_serie_lin||{};
       return lines.reduce((sum,l)=>sum+((fsl[l]||[])[DIA.bin]||0),0);
     }
     const ld=DIA[s.k+"_lin"];
     if(!ld) return null;
     return lines.reduce((sum,l)=>sum+(ld[l]||0),0);
   }
+  if(s.k==="freq") return DIA.freq_blk ?? 0;
   return DIA[s.k];
 }
 function _baseVal(s, base, b, L){
-  const noBase = ["freq","inact","descanso"];
+  // freq: baseline por RUNS ya corregido, pero el VIVO de expediciones aún se calibra (map-matcher
+  // pierde lock en corredores; trip_id se resetea a mitad). Sin comparación % hasta tener vivo robusto.
+  const noBase = ["freq","inact","descanso","term"];   // term: baseline mal escalado (reestimar); freq: vivo en calibración
   if(noBase.includes(s.k)) return null;
   if(L){
     const bl = base[s.k+"_lin"];
@@ -736,15 +741,18 @@ function renderFreqChart(){
   if(!freqChart) freqChart = echarts.init($("ch-freq"));
   const L = lineView ? state.linea : null;
   const dt=DIA.dia_tipo, bins=BASE30.bins;
-  let serie;
-  if(L){ serie = (DIA.freq_serie_lin||{})[L]||[]; }
-  else if(comView){
-    const fsl=DIA.freq_serie_lin||{}, lines=CLIN[state.comuna]||[];
+  const bd=BASE30[dt]||{};
+  let serie, bserie;                                       // serie vivo (expediciones) + baseline (runs)
+  if(comView){
+    const fsl=DIA.freq_mm_serie_lin||{}, lines=CLIN[state.comuna]||[];
     serie = Array.from({length:48},(_,i)=>lines.reduce((s,l)=>s+((fsl[l]||[])[i]||0),0));
-  } else { serie = DIA.freq_serie||[]; }
+    const bfl=bd.freq_lin||{};
+    bserie = Array.from({length:48},(_,i)=>lines.reduce((s,l)=>s+((bfl[l]||[])[i]||0),0));
+  } else { serie = DIA.freq_mm_serie||[]; bserie = bd.freq||[]; }
   const i0=10, i1=47;
   const x=bins.slice(i0,i1+1);
   const ovals=x.map((_,j)=>{const i=i0+j; return i<=DIA.bin ? (serie[i]||0) : null;});
+  const nvals=x.map((_,j)=>bserie[i0+j]??null);            // "normal" (perfil histórico por runs)
   const th=TH();
   freqChart.setOption({
     textStyle:{fontFamily:th.font,color:th.tx},
@@ -753,14 +761,14 @@ function renderFreqChart(){
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>{const t=p[0].axisValue; let s=`${t}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${Math.round(x.value)}</b><br>`;}); return s;}},
     xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:3},axisLine:{lineStyle:{color:th.axis}}},
-    yAxis:{type:"value",name:"despachos/30min",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    yAxis:{type:"value",name:"expediciones/30min",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
     series:[
-      {name:"Observado hoy",type:"line",data:ovals,smooth:false,symbol:"circle",symbolSize:6,showSymbol:true,connectNulls:false,
-        lineStyle:{width:2,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991f"}},
+      {name:"Normal",type:"line",data:nvals,smooth:true,symbol:"none",
+        lineStyle:{width:2,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"18"}},
     ],
   },true);
   setTimeout(()=>freqChart.resize(),60);
-  $("freq-sub").textContent = L ? `despachos/30 min · línea ${L} · observado hoy` : comView ? `despachos/30 min · ${state.comuna} · observado hoy` : `despachos/30 min · observado hoy`;
+  $("freq-sub").textContent = (comView ? `${state.comuna} · ` : "") + `expediciones/30 min · perfil normal (histórico por expediciones)`;
 }
 
 function renderLineFreqChart(){
@@ -778,7 +786,7 @@ function renderLineFreqChart(){
   const vL=fL?fL.slice(i0,i1+1):x.map(()=>null);
   const vS=fS?fS.slice(i0,i1+1):x.map(()=>null);
   const vD=fD?fD.slice(i0,i1+1):x.map(()=>null);
-  const liveSerie=(DIA&&DIA.freq_serie_lin||{})[state.linea];
+  const liveSerie=null;   // "Hoy" desactivado en freq hasta tener vivo robusto (expediciones); muestra perfil L/S/D
   const vHoy=liveSerie?x.map((_,j)=>{const i=i0+j; return (DIA&&i<=DIA.bin)?(liveSerie[i]||0):null;}):x.map(()=>null);
   const hasLive=vHoy.some(v=>v!=null&&v>0);
   const th=TH();
