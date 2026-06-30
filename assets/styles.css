@@ -19,12 +19,12 @@ header{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);
 .brand{display:flex;align-items:center;gap:13px;min-width:0}
 .logo{width:42px;height:42px;border-radius:12px;flex:none;
   background:var(--grad-brand);display:grid;place-items:center;
-  font-weight:800;color:#06121f;font-size:18px;box-shadow:var(--shadow-glow-live)}
+  font-weight:800;color:var(--bg-void);font-size:18px;box-shadow:var(--shadow-glow-live)}
 .brand h1{font-family:var(--font-display);font-size:16px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
 .brand p{font-size:var(--fs-caption);color:var(--muted);font-weight:500}
 .nav-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .pill{display:inline-flex;align-items:center;gap:7px;font-size:var(--fs-caption);font-weight:600;
-  padding:7px 13px;border-radius:var(--r-pill);border:1px solid var(--line2);color:var(--muted);background:rgba(255,255,255,.03)}
+  padding:7px 13px;border-radius:var(--r-pill);border:1px solid var(--line2);color:var(--muted);background:var(--hover)}
 .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--live);box-shadow:0 0 0 3px rgba(52,225,196,.18)}
 .pill a{color:var(--acc);text-decoration:none}
 .ghbtn{color:var(--tx);text-decoration:none}
@@ -85,7 +85,7 @@ section.block{padding:30px 0}
 .chart.tall{height:420px}
 .chart.heat{height:460px}
 .chart.xl{height:540px}
-.chart.map{height:580px;background:rgba(52,225,196,.02);border-radius:var(--r-control)}
+.chart.map{height:580px;background:var(--surface-1);border-radius:var(--r-control)}
 
 /* Footer / methodology */
 .method{background:var(--grad-panel);border:1px solid var(--line);border-radius:var(--r-card);padding:26px;margin:18px 0 8px;box-shadow:var(--shadow-card)}
@@ -94,7 +94,7 @@ section.block{padding:30px 0}
 .method dt{font-weight:700;color:var(--tx);font-size:14px;margin-bottom:3px}
 .method dd{color:var(--muted);font-size:var(--fs-body)}
 .note{display:flex;gap:10px;align-items:flex-start;margin-top:16px;padding:13px 15px;border-radius:var(--r-control);
-  background:rgba(244,183,64,.08);border:1px solid rgba(244,183,64,.25);font-size:var(--fs-body);color:#f6d98a}
+  background:var(--warn-tint);border:1px solid var(--warn-border);font-size:var(--fs-body);color:var(--warn-text)}
 footer{border-top:1px solid var(--line);padding:26px 0 50px;color:var(--dim);font-size:var(--fs-caption);text-align:center}
 footer a{color:var(--acc);text-decoration:none}
 .loading{color:var(--dim);font-size:var(--fs-caption);padding:40px;text-align:center}

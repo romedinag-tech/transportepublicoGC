@@ -276,8 +276,7 @@ let LIVE_KPIS = [
 ];
 function gaugeColor(pct,dir){
   if(pct==null) return "#64748b";
-  if(dir===0) return cssv("--ref")||"#6C8FF5";
-  const g = dir>0 ? pct : 200-pct;                       // "bondad": alta = mejor
+  const g = dir>0 ? pct : dir<0 ? 200-pct : pct;
   return g>=95 ? "#34d399" : g>=75 ? "#fbbf24" : "#f87171";
 }
 function liveBox(s, live, norm, pct){
@@ -307,11 +306,11 @@ function liveBox(s, live, norm, pct){
     `<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`+
     `<circle cx="${cx}" cy="${cy}" r="4" fill="${col}"/>`+
     `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" class="g-pct" fill="${col}">${pctTxt}</text>`;
-  return `<div class="kpi klive" data-k="${s.k}"><div class="lab"><span class="ic">${s.ic}</span>${s.lab}</div>`+
+  return `<div class="kpi klive" data-k="${s.k}" style="border-color:${col}30"><div class="lab"><span class="ic">${s.ic}</span>${s.lab}</div>`+
     `<svg class="gauge" viewBox="-8 -12 216 118">`+
-      `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--track,#2a3550)" stroke-width="7" stroke-linecap="round"/>`+
+      `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="#2a3550" stroke-width="7" stroke-linecap="round"/>`+
       prog+
-      `<text x="${cx}" y="${cy-14}" text-anchor="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2">${s.unit}</tspan></text>`+
+      `<text x="${cx}" y="${cy-14}" text-anchor="middle" class="g-val" fill="${col}">${valTxt}<tspan class="g-unit" dx="2">${s.unit}</tspan></text>`+
     `</svg>`+
     `<div class="sub">${norm!=null ? `normal: <b class="g-norm">${normTxt}</b>${deltaTxt}` : `<span style="color:var(--muted)">${valTxt}${s.unit}</span>`}</div></div>`;
 }
@@ -337,6 +336,7 @@ function animateNumber(setter, from, to, ms, fmt){
 function updateLiveCard(card, s, live, norm, pct, prev){
   const cx=100, cy=98, r=72;
   const col = gaugeColor(pct, s.dir);
+  card.style.borderColor = col+"30";
   const p = Math.max(0, Math.min(pct==null?0:pct, 200));
   const a = Math.PI*(1 - p/200);
   const tx=(cx+r*Math.cos(a)).toFixed(1), ty=(cy-r*Math.sin(a)).toFixed(1);
@@ -344,6 +344,7 @@ function updateLiveCard(card, s, live, norm, pct, prev){
   const pctTxt = pct==null ? "—" : Math.round(pct)+"%";
   const normTxt = norm==null ? "—" : s.f(norm)+s.unit;
   const valNode = card.querySelector('.g-val');
+  if(valNode) valNode.setAttribute('fill', col);
   const valText = valNode && valNode.firstChild;
   const unitT = valNode && valNode.querySelector('.g-unit');
   // animar el textNode del valor; mantener el tspan de unidad
@@ -616,11 +617,11 @@ function liveBoxCobAhora(hog, tot, pct, nb){
     `<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`+
     `<circle cx="${cx}" cy="${cy}" r="4" fill="${col}"/>`+
     `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" class="g-pct" fill="${col}">${pctTxt}</text>`;
-  return `<div class="kpi klive" data-k="cob_now"><div class="lab"><span class="ic">🏠</span>Cobertura ahora</div>`+
+  return `<div class="kpi klive" data-k="cob_now" style="border-color:${col}30"><div class="lab"><span class="ic">🏠</span>Cobertura ahora</div>`+
     `<svg class="gauge" viewBox="-8 -12 216 118">`+
-      `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--track,#2a3550)" stroke-width="7" stroke-linecap="round"/>`+
+      `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="#2a3550" stroke-width="7" stroke-linecap="round"/>`+
       prog+
-      `<text x="${cx}" y="${cy-14}" text-anchor="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2"> hog</tspan></text>`+
+      `<text x="${cx}" y="${cy-14}" text-anchor="middle" class="g-val" fill="${col}">${valTxt}<tspan class="g-unit" dx="2"> hog</tspan></text>`+
     `</svg>`+
     `<div class="sub">de <b class="g-norm">${NF.format(tot)}</b> hogares · <b>${nb}</b> buses</div></div>`;
 }
@@ -652,13 +653,18 @@ function _linFleetRow(d, top){
     `<div class="kcr-row"><div class="kcr-bar"><div class="kcr-fill" style="width:${w}%;background:${col}"></div><span class="bar-pct">${pct.toFixed(0)}%</span></div></div>`+
     `</div>`;
 }
+let _fleetMode = "menos";
 function liveBoxFleetLineas(def, top){
   const defRows = def.map(d=>_linFleetRow(d,false)).join("");
   const topRows = top.map(d=>_linFleetRow(d,true)).join("");
   const empty = `<div class="sub" style="text-align:center;padding:6px 0">sin datos</div>`;
+  const isMenos = _fleetMode==="menos";
   return `<div class="kpi klive" data-k="fleet_lin"><div class="lab"><span class="ic">🚍</span>Flota por línea</div>`+
-    `<div class="kcr-sec">📉 Menos buses</div><div class="kcr-list">${defRows||empty}</div>`+
-    `<div class="kcr-sec">📈 Más buses</div><div class="kcr-list">${topRows||empty}</div>`+
+    `<div class="fleet-toggle">`+
+      `<button class="${isMenos?"on":""}" onclick="_fleetMode='menos';renderLiveExtras()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Menos</button>`+
+      `<button class="${!isMenos?"on":""}" onclick="_fleetMode='mas';renderLiveExtras()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Más</button>`+
+    `</div>`+
+    `<div class="kcr-list">${isMenos ? (defRows||empty) : (topRows||empty)}</div>`+
     `<div class="sub">buses ahora / flota pico</div></div>`;
 }
 // Gráfico: frecuencia de salida de terminales — promedio histórico del tipo de día vs observado hoy
@@ -965,7 +971,7 @@ function renderOpNow(){
   if(isLine && ratio!=null){ const c=semColor(ratio); sem.style.cssText=`margin-left:auto;background:${c}22;color:${c}`;
     sem.textContent = ratio>=0.7?`● normal (${Math.round(ratio*100)}%)`:ratio>=0.4?`▲ bajo (${Math.round(ratio*100)}%)`:`▲ muy bajo (${Math.round(ratio*100)}%)`; }
   else if(isCom){ const _ref=cssv("--ref"); sem.style.cssText=`margin-left:auto;background:${_ref}22;color:${_ref}`; sem.textContent=`${Object.keys(byLine).length} líneas activas`; }
-  else { sem.style.cssText="margin-left:auto;background:#94a1ba22;color:#94a1ba"; sem.textContent="sin referencia"; }
+  else { sem.style.cssText=`margin-left:auto;background:${cssv("--text-mid")}22;color:${cssv("--text-mid")}`; sem.textContent="sin referencia"; }
   // desglose por línea (vista comuna)
   if(isCom){ const rows=Object.entries(byLine).sort((a,b)=>b[1]-a[1]);
     $("opnow-lines").innerHTML = `<div class="hint" style="margin-bottom:4px">Buses operando ahora por línea</div>`+
