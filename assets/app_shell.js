@@ -1156,10 +1156,30 @@ function periodCellSpeeds(){            // velocidad media por celda en el perí
   }
   return sp;
 }
+const PER_VC = {agg:"agregado", am:"pam", md:"mediodia", pm:"ppm", off:"fuera", noche:"noche"};
 function drawCongestion(){
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!GRID){ setCoverLegend("conges"); return; }
   const lbl = periodoLbl(state.periodo);
+  // VISTA LÍNEA: pintar los ARCOS DE LA RUTA coloreados por velocidad del período (no toda la red,
+  // y sin sobreponer la ruta). Mismo criterio que bunching. Usa vel_ciclo.json (vel por punto×período).
+  if(state.linea!=="TODAS" && VCICLO && VCICLO.lineas && VCICLO.lineas[state.linea]){
+    const vp = PER_VC[state.periodo] || "agregado";
+    const sens = state.sentido==="0" ? ["ida"] : state.sentido==="1" ? ["regreso"] : ["ida","regreso"];
+    const ld = VCICLO.lineas[state.linea];
+    sens.forEach(sn=>{
+      const s = ld[sn]; if(!s || !s.coords) return;
+      const co = s.coords, ve = (s.vel||{})[vp] || [];
+      for(let i=0;i<co.length-1;i++){
+        const a=ve[i], b=ve[i+1];
+        const m = (a!=null&&b!=null)?(a+b)/2 : (a!=null?a:b);
+        if(!(m>0)) continue;
+        L.polyline([co[i],co[i+1]],{renderer:coverCanvas,color:congSpeedColor(m),weight:5,opacity:.9,lineCap:"round"})
+          .bindTooltip(`Línea ${state.linea} · ${Math.round(m)} km/h (${lbl})`,{sticky:true}).addTo(coverLayer);
+      }
+    });
+    setCoverLegend("conges"); return;
+  }
   if(CONGRED && CONGRED.roads){       // RED CONTINUA: velocidad drapeada sobre cada calle
     const cs = periodCellSpeeds();
     CONGRED.roads.forEach(rd=>{
@@ -1453,7 +1473,8 @@ function renderMapa(){
           const sv = (a!=null&&b!=null)?(a+b)/2 : (a!=null?a:b);
           L.polyline([p[i],p[i+1]],{color:speedColor(sv),weight:4,opacity:0.92}).addTo(routeLayer);
         }
-      } else {
+      } else if(!["conges","bunch"].includes(state.mapMode)){
+        // en congestión/bunching NO se dibuja la ruta de referencia: los arcos ya van coloreados por el KPI
         L.polyline(p,{color:cssv("--ref"),weight:2.5,opacity:0.65}).addTo(routeLayer);
       }
       bounds.push(...p);
