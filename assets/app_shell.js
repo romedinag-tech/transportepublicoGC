@@ -304,7 +304,7 @@ function liveBox(s, live, norm, pct){
   // F1: reloj semicírculo más compacto; valor dentro del arco, aguja, % al final de la aguja.
   // Baseline "normal a esta hora" abajo en mono/--muted + delta semántico (▲/▼/=).
   const col = gaugeColor(pct, s.dir);
-  const cx=100, cy=98, r=72;                             // r baja de 80 a 72 (más aire)
+  const cx=100, cy=98, r=84;                             // r baja de 80 a 72 (más aire)
   const p = Math.max(0, Math.min(pct==null?0:pct, 200));
   const a = Math.PI*(1 - p/200);                         // 0%→izq, 100%→arriba, 200%→der
   const tx=(cx+r*Math.cos(a)).toFixed(1), ty=(cy-r*Math.sin(a)).toFixed(1);
@@ -355,7 +355,7 @@ function animateNumber(setter, from, to, ms, fmt){
 }
 // F2: actualizar una tarjeta KPI in-place (sin reescribir el SVG entero) → count-up suave
 function updateLiveCard(card, s, live, norm, pct, prev){
-  const cx=100, cy=98, r=72;
+  const cx=100, cy=98, r=84;
   const col = gaugeColor(pct, s.dir);
   card.style.borderColor = col+"30";
   const p = Math.max(0, Math.min(pct==null?0:pct, 200));
@@ -626,7 +626,7 @@ function renderLiveExtras(){
 }
 function liveBoxCobAhora(hog, tot, pct, nb){
   const col = pct==null ? "#64748b" : pct>=60 ? "#34d399" : pct>=30 ? "#fbbf24" : "#f87171";
-  const cx=100, cy=98, r=72;
+  const cx=100, cy=98, r=84;
   const p = Math.max(0, Math.min(pct==null?0:pct, 100));
   const a = Math.PI*(1 - p/100);                                  // 0..100 → izq..der
   const tx=(cx+r*Math.cos(a)).toFixed(1), ty=(cy-r*Math.sin(a)).toFixed(1);
