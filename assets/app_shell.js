@@ -1,4 +1,25 @@
 /* Visor Transporte Gran Concepción — navegación por comuna (territorio) y línea (operador) */
+const IC={
+  bus:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="14" rx="3"/><path d="M6 10h12"/><circle cx="9" cy="20" r="1"/><circle cx="15" cy="20" r="1"/><path d="M6 17v4M18 17v4"/></svg>',
+  zap:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+  stop:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>',
+  park:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>',
+  pause:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
+  sleep:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+  freq:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+  home:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  map:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>',
+  ruler:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0z"/><path d="m14.5 12.5 2-2M11.5 9.5l2-2M8.5 6.5l2-2"/></svg>',
+  cycle:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>',
+  chart:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+  timer:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="8"/><path d="M12 6v4l2 2"/><path d="M10 2h4"/></svg>',
+  trend:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>',
+  sat:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a5 5 0 0 0 5 5 8 8 0 0 1 5 2 8 8 0 0 1 5-2 5 5 0 0 0 5-5"/><path d="M6 8a3 3 0 0 1 3-3c1 0 1.5.5 2 1l1 2a3 3 0 0 0 3 2h2"/></svg>',
+  warn:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  nseUp:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  nseMd:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/></svg>',
+  nseDn:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+};
 const NF = new Intl.NumberFormat("es-CL");
 const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
@@ -250,11 +271,11 @@ function renderKPIs(cell){
   if((home || lineView || comView) && DIA && BASE30){ renderLiveKPIs(); return; }
   const k = cell.kpi;
   if(!k){ $("kpis2").innerHTML = `<div class="empty">Sin datos para este ámbito.</div>`; return; }
-  const ctx = kpiCard("Líneas", k.n_lineas, "operando en el ámbito", "🚍", "neutral");
+  const ctx = kpiCard("Líneas", k.n_lineas, "operando en el ámbito", IC.bus, "neutral");
   $("kpis2").innerHTML = [
-    kpiCard("Flota en punta", fmt(k.flota_pico), "buses activos máx/hora", "🚍", "neutral"),
-    kpiCard("Velocidad media", fmt1(k.vel)+" km/h", "efectiva, en ruta", "⚡", semHigh(k.vel,22,14)),
-    kpiCard("Tiempo detenido", fmt1(k.pct_det)+" %", "en ruta · excl. terminales", "🛑", semLow(k.pct_det,18,28)),
+    kpiCard("Flota en punta", fmt(k.flota_pico), "buses activos máx/hora", IC.bus, "neutral"),
+    kpiCard("Velocidad media", fmt1(k.vel)+" km/h", "efectiva, en ruta", IC.zap, semHigh(k.vel,22,14)),
+    kpiCard("Tiempo detenido", fmt1(k.pct_det)+" %", "en ruta · excl. terminales", IC.stop, semLow(k.pct_det,18,28)),
     ctx,
   ].join("");
 }
@@ -265,14 +286,14 @@ function renderKPIs(cell){
 const _LIVE_FMT = {int:v=>fmt(Math.round(v)), dec1:v=>fmt1(v), pct:v=>fmt1(v)+"%"};
 let LIVE_KPIS = [
   // los 4 estados de flota (en ruta + en terminal + fuera de servicio + sin operar = flota)
-  {k:"buses_op", lab:"Buses en ruta",          ic:"🚍", dir:1,  unit:"",       f:v=>fmt(Math.round(v))},
-  {k:"term",     lab:"Buses en terminal",      ic:"🅿️", dir:0,  unit:"",       f:v=>fmt(Math.round(v))},
-  {k:"descanso", lab:"Fuera de servicio",      ic:"⏸️", dir:0,  unit:"",       f:v=>fmt(Math.round(v))},
-  {k:"inact",    lab:"Sin operar hoy",         ic:"💤", dir:-1, unit:"",       f:v=>fmt(Math.round(v))},
+  {k:"buses_op", lab:"Buses en ruta",          ic:IC.bus,   dir:1,  unit:"",       f:v=>fmt(Math.round(v))},
+  {k:"term",     lab:"Buses en terminal",      ic:IC.park,  dir:0,  unit:"",       f:v=>fmt(Math.round(v))},
+  {k:"descanso", lab:"Fuera de servicio",      ic:IC.pause, dir:0,  unit:"",       f:v=>fmt(Math.round(v))},
+  {k:"inact",    lab:"Sin operar hoy",         ic:IC.sleep, dir:-1, unit:"",       f:v=>fmt(Math.round(v))},
   // calidad de operación
-  {k:"vel",      lab:"Velocidad media",        ic:"⚡", dir:1,  unit:" km/h",  f:v=>fmt1(v)},
-  {k:"det",      lab:"Tiempo detenido",        ic:"🛑", dir:-1, unit:" %",     f:v=>fmt1(v)},
-  {k:"freq",     lab:"Frecuencia terminales",  ic:"🟢", dir:1,  unit:"/30min", f:v=>fmt(Math.round(v))},
+  {k:"vel",      lab:"Velocidad media",        ic:IC.zap,  dir:1,  unit:" km/h",  f:v=>fmt1(v)},
+  {k:"det",      lab:"Tiempo detenido",        ic:IC.stop, dir:-1, unit:" %",     f:v=>fmt1(v)},
+  {k:"freq",     lab:"Frecuencia terminales",  ic:IC.freq, dir:1,  unit:"/30min", f:v=>fmt(Math.round(v))},
 ];
 function gaugeColor(pct,dir){
   if(pct==null) return "#64748b";
@@ -617,7 +638,7 @@ function liveBoxCobAhora(hog, tot, pct, nb){
     `<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`+
     `<circle cx="${cx}" cy="${cy}" r="4" fill="${col}"/>`+
     `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" class="g-pct" fill="${col}">${pctTxt}</text>`;
-  return `<div class="kpi klive" data-k="cob_now" style="border-color:${col}30"><div class="lab"><span class="ic">🏠</span>Cobertura ahora</div>`+
+  return `<div class="kpi klive" data-k="cob_now" style="border-color:${col}30"><div class="lab"><span class="ic">${IC.home}</span>Cobertura ahora</div>`+
     `<svg class="gauge" viewBox="-8 -12 216 118">`+
       `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="#2a3550" stroke-width="7" stroke-linecap="round"/>`+
       prog+
@@ -636,7 +657,7 @@ function liveBoxCobComuna(byCom){
       `<div class="kcr-bar"><div class="kcr-fill" style="width:${w}%;background:${col}"></div></div>`+
       `<div class="kcr-vp" style="color:${col}">${pctTxt}</div></div>`;
   }).join("");
-  return `<div class="kpi klive" data-k="cob_com"><div class="lab"><span class="ic">🗺️</span>Cobertura por comuna</div>`+
+  return `<div class="kpi klive" data-k="cob_com"><div class="lab"><span class="ic">${IC.map}</span>Cobertura por comuna</div>`+
     `<div class="kcr-list">${rows}</div>`+
     `<div class="sub">% hogares con ≥1 bus ≤300 m</div></div>`;
 }
@@ -659,7 +680,7 @@ function liveBoxFleetLineas(def, top){
   const topRows = top.map(d=>_linFleetRow(d,true)).join("");
   const empty = `<div class="sub" style="text-align:center;padding:6px 0">sin datos</div>`;
   const isMenos = _fleetMode==="menos";
-  return `<div class="kpi klive" data-k="fleet_lin"><div class="lab"><span class="ic">🚍</span>Flota por línea</div>`+
+  return `<div class="kpi klive" data-k="fleet_lin"><div class="lab"><span class="ic">${IC.bus}</span>Flota por línea</div>`+
     `<div class="fleet-toggle">`+
       `<button class="${isMenos?"on":""}" onclick="_fleetMode='menos';renderLiveExtras()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Menos</button>`+
       `<button class="${!isMenos?"on":""}" onclick="_fleetMode='mas';renderLiveExtras()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Más</button>`+
@@ -690,12 +711,12 @@ function renderCobDinLinea(){
     `<div class="cdl-pill"><div class="lab">${ic?`<span>${ic}</span>`:""}${lab}</div>`+
     `<div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`;
   $("cdl-grid").innerHTML = [
-    pill("🏠","Hogares cubiertos", hogDin==null?"—":NF.format(hogDin), `${pct==null?"—":pct+"%"} del tiempo · base ${NF.format(info.hog)}`),
-    pill("⬇","NSE bajo", nseLoDin==null?"—":NF.format(nseLoDin), `de ${NF.format(info.nse_lo)} hog`),
-    pill("◯","NSE medio", nseMdDin==null?"—":NF.format(nseMdDin), `de ${NF.format(info.nse_md)} hog`),
-    pill("⬆","NSE alto", nseHiDin==null?"—":NF.format(nseHiDin), `de ${NF.format(info.nse_hi)} hog`),
-    pill("📏","Hogares por km", info.hog_por_km==null?"—":NF.format(info.hog_por_km), `línea ${info.km} km`),
-    pill("🔁","Ciclos/bus/día", info.ciclos_bus_dia==null?"—":info.ciclos_bus_dia.toFixed(1), `flota ${info.buses??"—"} · ${info.despachos_dia_L??"—"} desp/día`),
+    pill(IC.home,"Hogares cubiertos", hogDin==null?"—":NF.format(hogDin), `${pct==null?"—":pct+"%"} del tiempo · base ${NF.format(info.hog)}`),
+    pill(IC.nseDn,"NSE bajo", nseLoDin==null?"—":NF.format(nseLoDin), `de ${NF.format(info.nse_lo)} hog`),
+    pill(IC.nseMd,"NSE medio", nseMdDin==null?"—":NF.format(nseMdDin), `de ${NF.format(info.nse_md)} hog`),
+    pill(IC.nseUp,"NSE alto", nseHiDin==null?"—":NF.format(nseHiDin), `de ${NF.format(info.nse_hi)} hog`),
+    pill(IC.ruler,"Hogares por km", info.hog_por_km==null?"—":NF.format(info.hog_por_km), `línea ${info.km} km`),
+    pill(IC.cycle,"Ciclos/bus/día", info.ciclos_bus_dia==null?"—":info.ciclos_bus_dia.toFixed(1), `flota ${info.buses??"—"} · ${info.despachos_dia_L??"—"} desp/día`),
   ].join("");
   $("cdl-sub").textContent = `línea ${L} · ${periodoLbl(per)} · f=${f==null?"—":f.toFixed(1)} bus/h · headway ${H==null?"—":H.toFixed(1)+" min"}`;
   const narr = $("cdl-narr");
@@ -765,7 +786,7 @@ function renderLineFreqChart(){
   if(hasLive) legendData.push("Hoy");
   const series=[
     {name:"Laborable",type:"line",data:vL,smooth:true,symbol:"none",lineStyle:{width:2,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"12"}},
-    {name:"Sábado",type:"line",data:vS,smooth:true,symbol:"none",lineStyle:{width:2,color:"#a78bfa"},itemStyle:{color:"#a78bfa"}},
+    {name:"Sábado",type:"line",data:vS,smooth:true,symbol:"none",lineStyle:{width:2,color:cssv("--violet")},itemStyle:{color:cssv("--violet")}},
     {name:"Domingo",type:"line",data:vD,smooth:true,symbol:"none",lineStyle:{width:2,color:"#fb923c"},itemStyle:{color:"#fb923c"}},
   ];
   if(hasLive) series.push({name:"Hoy",type:"line",data:vHoy,smooth:false,symbol:"circle",symbolSize:5,showSymbol:true,connectNulls:false,lineStyle:{width:2.5,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991a"}});
@@ -961,7 +982,7 @@ function renderOpNow(){
   $("opnow-title").textContent = isLine ? `Operación en tiempo real · Línea ${state.linea}` : `Operación en tiempo real · ${state.comuna}`;
   const rect=(l,v,s,col)=>`<div class="kpi"><div class="lab">${l}</div><div class="val"${col?` style="color:${col}"`:""}>${v}</div><div class="sub">${s}</div></div>`;
   let rects = rect("En calle (operando)", calle, "buses en movimiento", cssv("--live"))
-    + rect("En terminal", term, "parados en cabecera", "#a78bfa")
+    + rect("En terminal", term, "parados en cabecera", cssv("--violet"))
     + rect("Detenidos en ruta", ruta, "semáforo / taco");
   if(isCom) rects = rect("Líneas operando", Object.keys(byLine).length, `de ${(CLIN[state.comuna]||[]).length} que operan aquí`, cssv("--ref")) + rects;
   $("opnow-rects").innerHTML = rects;
@@ -1338,7 +1359,7 @@ function drawCoverage(mode){
       if(!inComuna(s[0],s[1])) return;
       if(_rPts && !_rPts.some(p=>Math.abs(p[0]-s[0])<0.006&&Math.abs(p[1]-s[1])<0.006)) return;
       L.circleMarker([s[0],s[1]],{renderer:coverCanvas,radius:3.4,weight:1,color:"#fff",
-        fillColor:isS?"#f43f5e":"#a78bfa",fillOpacity:.95})
+        fillColor:isS?cssv("--alert"):cssv("--violet"),fillOpacity:.95})
         .bindTooltip(isS?"Salud":"Educación",{direction:"top"}).addTo(coverLayer);
     });
   }
@@ -1357,7 +1378,7 @@ function setCoverLegend(mode){
     : mode==="trans" ? ["Transbordo: viajes-trabajo con UNA línea (Censo 2024)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>verde = llega directo con una línea · rojo = exige transbordo o es inalcanzable</span>"]
     : mode==="wait" ? [`Espera hacia destinos · ${periodoLbl(state.periodo)} (min)`,RYG,"<span class='lbls'><i>0</i><i>3</i><i>6+</i></span><span class='par'>manzana = espera a destinos · ● paradero = espera ahí (hover)</span>"]
     : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
-    : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#a78bfa'>● colegio</span>"]
+    : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:var(--violet)'>● colegio</span>"]
     : mode==="conges" ? [`Velocidad efectiva · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>≤10</i><i>20</i><i>30+</i></span><span class='par'>incluye el tiempo detenido en tránsito</span>"]
     : mode==="bunch" ? [`Apelotonamiento · ${periodoLbl(state.periodo)} (CV de headways)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(120,75%,50%),hsl(60,75%,50%),hsl(0,75%,50%))"></span>`,"<span class='lbls'><i>regular</i><i></i><i>apelotonado</i></span><span class='par'>CV alto = buses pegados unos a otros</span>"]
     : mode==="det" ? ["Congestión: nodos de demora (sin terminales)",`<span class="grad" style="background:linear-gradient(90deg,hsl(45,85%,52%),hsl(0,85%,52%))"></span>`,"<span class='lbls'><i>menor</i><i>mayor</i></span><span class='par'><b style='color:#22d3ee'>▣</b> terminal · flota por línea al pasar</span>"]
@@ -1539,7 +1560,7 @@ function renderLineaKpis(){
     const senL = sen==="amb"?"Ida+Regreso":(sen==="0"?"Ida":"Regreso");
     el.style.display="grid";
     el.innerHTML = [
-      card("b-tot",`🛑 % tiempo detenido (${periodoLbl(state.periodo)})`, det!=null?det.toFixed(1)+"%":"—", `${lbl(det)} · ${senL} · en ruta (excl. terminal)`, bg(det)),
+      card("b-tot",`${IC.stop} % tiempo detenido (${periodoLbl(state.periodo)})`, det!=null?det.toFixed(1)+"%":"—", `${lbl(det)} · ${senL} · en ruta (excl. terminal)`, bg(det)),
       card("b-eff","Vs. sistema", (det!=null&&sis!=null)?((det-sis)>=0?"+":"")+(det-sis).toFixed(1):"—", sis!=null?`sistema ${sis}% · ${det!=null&&det<sis?"mejor":"peor"}`:"—"),
       card("b-bajo","% AM punta", dAm!=null?dAm.toFixed(1)+"%":"—", lbl(dAm), bg(dAm)),
       card("b-med","% PM punta", dPm!=null?dPm.toFixed(1)+"%":"—", lbl(dPm), bg(dPm)),
@@ -1562,8 +1583,8 @@ function renderLineaKpis(){
     const card=(cls,l,v,s,st="")=>`<div class="lk ${cls}" style="${st}"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
     el.style.display="grid";
     el.innerHTML = [
-      card("b-tot",`📊 CV headways (${periodoLbl(per)})`, cv!=null?cv.toFixed(2):"—", `${cvLbl(cv)} · ${n||0} intervalos`, cvBg(cv)),
-      card("b-eff","⏱️ Headway medio", hw!=null?hw.toFixed(1)+" min":"—", `intervalo entre buses (${periodoLbl(per)})`),
+      card("b-tot",`${IC.chart} CV headways (${periodoLbl(per)})`, cv!=null?cv.toFixed(2):"—", `${cvLbl(cv)} · ${n||0} intervalos`, cvBg(cv)),
+      card("b-eff",`${IC.timer} Headway medio`, hw!=null?hw.toFixed(1)+" min":"—", `intervalo entre buses (${periodoLbl(per)})`),
       card("b-bajo","Vs. sistema", sisCv!=null?(cv!=null?((cv-sisCv)>=0?"+":"")+(cv-sisCv).toFixed(2):"—"):"—",
         sisCv!=null?`sistema ${sisCv.toFixed(2)} · ${cv!=null&&cv<sisCv?"mejor":"peor"}`:"sin referencia", ""),
       card("b-med","CV AM punta", dAm!=null?dAm.toFixed(2):"—", cvLbl(dAm), cvBg(dAm)),
@@ -1591,7 +1612,7 @@ function renderLineaKpis(){
     const card=(cls,l,v,s,st="")=>`<div class="lk ${cls}" style="${st}"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
     el.style.display="grid";
     el.innerHTML = [
-      card("b-tot",`🛑 % detenido comuna (${periodoLbl(per)})`, det!=null?det+"%":"—", `promedio ${comLines.length} líneas · ${state.comuna}`, bg(det)),
+      card("b-tot",`${IC.stop} % detenido comuna (${periodoLbl(per)})`, det!=null?det+"%":"—", `promedio ${comLines.length} líneas · ${state.comuna}`, bg(det)),
       card("b-eff","Vs. sistema", (det!=null&&sis!=null)?((det-sis)>=0?"+":"")+(det-sis).toFixed(1):"—", sis!=null?`sistema ${sis}%`:"—"),
       card("b-bajo","% AM punta", dAm!=null?dAm+"%":"—", lbl(dAm), bg(dAm)),
       card("b-med","% PM punta", dPm!=null?dPm+"%":"—", lbl(dPm), bg(dPm)),
@@ -1613,8 +1634,8 @@ function renderLineaKpis(){
     const card=(cls,l,v,s,st="")=>`<div class="lk ${cls}" style="${st}"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
     el.style.display="grid";
     el.innerHTML = [
-      card("b-tot",`📊 CV comuna (${periodoLbl(per)})`, cv??"—", `${cvLbl(+cv)} · promedio ${vals.length} líneas`, cvBg(+cv)),
-      card("b-eff","⏱️ Headway medio", hw!=null?hw+" min":"—", `promedio en ${state.comuna}`),
+      card("b-tot",`${IC.chart} CV comuna (${periodoLbl(per)})`, cv??"—", `${cvLbl(+cv)} · promedio ${vals.length} líneas`, cvBg(+cv)),
+      card("b-eff",`${IC.timer} Headway medio`, hw!=null?hw+" min":"—", `promedio en ${state.comuna}`),
       card("b-bajo","Vs. sistema", sisCv!=null?(cv!=null?((cv-sisCv)>=0?"+":"")+(cv-sisCv).toFixed(2):"—"):"—",
         sisCv!=null?`sistema ${sisCv.toFixed(2)}`:"—", ""),
       card("b-med","Líneas evaluadas", vals.length+"", `de ${comLines.length} que operan`),
@@ -1653,12 +1674,12 @@ function renderLineaKpis(){
   el.style.display="grid";
   const scope = showCoverLine ? `buffer 300 m · línea ${state.linea}` : `manzanas en ${state.comuna}`;
   el.innerHTML = [
-    card("b-tot","🏠 Hogares cubiertos", NF.format(hog), `${nMz} manzanas · ${scope}`),
+    card("b-tot",`${IC.home} Hogares cubiertos`, NF.format(hog), `${nMz} manzanas · ${scope}`),
     card("b-bajo","NSE bajo", NF.format(hbaj), `${pct(hbaj)}% · ≤ ${t1?NF.format(t1):"—"} CLP/m²`),
     card("b-med","NSE medio", NF.format(hmed), `${pct(hmed)}% · entre terciles`),
     card("b-alto","NSE alto", NF.format(halt), `${pct(halt)}% · > ${t2?NF.format(t2):"—"} CLP/m²`),
-    card("b-eff","📏 Hog. por km", hogkm!=null?NF.format(hogkm):"—", ext?`extensión ${ext} km (ida)`:(showCoverCom?`${comLines.length} líneas en comuna`:"")),
-    card("b-cic","🔁 Ciclos/bus/día", ciclos??"—", tc?`tiempo de ciclo ${Math.round(tc)} min · ${flota||"—"} buses`:(showCoverCom?"—":"")),
+    card("b-eff",`${IC.ruler} Hog. por km`, hogkm!=null?NF.format(hogkm):"—", ext?`extensión ${ext} km (ida)`:(showCoverCom?`${comLines.length} líneas en comuna`:"")),
+    card("b-cic",`${IC.cycle} Ciclos/bus/día`, ciclos??"—", tc?`tiempo de ciclo ${Math.round(tc)} min · ${flota||"—"} buses`:(showCoverCom?"—":"")),
   ].join("");
 }
 /* ---------- Tabla de cobertura por recorrido (vista sistema + cover) ---------- */
@@ -1993,7 +2014,7 @@ function renderVarFreq(){
 }
 function drawVarCharts(){
   const th=TH(), v=VFREQ.variantes[curVar]; if(!v) return;
-  const xs=VFREQ.horas.map(h=>h+"h"), COLP=[cssv("--live"),cssv("--ref"),cssv("--warn"),"#a78bfa","#fb7185"];
+  const xs=VFREQ.horas.map(h=>h+"h"), COLP=[cssv("--live"),cssv("--ref"),cssv("--warn"),cssv("--violet"),cssv("--alert")];
   if(varProfChart) varProfChart.dispose(); varProfChart=echarts.init($("var-prof-chart"));
   varProfChart.setOption({
     textStyle:{fontFamily:th.font,color:th.tx},
@@ -2161,7 +2182,7 @@ function renderEmpresas(){
     xAxis:{type:"value",name:"buses",axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
     yAxis:{type:"category",inverse:true,data:d.map(x=>`${x.fantasia} (L${x.linea})`),axisLabel:{fontSize:11,color:th.tx},axisLine:{lineStyle:{color:th.axis}}},
     series:[{type:"bar",data:d.map(x=>x.buses),barWidth:"66%",itemStyle:{borderRadius:[0,5,5,0],
-      color:new echarts.graphic.LinearGradient(1,0,0,0,[{offset:0,color:"#a78bfa"},{offset:1,color:"rgba(167,139,250,.35)"}])},
+      color:new echarts.graphic.LinearGradient(1,0,0,0,[{offset:0,color:cssv("--violet")},{offset:1,color:cssv("--violet")+"59"}])},
       label:{show:true,position:"right",color:th.mut,fontSize:10.5,formatter:o=>o.value}}]
   },true);
   setTimeout(()=>empresasChart.resize(),60);

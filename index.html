@@ -27,15 +27,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Design tokens: single source of truth for color/type/space (loaded FIRST) -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=91">
+<link rel="stylesheet" href="assets/css/tokens.css?v=92">
 <!-- Leaflet self-hosted -->
 <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=75"/>
 <script defer src="assets/vendor/leaflet/leaflet.js?v=75"></script>
 <!-- Component styles (consume tokens via legacy bridge vars) -->
-<link rel="stylesheet" href="assets/styles.css?v=91">
-<link rel="stylesheet" href="assets/shell.css?v=91">
+<link rel="stylesheet" href="assets/styles.css?v=92">
+<link rel="stylesheet" href="assets/shell.css?v=92">
 <!-- Tailwind purged utilities (~12 KB static, no runtime recompilation) -->
-<link rel="stylesheet" href="assets/tw.css?v=91">
+<link rel="stylesheet" href="assets/tw.css?v=92">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
@@ -167,6 +167,17 @@
   @media (prefers-reduced-motion: reduce){
     .widget{animation:none}
   }
+
+  /* ── Skeleton loading ── */
+  @keyframes shimmer{to{background-position:200% 0}}
+  .skel{border-radius:6px;background:linear-gradient(90deg,var(--surface-1) 30%,var(--surface-2) 50%,var(--surface-1) 70%);
+    background-size:200% 100%;animation:shimmer 1.6s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){.skel{animation:none}}
+  .skel-kpi{height:72px}
+  .skel-chart{height:260px;border-radius:var(--r-control)}
+  .skel-line{height:12px;width:60%;margin:6px 0}
+  .skel-line.w40{width:40%}
+  .skel-line.w80{width:80%}
 
   /* ── Comuna bar ── */
   .comuna-bar{display:flex;align-items:center;gap:6px;padding:var(--s2) var(--s3);white-space:nowrap;
@@ -450,7 +461,7 @@
       <!-- ===== VISTA NORMAL ===== -->
       <div id="normal-view" class="space-y-4">
       <!-- Tira de KPIs -->
-      <div id="kpis2" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3"><div class="loading">Cargando datos…</div></div>
+      <div id="kpis2" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3"><div class="skel skel-kpi"></div><div class="skel skel-kpi"></div><div class="skel skel-kpi"></div><div class="skel skel-kpi"></div><div class="skel skel-kpi"></div></div>
 
       <!-- HERO: mapa + columna de widgets -->
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -497,7 +508,7 @@
         <div class="flex flex-col gap-4 thin-scroll xl:pr-1">
           <section class="widget" id="excesos-card">
             <div class="widget-h">
-              <span class="ico">⚠️</span>
+              <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
               <div><h3>Excesos de velocidad</h3><span class="sub" id="excesos-sub">&gt; 80 km/h · acumulado hoy</span></div>
             </div>
             <div class="widget-b"><div id="excesos-list" style="max-height:236px;overflow-y:auto"></div></div>
@@ -505,7 +516,7 @@
 
           <section class="widget" id="freq-card" style="display:none">
             <div class="widget-h">
-              <span class="ico">🟢</span>
+              <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
               <div><h3>Frecuencia de salida de terminales</h3><span class="sub" id="freq-sub">promedio histórico vs hoy</span></div>
             </div>
             <div class="widget-b"><div id="ch-freq" style="height:212px"></div><p id="freq-narr" class="wnarr"></p></div>
@@ -513,7 +524,7 @@
 
           <section class="widget" id="velciclo-card" style="display:none">
             <div class="widget-h">
-              <span class="ico">📈</span>
+              <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></span>
               <div><h3>Velocidad a lo largo del ciclo</h3><span class="sub" id="vc-sub">km/h vs km — ida y regreso</span></div>
             </div>
             <div class="widget-b">
@@ -537,7 +548,7 @@
 
           <section class="widget" id="lin-freq-card" style="display:none">
             <div class="widget-h">
-              <span class="ico">🟢</span>
+              <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
               <div><h3>Frecuencia de salida</h3><span class="sub" id="lin-freq-sub">perfil empírico por tipo de día</span></div>
             </div>
             <div class="widget-b"><div id="ch-lin-freq" style="height:340px"></div></div>
@@ -546,7 +557,7 @@
           <!-- F6: Cobertura dinámica por línea — 6 KPIs (vista línea + sub-selector "din") -->
           <section class="widget" id="cob-din-line" style="display:none">
             <div class="widget-h">
-              <span class="ico">📡</span>
+              <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a5 5 0 0 0 5 5 8 8 0 0 1 5 2 8 8 0 0 1 5-2 5 5 0 0 0 5-5"/><path d="M6 8a3 3 0 0 1 3-3c1 0 1.5.5 2 1l1 2a3 3 0 0 0 3 2h2"/></svg></span>
               <div><h3>Cobertura dinámica de la línea</h3><span class="sub" id="cdl-sub">modelo cápsula 2 min · 300 m</span></div>
             </div>
             <div class="widget-b">
@@ -717,7 +728,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=91"></script>
+<script defer src="assets/app_shell.js?v=92"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
