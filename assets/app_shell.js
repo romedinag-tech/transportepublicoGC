@@ -1195,6 +1195,18 @@ function drawDetenciones(){
   if(!coverLayer) return; coverLayer.clearLayers();
   let cong = (DET2||[]).filter(d=>inComuna(d.la,d.lo));
   let terms = ((TERM&&TERM.terminales)||[]).filter(t=>inComuna(t.la,t.lo));
+  // excluir falsos focos: detenciones que caen sobre un TERMINAL real con reposo (no congestión).
+  // Combina terminales.json (TERM) + puntos tipo "terminal" por línea (TLIN); NO usa cabeceras
+  // (extremos geométricos del recorrido) para no borrar congestión legítima cercana.
+  const _termPts=[];
+  ((TERM&&TERM.terminales)||[]).forEach(t=>_termPts.push([t.la,t.lo]));
+  Object.values(TLIN||{}).forEach(tl=>((tl&&tl.puntos)||[]).forEach(p=>{
+    if(p.tipo==="terminal"){ const la=p.la??p.lat, lo=p.lo??p.lon; if(la&&lo) _termPts.push([la,lo]); }
+  }));
+  if(_termPts.length){
+    const MXt=111320*Math.cos(-36.83*Math.PI/180), MYt=110540, RT=220;
+    cong = cong.filter(d=>!_termPts.some(t=>{ const dx=(d.lo-t[1])*MXt, dy=(d.la-t[0])*MYt; return dx*dx+dy*dy < RT*RT; }));
+  }
   if(state.linea!=="TODAS") terms = terms.filter(t=>(t.lineas||[]).some(l=>l.linea===state.linea));
   if(state.linea!=="TODAS" && GEOM && GEOM[state.linea]){
     const MX2=111320*Math.cos(-36.83*Math.PI/180), MY2=110540, R=400;
@@ -1487,8 +1499,9 @@ function renderMapa(){
   if(state.mapMode!=="live"){
     liveLayer.clearLayers();
     drawCoverage(state.mapMode);
-    // en modos de red, redibujar recorrido sobre la capa territorial para que se vea encima
-    if(state.linea!=="TODAS" && GEOM[state.linea]){
+    // en modos de red, redibujar recorrido sobre la capa territorial para que se vea encima.
+    // EXCEPTO en congestión/bunching: ahí los arcos YA están coloreados por el KPI y la ruta los taparía.
+    if(state.linea!=="TODAS" && GEOM[state.linea] && !["conges","bunch"].includes(state.mapMode)){
       GEOM[state.linea].forEach(s=>{ L.polyline(s.p,{color:cssv("--ref"),weight:3,opacity:0.85}).addTo(liveLayer); });
     }
     const b=$("live-count"), R=(COB&&COB.resumen)||{};
