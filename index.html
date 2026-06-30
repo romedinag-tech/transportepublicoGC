@@ -509,6 +509,7 @@
                 <div class="periodo-sel" id="cover-sub" title="Dimensión de cobertura (estática / oferta dinámica)"></div>
                 <div class="periodo-sel" id="sentido-sel" title="Sentido de circulación (ida/regreso analizados por separado)"></div>
                 <div class="periodo-sel" id="dettipo-sel" title="Detención: congestión en tránsito (semáforos/tacos) vs detención de servicio en paraderos"></div>
+                <div class="periodo-sel" id="congsub-sel" title="Medida de congestión: promedio · día crítico (peores días de la ciudad) · estabilidad (dispersión día a día)"></div>
                 <div class="periodo-sel" id="purpose-sel" title="Propósito de viaje (repondera por demanda EOD)"></div>
               </div>
               <p id="map-narrative" class="map-narr"></p>
@@ -742,7 +743,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=97"></script>
+<script defer src="assets/app_shell.js?v=98"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

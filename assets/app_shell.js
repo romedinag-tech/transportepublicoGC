@@ -25,10 +25,10 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=79`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=80`).then(r=>r.json());
 const BUILD = "2026-06-28 03:33";
 
-let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null;
+let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
@@ -36,7 +36,7 @@ let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stop
 let VCICLO=null, vcChart=null, vcPer="agregado", vcSm=0;
 let DETP=null, CLINE={lineas:[]}, BUNCH=null, BUNCHA=null, CICLO=null;
 let _nseTerciles=null;
-let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", cmpA:null, cmpB:null};
+let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", cmpA:null, cmpB:null};
 let csChart, freqChart, linFreqChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
@@ -46,6 +46,7 @@ const PERIODO_H = {agg:[6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22], am:[7,8
 const periodoLbl = p => (PERIODOS.find(x=>x[0]===p)||["","Agregado"])[1];
 const SENTIDOS = [["amb","Ambos"],["0","Ida"],["1","Regreso"]];
 const DET_TIPOS = [["cong","Congestión"],["par","Paraderos"]];
+const CONG_SUBS = [["prom","Promedio"],["crit","Día crítico"],["estab","Estabilidad"]];
 const nseColors = {0:"#fb923c", 1:"#94a3b8", 2:"#2dd4bf"};
 const nseLabel = n => n===0?"NSE bajo":n===1?"NSE medio":n===2?"NSE alto":"sin dato NSE";
 
@@ -158,6 +159,14 @@ function buildDettipo(){
     box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.p===state.detTipo));
     if(state.mapMode==="det") render(); });
 }
+function buildCongsub(){
+  const box=$("congsub-sel"); if(!box) return;
+  box.innerHTML = `<span class="lbl">Medida</span><div class="seg">`+
+    CONG_SUBS.map(([k,l])=>`<b data-p="${k}" class="${state.congSub===k?"on":""}">${l}</b>`).join("")+`</div>`;
+  box.querySelectorAll("b").forEach(el=>el.onclick=()=>{ state.congSub=el.dataset.p;
+    box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.p===state.congSub));
+    if(state.mapMode==="conges") render(); });
+}
 function buildLineaList(filter=""){
   const f = filter.trim().toLowerCase();
   const setC = (state.comuna!=="TODAS" && CLIN[state.comuna]) ? new Set(CLIN[state.comuna]) : null;
@@ -202,6 +211,10 @@ function render(){
   if($("sentido-sel")) $("sentido-sel").style.display = sentidoRel ? "flex" : "none";
   const dettipoRel = state.vista==="normal" && state.mapMode==="det";
   if($("dettipo-sel")) $("dettipo-sel").style.display = dettipoRel ? "flex" : "none";
+  // sub-selector de congestión (promedio/día crítico/estabilidad): solo en vista de RED (sin línea);
+  // por línea aún no hay estadística día-a-día por arco (fase posterior).
+  const congsubRel = state.vista==="normal" && state.mapMode==="conges" && state.linea==="TODAS";
+  if($("congsub-sel")) $("congsub-sel").style.display = congsubRel ? "flex" : "none";
 
   // VISTAS ESPECIALES (territorio): ranking / comparador de comunas
   if(state.vista==="ranking" || state.vista==="comparador"){
@@ -1150,6 +1163,7 @@ function nseColor(v){
 }
 const accSColor = m => m==null ? "#555b6b" : `hsl(${120-120*Math.min(m/25,1)},72%,50%)`;  // 0min verde -> 25+ rojo
 const congSpeedColor = v => `hsl(${Math.max(0,Math.min((v-10)/20,1))*120},75%,50%)`;   // velocidad EFECTIVA: <=10 rojo -> >=30 verde
+const cvVelColor = cv => cv==null ? "#475569" : `hsl(${120-120*Math.min(Math.max((cv-0.08)/0.20,0),1)},75%,50%)`; // CV vel día-a-día: <=0.08 estable(verde) -> >=0.28 variable(rojo)
 const cvColor = cv => cv==null ? "#475569" : `hsl(${120-120*Math.min(Math.max((cv-0.4)/0.6,0),1)},75%,50%)`; // CV 0.4 regular(verde) -> 1.0+ apelotonado(rojo)
 function periodCellSpeeds(){            // velocidad media por celda en el período elegido
   const hrs = PERIODO_H[state.periodo] || GRID.horas;
@@ -1185,7 +1199,11 @@ function drawCongestion(){
     setCoverLegend("conges"); return;
   }
   if(CONGRED && CONGRED.roads){       // RED CONTINUA: velocidad drapeada sobre cada calle
-    const cs = periodCellSpeeds();
+    // medida: promedio (GRID horario) · día crítico (vel en peores días) · estabilidad (CV día-a-día)
+    const sub = state.congSub, useStats = sub!=="prom" && SGSTATS && SGSTATS.per;
+    const SP = useStats ? (SGSTATS.per[state.periodo]||SGSTATS.per.agg||{}) : {};
+    const cs = sub==="crit"&&useStats ? (SP.crit||[]) : sub==="estab"&&useStats ? (SP.cv||[]) : periodCellSpeeds();
+    const mn = SP.mean||[];
     CONGRED.roads.forEach(rd=>{
       const P=rd.p, C=rd.c;
       for(let i=0;i<P.length-1;i++){
@@ -1195,8 +1213,14 @@ function drawCongestion(){
         if(!(va>0)||!(vb>0)) continue;
         if(!inComuna((P[i][0]+P[i+1][0])/2,(P[i][1]+P[i+1][1])/2)) continue;
         const m=(va+vb)/2;
-        L.polyline([P[i],P[i+1]],{renderer:coverCanvas,color:congSpeedColor(m),weight:3.6,opacity:.85,lineCap:"round"})
-          .bindTooltip(`${rd.n?rd.n+" · ":""}${Math.round(m)} km/h (${lbl})`,{sticky:true}).addTo(coverLayer);
+        const col = sub==="estab"&&useStats ? cvVelColor(m) : congSpeedColor(m);
+        let tip;
+        if(sub==="estab"&&useStats) tip=`${rd.n?rd.n+" · ":""}CV ${m.toFixed(2)} (${lbl}) · ${m<0.12?"estable":m>0.20?"variable":"medio"}`;
+        else if(sub==="crit"&&useStats){ const me=(mn[a]+mn[b])/2, r=me>0?Math.round(100*m/me):null;
+          tip=`${rd.n?rd.n+" · ":""}${Math.round(m)} km/h en días críticos (${lbl})${r!=null?` · normal ${Math.round(me)} (${r}%)`:""}`; }
+        else tip=`${rd.n?rd.n+" · ":""}${Math.round(m)} km/h (${lbl})`;
+        L.polyline([P[i],P[i+1]],{renderer:coverCanvas,color:col,weight:3.6,opacity:.85,lineCap:"round"})
+          .bindTooltip(tip,{sticky:true}).addTo(coverLayer);
       }
     });
     setCoverLegend("conges"); return;
@@ -1424,6 +1448,8 @@ function setCoverLegend(mode){
     : mode==="wait" ? [`Espera hacia destinos · ${periodoLbl(state.periodo)} (min)`,RYG,"<span class='lbls'><i>0</i><i>3</i><i>6+</i></span><span class='par'>manzana = espera a destinos · ● paradero = espera ahí (hover)</span>"]
     : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
     : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:var(--violet)'>● colegio</span>"]
+    : (mode==="conges" && state.linea==="TODAS" && state.congSub==="estab") ? [`Estabilidad de velocidad · ${periodoLbl(state.periodo)} (CV día a día)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(120,75%,50%),hsl(60,75%,50%),hsl(0,75%,50%))"></span>`,"<span class='lbls'><i>estable</i><i></i><i>variable</i></span><span class='par'>verde = velocidad consistente día a día pese a la congestión (corredor eficiente)</span>"]
+    : (mode==="conges" && state.linea==="TODAS" && state.congSub==="crit") ? [`Velocidad en días críticos · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>≤10</i><i>20</i><i>30+</i></span><span class='par'>peores ~10% de días de congestión de la ciudad (28 días); hover = % vs día normal</span>"]
     : mode==="conges" ? [`Velocidad efectiva · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>≤10</i><i>20</i><i>30+</i></span><span class='par'>incluye el tiempo detenido en tránsito</span>"]
     : mode==="bunch" ? [`Apelotonamiento · ${periodoLbl(state.periodo)} (CV de headways)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(120,75%,50%),hsl(60,75%,50%),hsl(0,75%,50%))"></span>`,"<span class='lbls'><i>regular</i><i></i><i>apelotonado</i></span><span class='par'>CV alto = buses pegados unos a otros</span>"]
     : mode==="det" ? ["Congestión: nodos de demora (sin terminales)",`<span class="grad" style="background:linear-gradient(90deg,hsl(45,85%,52%),hsl(0,85%,52%))"></span>`,"<span class='lbls'><i>menor</i><i>mayor</i></span><span class='par'><b style='color:#22d3ee'>▣</b> terminal · flota por línea al pasar</span>"]
@@ -1552,7 +1578,9 @@ function renderMapa(){
       const badgeSys = {cover: coverBadge,
         trans:`${(R.lab&&R.lab.dir)??"—"}% de los viajes-trabajo se hacen con UNA línea · ${(R.lab&&R.lab.tr)??"—"}% exige transbordo · ${(R.lab&&R.lab.no)??"—"}% inalcanzable (Censo 2024)`,
         wait:`espera media hacia destinos ${(R.waitd_medio&&R.waitd_medio[state.periodo])??"—"} min · frecuencia real observada · cambia con el período`,
-        conges:`velocidad efectiva (incluye detenido en tránsito) en ${periodoLbl(state.periodo)} · rojo = ejes lentos`,
+        conges:(state.linea==="TODAS"&&state.congSub==="estab")?`estabilidad de la velocidad en ${periodoLbl(state.periodo)} · CV día a día · verde = eje consistente (corredor eficiente) · rojo = muy variable`
+          :(state.linea==="TODAS"&&state.congSub==="crit")?`velocidad en los días de congestión EXTREMA de la ciudad (peor 10%) en ${periodoLbl(state.periodo)} · rojo = colapsa · hover = % vs día normal`
+          :`velocidad efectiva (incluye detenido en tránsito) en ${periodoLbl(state.periodo)} · rojo = ejes lentos`,
         bunch:`regularidad de los buses (CV de headways) en ${periodoLbl(state.periodo)} · rojo = se apelotonan ⇒ peor espera efectiva`,
         det:`${DET2.length} nodos de congestión (sin terminales) · ${(TERM&&TERM.terminales||[]).length} terminales detectados`,
         salud:`tiempo mediano a salud: ${R.salud_med} min`, edu:`tiempo mediano a educación: ${R.edu_med} min`,
@@ -1812,6 +1840,12 @@ function renderNarrative(){
   } else if(M==="wait"){
     const v=scopeWavg(p=>p.waitd&&p.waitd[pu]&&p.waitd[pu][per]);
     txt=`<b>Espera</b> estima el tiempo efectivo de espera hacia los destinos${pe}: ½·intervalo·(1+CV²), con la <b>frecuencia real en el sentido que va hacia el destino</b> (un bus en dirección contraria no cuenta) y penalizando el <b>apelotonamiento</b>. ${v!=null?`Media en ${amb} (${periodoLbl(per)}): <b>${v.toFixed(1)} min</b>. `:""}Cambia con el período — compara punta y fuera de punta.`;
+  } else if(M==="conges" && state.linea==="TODAS" && state.congSub==="estab"){
+    const md=SGSTATS&&SGSTATS.meta&&SGSTATS.meta.ndays?SGSTATS.meta.ndays[per]:null;
+    txt=`<b>Estabilidad de la velocidad</b>: coeficiente de variación (σ/μ) de la velocidad efectiva <b>día a día</b> por arco, en <b>${periodoLbl(per)}</b>${md?` (sobre ${md} días hábiles)`:""}. <b>Verde = eje consistente</b>: la velocidad casi no cambia entre un día y otro, aunque haya congestión — la firma de un <b>corredor eficiente o vía exclusiva</b>. Rojo = muy variable: depende fuerte del día (un accidente, lluvia o un evento lo colapsan). La hipótesis: la infraestructura exclusiva de buses debería pintarse verde incluso en punta.`;
+  } else if(M==="conges" && state.linea==="TODAS" && state.congSub==="crit"){
+    const K=SGSTATS&&SGSTATS.meta&&SGSTATS.meta.K?SGSTATS.meta.K[per]:null;
+    txt=`<b>Día crítico</b>: velocidad de cada arco en los <b>días de congestión extrema de la ciudad</b>${K?` (los ${K} peores días, ≈10%)`:""} en <b>${periodoLbl(per)}</b>. Se eligen los días con peor velocidad <b>global de toda la red</b> y se mide cómo responde cada eje al <b>mismo shock</b>. Rojo = el eje colapsa esos días; verde = aguanta. En el hover: <b>% respecto del día normal</b> (resiliencia) — un corredor protegido se mantiene cerca del 100%.`;
   } else if(M==="conges"){
     const v=GRID?(function(){const cs=periodCellSpeeds().filter(x=>x>0);return cs.length?cs.reduce((a,b)=>a+b,0)/cs.length:null;})():null;
     txt=`<b>Congestión</b>: <b>velocidad efectiva</b> de los buses por arco de la red en <b>${periodoLbl(per)}</b> — incluye el <b>tiempo detenido en tránsito</b> (semáforos, tacos), no solo cuando el bus avanza, por eso revela la congestión real. Rojo = ejes lentos. ${v!=null?`Velocidad efectiva media: <b>${v.toFixed(1)} km/h</b>. `:""}Cambia con el período para ver dónde y cuándo aparece.`;
@@ -2361,6 +2395,7 @@ function renderEvolucion(){
     J("operacion_linea.json").then(d=>{ OP=d; renderOperacion(); renderCalidad(); }).catch(()=>{});
     J("speed_grid_hora.json").then(d=>{ GRID=d; if(state.mapMode==="conges") renderMapa(); }).catch(()=>{});
     J("congestion_red.json").then(d=>{ CONGRED=d; if(state.mapMode==="conges"||state.mapMode==="bunch") renderMapa(); }).catch(()=>{});
+    J("speed_grid_stats.json").then(d=>{ SGSTATS=d; if(state.mapMode==="conges"&&state.congSub!=="prom") renderMapa(); }).catch(()=>{});
     J("red_freq.json").then(d=>{ RFREQ=d; if(state.mapMode==="bunch") renderMapa(); }).catch(()=>{});
     J("detenciones.json").then(d=>{ DET2=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
     J("terminales.json").then(d=>{ TERM=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
@@ -2384,7 +2419,7 @@ function renderEvolucion(){
     J("bunching_arco.json").then(d=>{ BUNCHA=d; if(state.mapMode==="bunch"&&state.linea!=="TODAS") renderMapa(); }).catch(()=>{});
     J("ciclo.json").then(d=>{ CICLO=d; }).catch(()=>{});
     buildMapModes();
-    buildPeriodo(); buildPurpose(); buildCoverSub(); buildSentido(); buildDettipo();
+    buildPeriodo(); buildPurpose(); buildCoverSub(); buildSentido(); buildDettipo(); buildCongsub();
     buildComunaTabs();
     buildLineaList();
     $("linea-search").addEventListener("input", e=>buildLineaList(e.target.value));
