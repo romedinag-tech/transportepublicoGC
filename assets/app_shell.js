@@ -431,15 +431,20 @@ function _liveVal(s, L){
   }
   const C = state.comuna!=="TODAS" ? state.comuna : null;
   if(C){
-    if(s.k==="buses_op"||s.k==="vel"||s.k==="det"||s.k==="term"){
-      const gps=_comGPS(); return gps?gps[s.k]:null;
-    }
+    // COMUNA = agrega las líneas que operan en ella, con el MISMO método que sistema/línea
+    // (deriva de DIA.*_lin del capturador, no del GPS instantáneo). Coherente y comparable al baseline.
     const lines = CLIN[C]||[];
     if(s.k==="freq"){
       const fsl = DIA.freq_blk_serie_lin||{};
       return lines.reduce((sum,l)=>sum+((fsl[l]||[])[DIA.bin]||0),0);
     }
-    const ld=DIA[s.k+"_lin"];
+    if(s.k==="vel"||s.k==="det"){            // promedio ponderado por volumen (buses en ruta por línea)
+      const vl=DIA[s.k+"_lin"]||{}, w=DIA.buses_op_lin||{};
+      let sv=0,sw=0;
+      for(const l of lines){ const v=vl[l], ww=w[l]||0; if(v!=null&&ww>0){sv+=v*ww;sw+=ww;} }
+      return sw>0 ? Math.round(sv/sw*10)/10 : null;
+    }
+    const ld=DIA[s.k+"_lin"];                // buses_op, term, inact, descanso: suma de líneas
     if(!ld) return null;
     return lines.reduce((sum,l)=>sum+(ld[l]||0),0);
   }
@@ -457,7 +462,6 @@ function _baseVal(s, base, b, L){
   }
   const C = state.comuna!=="TODAS" ? state.comuna : null;
   if(C){
-    if(s.k==="buses_op"||s.k==="term") return null;
     const lines = CLIN[C]||[];
     if(s.k==="vel"||s.k==="det"){
       const bl=base[s.k+"_lin"], bbl=base.buses_op_lin;
