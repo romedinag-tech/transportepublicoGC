@@ -25,7 +25,7 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=87`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=88`).then(r=>r.json());
 const BUILD = "2026-06-28 03:33";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null;
@@ -300,8 +300,8 @@ const _LIVE_FMT = {int:v=>fmt(Math.round(v)), dec1:v=>fmt1(v), pct:v=>fmt1(v)+"%
 let LIVE_KPIS = [
   // los 4 estados de flota (en ruta + en terminal + fuera de servicio + sin operar = flota)
   {k:"buses_op", lab:"Buses en ruta",          ic:IC.bus,   dir:1,  unit:"",       f:v=>fmt(Math.round(v))},
-  {k:"term",     lab:"Buses en terminal",      ic:IC.park,  dir:0,  unit:"",       f:v=>fmt(Math.round(v))},
-  {k:"descanso", lab:"Fuera de servicio",      ic:IC.pause, dir:0,  unit:"",       f:v=>fmt(Math.round(v))},
+  {k:"term",     lab:"Buses en terminal",      ic:IC.park,  dir:-1, unit:"",       f:v=>fmt(Math.round(v))},  // más que lo normal = malo (rojo)
+  {k:"descanso", lab:"Fuera de servicio",      ic:IC.pause, dir:-1, unit:"",       f:v=>fmt(Math.round(v))},  // más fuera de servicio = malo (rojo)
   {k:"inact",    lab:"Sin operar hoy",         ic:IC.sleep, dir:-1, unit:"",       f:v=>fmt(Math.round(v))},
   // calidad de operación
   {k:"vel",      lab:"Velocidad media",        ic:IC.zap,  dir:1,  unit:" km/h",  f:v=>fmt1(v)},
@@ -1345,11 +1345,15 @@ function drawTerminales(){
     L.circleMarker([t.lat,t.lon],{renderer:coverCanvas,radius:6,weight:1.5,color:"#f59e0b",fillColor:"#f59e0b",fillOpacity:.15})
       .bindTooltip(`<b>Extremo sin reposo (dudoso)</b><br>L${(t.lineas||[]).join(", ")}<br>reposo ${Math.round((t.fstop||0)*100)}% — no parece terminal real`,{sticky:true}).addTo(coverLayer);
   });
-  // confirmados encima: terminal físico con reposo GPS -> verde, tamaño según reposo
-  (TERMCONF.confirmados||[]).forEach(t=>{
+  // confirmados encima: terminal físico con reposo GPS -> verde, tamaño según reposo.
+  // Número = índice (1-based) en terminales_confirmados.json, estable, para auditar cuáles son correctos.
+  (TERMCONF.confirmados||[]).forEach((t,i)=>{
     if(!inComuna(t.lat,t.lon)) return;
     L.circleMarker([t.lat,t.lon],{renderer:coverCanvas,radius:8+12*(t.fstop||0),weight:2,color:"#064e2b",fillColor:"#22c55e",fillOpacity:.6})
-      .bindTooltip(`<b>Terminal confirmado</b>${t.name?" · "+t.name:""}<br>Líneas: ${(t.lineas||[]).join(", ")}<br>reposo <b>${Math.round((t.fstop||0)*100)}%</b> de los pulsos (GPS)`,{sticky:true}).addTo(coverLayer);
+      .bindTooltip(`<b>#${i+1} · Terminal confirmado</b>${t.name?" · "+t.name:""}<br>Líneas: ${(t.lineas||[]).join(", ")}<br>reposo <b>${Math.round((t.fstop||0)*100)}%</b> de los pulsos (GPS)`,{sticky:true}).addTo(coverLayer);
+    L.marker([t.lat,t.lon],{interactive:false,zIndexOffset:600,icon:L.divIcon({className:"term-num",
+      html:`<div style="font:700 10px/15px var(--font-data,monospace);color:#052e16;background:#fff;border:1.5px solid #052e16;border-radius:9px;min-width:16px;height:16px;padding:0 2px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.5)">${i+1}</div>`,
+      iconSize:[16,16],iconAnchor:[8,8]})}).addTo(coverLayer);
   });
   setCoverLegend("terms");
 }
