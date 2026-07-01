@@ -25,10 +25,10 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=81`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=82`).then(r=>r.json());
 const BUILD = "2026-06-28 03:33";
 
-let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null;
+let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
@@ -39,7 +39,7 @@ let _nseTerciles=null;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", cmpA:null, cmpB:null};
 let csChart, freqChart, linFreqChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
-const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
+const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["terms","Terminales"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
 const PEAK_H = [7,8,9,17,18,19];
 const PERIODOS = [["agg","Agregado"],["am","Punta AM"],["md","Mediodía"],["pm","Punta PM"],["off","Fuera punta"],["noche","Noche"]];
 const PERIODO_H = {agg:[6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22], am:[7,8,9], md:[12,13,14], pm:[17,18,19], off:[10,11,15,16,20,21,22], noche:[21,22,23]};
@@ -1251,6 +1251,9 @@ function drawDetenciones(){
   Object.values(TLIN||{}).forEach(tl=>((tl&&tl.puntos)||[]).forEach(p=>{
     if(p.tipo==="terminal"){ const la=p.la??p.lat, lo=p.lo??p.lon; if(la&&lo) _termPts.push([la,lo]); }
   }));
+  // terminales CONFIRMADOS por reposo GPS (capa limpia): excluir sus focos de detención falsos
+  // (es reposo de cabecera, no demora en marcha). Aplica en sistema y por línea.
+  ((TERMCONF&&TERMCONF.confirmados)||[]).forEach(t=>{ if(t.lat&&t.lon) _termPts.push([t.lat,t.lon]); });
   if(_termPts.length){
     const MXt=111320*Math.cos(-36.83*Math.PI/180), MYt=110540, RT=220;
     cong = cong.filter(d=>!_termPts.some(t=>{ const dx=(d.lo-t[1])*MXt, dy=(d.la-t[0])*MYt; return dx*dx+dy*dy < RT*RT; }));
@@ -1324,10 +1327,28 @@ function drawBunching(){
   });
   setCoverLegend("bunch");
 }
+function drawTerminales(){
+  if(!coverLayer) return; coverLayer.clearLayers();
+  if(!TERMCONF){ setCoverLegend("terms"); return; }
+  // dudosos primero (debajo): extremos estáticos SIN reposo GPS -> ámbar tenue
+  (TERMCONF.dudosos||[]).forEach(t=>{
+    if(!inComuna(t.lat,t.lon)) return;
+    L.circleMarker([t.lat,t.lon],{renderer:coverCanvas,radius:6,weight:1.5,color:"#f59e0b",fillColor:"#f59e0b",fillOpacity:.15})
+      .bindTooltip(`<b>Extremo sin reposo (dudoso)</b><br>L${(t.lineas||[]).join(", ")}<br>reposo ${Math.round((t.fstop||0)*100)}% — no parece terminal real`,{sticky:true}).addTo(coverLayer);
+  });
+  // confirmados encima: terminal físico con reposo GPS -> verde, tamaño según reposo
+  (TERMCONF.confirmados||[]).forEach(t=>{
+    if(!inComuna(t.lat,t.lon)) return;
+    L.circleMarker([t.lat,t.lon],{renderer:coverCanvas,radius:8+12*(t.fstop||0),weight:2,color:"#064e2b",fillColor:"#22c55e",fillOpacity:.6})
+      .bindTooltip(`<b>Terminal confirmado</b>${t.name?" · "+t.name:""}<br>Líneas: ${(t.lineas||[]).join(", ")}<br>reposo <b>${Math.round((t.fstop||0)*100)}%</b> de los pulsos (GPS)`,{sticky:true}).addTo(coverLayer);
+  });
+  setCoverLegend("terms");
+}
 function drawCoverage(mode){
   if(mode==="conges"){ drawCongestion(); return; }
   if(mode==="bunch"){ drawBunching(); return; }
   if(mode==="det"){ drawDetenciones(); return; }
+  if(mode==="terms"){ drawTerminales(); return; }
   if(mode==="exc"){ drawExcesosMap(); return; }
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!COB) return;
@@ -1453,6 +1474,7 @@ function setCoverLegend(mode){
     : mode==="conges" ? [`Velocidad efectiva · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>≤10</i><i>20</i><i>30+</i></span><span class='par'>incluye el tiempo detenido en tránsito</span>"]
     : mode==="bunch" ? [`Apelotonamiento · ${periodoLbl(state.periodo)} (CV de headways)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(120,75%,50%),hsl(60,75%,50%),hsl(0,75%,50%))"></span>`,"<span class='lbls'><i>regular</i><i></i><i>apelotonado</i></span><span class='par'>CV alto = buses pegados unos a otros</span>"]
     : mode==="det" ? ["Congestión: nodos de demora (sin terminales)",`<span class="grad" style="background:linear-gradient(90deg,hsl(45,85%,52%),hsl(0,85%,52%))"></span>`,"<span class='lbls'><i>menor</i><i>mayor</i></span><span class='par'><b style='color:#22d3ee'>▣</b> terminal · flota por línea al pasar</span>"]
+    : mode==="terms" ? ["Terminales detectados (estático + reposo GPS)",`<span class="grad" style="background:linear-gradient(90deg,#22c55e,#22c55e)"></span>`,"<span class='lbls'><i>● confirmado</i><i style='color:#f59e0b'>● dudoso</i></span><span class='par'>verde = extremo de ruta con reposo real (tamaño = % detenido) · ámbar = extremo sin reposo · activa la capa satelital para corroborar</span>"]
     : mode==="exc" ? ["Excesos de velocidad (> 80 km/h · hoy)",`<span class="grad" style="background:linear-gradient(90deg,#fbbf24,#f87171,#dc2626)"></span>`,"<span class='lbls'><i>80</i><i>90</i><i>100+</i></span><span class='par'>episodios registrados durante la jornada</span>"]
     : ["NSE (avalúo CLP/m²)",`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
   coverLegend = L.control({position:"bottomleft"});
@@ -1853,6 +1875,9 @@ function renderNarrative(){
     txt=`<b>Bunching</b>: regularidad de los intervalos entre buses (CV de los headways) medida en puntos de la red, en <b>${periodoLbl(per)}</b>. Verde = buses parejos; rojo = <b>apelotonados</b> (vienen pegados y luego un hueco largo) → peor espera efectiva aguas abajo. Es la huella de la congestión sobre la frecuencia.`;
   } else if(M==="det"){
     txt=`<b>Detenciones</b>: nodos donde los buses pasan más tiempo detenidos, <b>excluyendo los terminales</b> (que distorsionan por la espera de cabecera). Los círculos ámbar→rojo son cuellos de demora en marcha; las cajas <b>▣</b> cyan son terminales, con su flota por línea al pasar el cursor.`;
+  } else if(M==="terms"){
+    const nc=TERMCONF?(TERMCONF.confirmados||[]).length:0, nd=TERMCONF?(TERMCONF.dudosos||[]).length:0;
+    txt=`<b>Terminales</b> detectados cruzando la <b>referencia estática</b> (los extremos —bloque inicial y final— de cada recorrido GTFS) con el <b>reposo real del GPS</b> por bloque. <b style='color:#22c55e'>● Verde</b> = ${nc} terminales confirmados: el extremo coincide con un punto donde los buses efectivamente descansan (alta fracción de pulsos detenidos; el tamaño indica el % de reposo). <b style='color:#f59e0b'>● Ámbar</b> = ${nd} extremos sin reposo (cabeceras de paso o endpoint corrido). Activa la <b>capa satelital</b> (control de capas, arriba a la derecha) para corroborar cada punto con la foto aérea.`;
   } else if(M==="salud"||M==="edu"){
     const v=scopeWavg(p=>M==="salud"?p.salud:p.edu);
     txt=`Tiempo de viaje en transporte público desde cada manzana al ${M==="salud"?"<b>centro de salud</b>":"<b>establecimiento educacional</b>"} más cercano (caminata + espera + bus). ${v!=null?`Mediana ${amb}: <b>${v.toFixed(0)} min</b>. `:""}Verde = cerca en tiempo real de viaje; rojo = lejos.`;
@@ -2396,6 +2421,7 @@ function renderEvolucion(){
     J("speed_grid_hora.json").then(d=>{ GRID=d; if(state.mapMode==="conges") renderMapa(); }).catch(()=>{});
     J("congestion_red.json").then(d=>{ CONGRED=d; if(state.mapMode==="conges"||state.mapMode==="bunch") renderMapa(); }).catch(()=>{});
     J("speed_grid_stats.json").then(d=>{ SGSTATS=d; if(state.mapMode==="conges"&&state.congSub!=="prom") renderMapa(); }).catch(()=>{});
+    J("terminales_confirmados.json").then(d=>{ TERMCONF=d; if(state.mapMode==="terms") renderMapa(); }).catch(()=>{});
     J("red_freq.json").then(d=>{ RFREQ=d; if(state.mapMode==="bunch") renderMapa(); }).catch(()=>{});
     J("detenciones.json").then(d=>{ DET2=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
     J("terminales.json").then(d=>{ TERM=d; if(state.mapMode==="det") renderMapa(); }).catch(()=>{});
