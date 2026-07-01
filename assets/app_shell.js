@@ -25,7 +25,7 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=86`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=87`).then(r=>r.json());
 const BUILD = "2026-06-28 03:33";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null;
@@ -213,7 +213,7 @@ function render(){
   if($("dettipo-sel")) $("dettipo-sel").style.display = dettipoRel ? "flex" : "none";
   // sub-selector de congestión (promedio/día crítico/estabilidad): solo en vista de RED (sin línea);
   // por línea aún no hay estadística día-a-día por arco (fase posterior).
-  const congsubRel = state.vista==="normal" && state.mapMode==="conges" && state.linea==="TODAS";
+  const congsubRel = state.vista==="normal" && state.mapMode==="conges";   // ahora también en vista línea (crit/estab por arco)
   if($("congsub-sel")) $("congsub-sel").style.display = congsubRel ? "flex" : "none";
 
   // VISTAS ESPECIALES (territorio): ranking / comparador de comunas
@@ -1187,13 +1187,22 @@ function drawCongestion(){
     const ld = VCICLO.lineas[state.linea];
     sens.forEach(sn=>{
       const s = ld[sn]; if(!s || !s.coords) return;
-      const co = s.coords, ve = (s.vel||{})[vp] || [];
+      const co = s.coords;
+      // medida por arco: promedio · día crítico (p10 del propio arco) · estabilidad (CV día-a-día)
+      const sub = state.congSub, arr = sub==="crit" ? (s.crit||{})[vp] : sub==="estab" ? (s.cv||{})[vp] : (s.vel||{})[vp];
+      const ve = arr || [], vmean=(s.vel||{})[vp]||[];
       for(let i=0;i<co.length-1;i++){
         const a=ve[i], b=ve[i+1];
         const m = (a!=null&&b!=null)?(a+b)/2 : (a!=null?a:b);
-        if(!(m>0)) continue;
-        L.polyline([co[i],co[i+1]],{renderer:coverCanvas,color:congSpeedColor(m),weight:5,opacity:.9,lineCap:"round"})
-          .bindTooltip(`Línea ${state.linea} · ${Math.round(m)} km/h (${lbl})`,{sticky:true}).addTo(coverLayer);
+        if(m==null||!(m>0)) continue;
+        const col = sub==="estab" ? cvVelColor(m) : congSpeedColor(m);
+        let tip;
+        if(sub==="estab") tip=`Línea ${state.linea} · CV ${m.toFixed(2)} (${lbl}) · ${m<0.12?"estable":m>0.20?"variable":"medio"}`;
+        else if(sub==="crit"){ const me=(vmean[i]!=null&&vmean[i+1]!=null)?(vmean[i]+vmean[i+1])/2:null, r=me?Math.round(100*m/me):null;
+          tip=`Línea ${state.linea} · ${Math.round(m)} km/h en días críticos (${lbl})${r!=null?` · normal ${Math.round(me)} (${r}%)`:""}`; }
+        else tip=`Línea ${state.linea} · ${Math.round(m)} km/h (${lbl})`;
+        L.polyline([co[i],co[i+1]],{renderer:coverCanvas,color:col,weight:5,opacity:.9,lineCap:"round"})
+          .bindTooltip(tip,{sticky:true}).addTo(coverLayer);
       }
     });
     setCoverLegend("conges"); return;
@@ -1469,8 +1478,8 @@ function setCoverLegend(mode){
     : mode==="wait" ? [`Espera hacia destinos · ${periodoLbl(state.periodo)} (min)`,RYG,"<span class='lbls'><i>0</i><i>3</i><i>6+</i></span><span class='par'>manzana = espera a destinos · ● paradero = espera ahí (hover)</span>"]
     : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
     : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:var(--violet)'>● colegio</span>"]
-    : (mode==="conges" && state.linea==="TODAS" && state.congSub==="estab") ? [`Estabilidad de velocidad · ${periodoLbl(state.periodo)} (CV día a día)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(120,75%,50%),hsl(60,75%,50%),hsl(0,75%,50%))"></span>`,"<span class='lbls'><i>estable</i><i></i><i>variable</i></span><span class='par'>verde = velocidad consistente día a día pese a la congestión (corredor eficiente)</span>"]
-    : (mode==="conges" && state.linea==="TODAS" && state.congSub==="crit") ? [`Velocidad en días críticos · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>≤10</i><i>20</i><i>30+</i></span><span class='par'>velocidad en los peores ~10% de días DE CADA EJE; hover = % vs su día normal</span>"]
+    : (mode==="conges" && state.congSub==="estab") ? [`Estabilidad de velocidad · ${periodoLbl(state.periodo)} (CV día a día)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(120,75%,50%),hsl(60,75%,50%),hsl(0,75%,50%))"></span>`,"<span class='lbls'><i>estable</i><i></i><i>variable</i></span><span class='par'>verde = velocidad consistente día a día pese a la congestión (corredor eficiente)</span>"]
+    : (mode==="conges" && state.congSub==="crit") ? [`Velocidad en días críticos · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>≤10</i><i>20</i><i>30+</i></span><span class='par'>velocidad en los peores ~10% de días DE CADA EJE; hover = % vs su día normal</span>"]
     : mode==="conges" ? [`Velocidad efectiva · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>≤10</i><i>20</i><i>30+</i></span><span class='par'>incluye el tiempo detenido en tránsito</span>"]
     : mode==="bunch" ? [`Apelotonamiento · ${periodoLbl(state.periodo)} (CV de headways)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(120,75%,50%),hsl(60,75%,50%),hsl(0,75%,50%))"></span>`,"<span class='lbls'><i>regular</i><i></i><i>apelotonado</i></span><span class='par'>CV alto = buses pegados unos a otros</span>"]
     : mode==="det" ? ["Congestión: nodos de demora (sin terminales)",`<span class="grad" style="background:linear-gradient(90deg,hsl(45,85%,52%),hsl(0,85%,52%))"></span>`,"<span class='lbls'><i>menor</i><i>mayor</i></span><span class='par'><b style='color:#22d3ee'>▣</b> terminal · flota por línea al pasar</span>"]
@@ -1867,10 +1876,10 @@ function renderNarrative(){
   } else if(M==="wait"){
     const v=scopeWavg(p=>p.waitd&&p.waitd[pu]&&p.waitd[pu][per]);
     txt=`<b>Espera</b> estima el tiempo efectivo de espera hacia los destinos${pe}: ½·intervalo·(1+CV²), con la <b>frecuencia real en el sentido que va hacia el destino</b> (un bus en dirección contraria no cuenta) y penalizando el <b>apelotonamiento</b>. ${v!=null?`Media en ${amb} (${periodoLbl(per)}): <b>${v.toFixed(1)} min</b>. `:""}Cambia con el período — compara punta y fuera de punta.`;
-  } else if(M==="conges" && state.linea==="TODAS" && state.congSub==="estab"){
+  } else if(M==="conges" && state.congSub==="estab"){
     const md=SGSTATS&&SGSTATS.meta&&SGSTATS.meta.ndays?SGSTATS.meta.ndays[per]:null;
     txt=`<b>Estabilidad de la velocidad</b>: coeficiente de variación (σ/μ) de la velocidad efectiva <b>día a día</b> por arco, en <b>${periodoLbl(per)}</b>${md?` (sobre ${md} días hábiles)`:""}. <b>Verde = eje consistente</b>: la velocidad casi no cambia entre un día y otro, aunque haya congestión — la firma de un <b>corredor eficiente o vía exclusiva</b>. Rojo = muy variable: depende fuerte del día (un accidente, lluvia o un evento lo colapsan). La hipótesis: la infraestructura exclusiva de buses debería pintarse verde incluso en punta.`;
-  } else if(M==="conges" && state.linea==="TODAS" && state.congSub==="crit"){
+  } else if(M==="conges" && state.congSub==="crit"){
     const nd=SGSTATS&&SGSTATS.meta&&SGSTATS.meta.ndays?SGSTATS.meta.ndays[per]:null;
     txt=`<b>Día crítico</b>: velocidad de cada arco en <b>sus propios peores ~10% de días</b> (percentil 10)${nd?` sobre ${nd} días hábiles`:""} en <b>${periodoLbl(per)}</b>. Es el valor crítico <b>de cada eje por separado</b> — no los días malos de la ciudad, que enmascaraban los peaks locales (un eje puede congestionarse un día normal para el resto). Rojo = el eje colapsa en sus días malos; verde = aguanta. En el hover: <b>% respecto de su día normal</b> (resiliencia) — un corredor protegido se mantiene cerca del 100%.`;
   } else if(M==="conges"){
