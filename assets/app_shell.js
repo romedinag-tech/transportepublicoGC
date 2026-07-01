@@ -1753,17 +1753,20 @@ function renderLineaKpis(){
     const t=nseTercil(p.nse);
     if(t===0) hbaj+=h; else if(t===1) hmed+=h; else if(t===2) halt+=h;
   });
-  let ext=null, tc=null, flota=null;
+  let ext=null, tc=null, flota=null, mainRec=null, hogkm=null;
   if(showCoverLine){
-    const row = (CLINE.lineas||[]).find(r=>r.linea===state.linea && r.rec===state.linea)
-                || (CLINE.lineas||[]).find(r=>r.linea===state.linea);
-    ext = row ? row.ext_km : null;
+    // recorrido PRINCIPAL = variante más larga. hog/km coherente = hogares de ESA variante ÷ su km
+    // (antes se dividía la unión de hogares de TODAS las variantes por el km de UNA -> distorsión).
+    const vs = (CLINE.lineas||[]).filter(r=>r.linea===state.linea)
+                 .sort((a,b)=>(b.ext_km||0)-(a.ext_km||0));
+    const row = vs[0];
+    ext = row ? row.ext_km : null; mainRec = row ? row.rec : null;
+    hogkm = row ? row.hog_km : null;
     const ci = CICLO && CICLO.lineas && CICLO.lineas[state.linea];
     tc = ci ? ci.tc : null;
     flota = ci ? ci.flota_total : null;
   }
   const ciclos = (tc && flota && tc>0) ? (960/tc).toFixed(1) : null;
-  const hogkm = ext ? Math.round(hog/ext) : null;
   const pct = n => hog ? Math.round(100*n/hog) : 0;
   const t1 = _nseTerciles ? _nseTerciles[0] : null;
   const t2 = _nseTerciles ? _nseTerciles[1] : null;
@@ -1775,7 +1778,7 @@ function renderLineaKpis(){
     card("b-bajo","NSE bajo", NF.format(hbaj), `${pct(hbaj)}% · ≤ ${t1?NF.format(t1):"—"} CLP/m²`),
     card("b-med","NSE medio", NF.format(hmed), `${pct(hmed)}% · entre terciles`),
     card("b-alto","NSE alto", NF.format(halt), `${pct(halt)}% · > ${t2?NF.format(t2):"—"} CLP/m²`),
-    card("b-eff",`${IC.ruler} Hog. por km`, hogkm!=null?NF.format(hogkm):"—", ext?`extensión ${ext} km (ida)`:(showCoverCom?`${comLines.length} líneas en comuna`:"")),
+    card("b-eff",`${IC.ruler} Hog. por km`, hogkm!=null?NF.format(hogkm):"—", ext?`recorrido ${mainRec} · ${ext} km · desglose por variante abajo`:(showCoverCom?`${comLines.length} líneas en comuna`:"")),
     card("b-cic",`${IC.cycle} Ciclos/bus/día`, ciclos??"—", tc?`tiempo de ciclo ${Math.round(tc)} min · ${flota||"—"} buses`:(showCoverCom?"—":"")),
   ].join("");
 }
@@ -1783,8 +1786,10 @@ function renderLineaKpis(){
 function renderCoverTable(){
   const el=$("cover-table"); if(!el) return;
   let rows=(CLINE&&CLINE.lineas)||[];
-  if(state.mapMode!=="cover" || state.coverSub!=="est" || state.vista!=="normal" || state.linea!=="TODAS" || !rows.length){ el.style.display="none"; el.innerHTML=""; return; }
-  if(state.comuna!=="TODAS" && CLIN && CLIN[state.comuna]){ const s=new Set(CLIN[state.comuna]); rows=rows.filter(r=>s.has(r.linea)); }
+  if(state.mapMode!=="cover" || state.coverSub!=="est" || state.vista!=="normal" || !rows.length){ el.style.display="none"; el.innerHTML=""; return; }
+  if(state.linea!=="TODAS"){ rows=rows.filter(r=>r.linea===state.linea); }              // vista línea: desglose por variante
+  else if(state.comuna!=="TODAS" && CLIN && CLIN[state.comuna]){ const s=new Set(CLIN[state.comuna]); rows=rows.filter(r=>s.has(r.linea)); }
+  if(!rows.length){ el.style.display="none"; el.innerHTML=""; return; }
   el.style.display="";
   const mx=k=>Math.max(1,...rows.map(r=>r[k]||0));
   const mH=mx("hog"), mHK=mx("hog_km"), mE=mx("ext_km");
