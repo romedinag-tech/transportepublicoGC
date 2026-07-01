@@ -28,7 +28,7 @@ const $ = id => document.getElementById(id);
 const J = n => fetch(`data/${n}?v=88`).then(r=>r.json());
 const BUILD = "2026-06-28 03:33";
 
-let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null;
+let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null, AYERFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
@@ -532,6 +532,9 @@ function loadDia(){
         if(state.mapMode==="exc") renderMapa();
       }
     }).catch(()=>{});
+  // "Ayer" = último día completo (lo persiste el capturador al cambiar de fecha). 404 hasta el 1er cierre.
+  if(AYERFREQ===null) fetch("https://storage.googleapis.com/gccp-transporte-live/ayer.json?t="+Date.now(),{cache:"no-store"})
+    .then(r=>r.ok?r.json():null).then(d=>{ if(d){ AYERFREQ=d; if(state.vista==="normal"&&state.linea!=="TODAS") renderLineFreqChart(); } }).catch(()=>{});
 }
 
 /* ===== KPIs en vivo EXTRA: cobertura instantánea + déficit por línea =====
@@ -800,34 +803,36 @@ function renderLineFreqChart(){
   if(!fL&&!fS&&!fD){ card.style.display="none"; return; }
   card.style.display="";
   if(!linFreqChart) linFreqChart = echarts.init($("ch-lin-freq"));
-  const x=bins.slice(i0,i1+1);
-  const vL=fL?fL.slice(i0,i1+1):x.map(()=>null);
-  const vS=fS?fS.slice(i0,i1+1):x.map(()=>null);
-  const vD=fD?fD.slice(i0,i1+1):x.map(()=>null);
-  const liveSerie=null;   // "Hoy" desactivado en freq (vivo por expediciones en calibración); muestra perfil L/S/D
-  const vHoy=liveSerie?x.map((_,j)=>{const i=i0+j; return (DIA&&i<=DIA.bin)?(liveSerie[i]||0):null;}):x.map(()=>null);
-  const hasLive=vHoy.some(v=>v!=null&&v>0);
+  // UNIDAD HORARIA (despachos/hora) para ser comparable con la frecuencia exigida (GTFS) de abajo:
+  // se suman los 2 bins de 30 min de cada hora (05h..23h = bins 10..47).
+  const HH=[]; for(let h=5;h<=23;h++) HH.push(h);
+  const x=HH.map(h=>h+"h");
+  const toHour=arr=>HH.map(h=>{ if(!arr) return null; const a=arr[2*h], b=arr[2*h+1]; return (a==null&&b==null)?null:(a||0)+(b||0); });
+  const vL=toHour(fL), vS=toHour(fS), vD=toHour(fD);
+  const hasLive=false;
   const th=TH();
   const legendData=["Laborable","Sábado","Domingo"];
-  if(hasLive) legendData.push("Hoy");
+  // "Ayer" (último día completo observado) si está disponible — pendiente de la persistencia del capturador
+  const ayer = (AYERFREQ && AYERFREQ.freq_blk_serie_lin) ? AYERFREQ.freq_blk_serie_lin[state.linea] : null;
+  const vAyer = ayer ? toHour(ayer) : null;
   const series=[
     {name:"Laborable",type:"line",data:vL,smooth:true,symbol:"none",lineStyle:{width:2,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"12"}},
     {name:"Sábado",type:"line",data:vS,smooth:true,symbol:"none",lineStyle:{width:2,color:cssv("--violet")},itemStyle:{color:cssv("--violet")}},
     {name:"Domingo",type:"line",data:vD,smooth:true,symbol:"none",lineStyle:{width:2,color:"#fb923c"},itemStyle:{color:"#fb923c"}},
   ];
-  if(hasLive) series.push({name:"Hoy",type:"line",data:vHoy,smooth:false,symbol:"circle",symbolSize:5,showSymbol:true,connectNulls:false,lineStyle:{width:2.5,color:"#34d399"},itemStyle:{color:"#34d399"},areaStyle:{color:"#34d3991a"}});
+  if(vAyer){ legendData.push("Ayer"); series.push({name:"Ayer",type:"line",data:vAyer,smooth:false,symbol:"circle",symbolSize:4,lineStyle:{width:2.5,color:"#34d399",type:"dashed"},itemStyle:{color:"#34d399"}}); }
   linFreqChart.setOption({
     textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
     legend:{data:legendData,textStyle:{color:th.mut},top:0},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>{const t=p[0].axisValue; let s=`${t}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${x.value.toFixed(1)}</b><br>`;}); return s;}},
-    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:3},axisLine:{lineStyle:{color:th.axis}}},
-    yAxis:{type:"value",name:"despachos/30min",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"despachos/hora",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
     series:series,
   },true);
   setTimeout(()=>linFreqChart.resize(),60);
-  $("lin-freq-sub").textContent = `línea ${state.linea} · despachos/30 min · perfil empírico`+(hasLive?" + observado hoy":" por tipo de día");
+  $("lin-freq-sub").textContent = `línea ${state.linea} · despachos/hora · promedio por tipo de día`+(vAyer?" + ayer":"");
 }
 function renderExcesos(){
   const el = $("excesos-list"); if(!el) return;
