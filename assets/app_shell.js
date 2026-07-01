@@ -37,7 +37,7 @@ let VCICLO=null, vcChart=null, vcPer="agregado", vcSm=0;
 let DETP=null, CLINE={lineas:[]}, BUNCH=null, BUNCHA=null, CICLO=null;
 let _nseTerciles=null;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", cmpA:null, cmpB:null};
-let csChart, freqChart, linFreqChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
+let csChart, freqChart, linFreqChart, rankProgChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["terms","Terminales"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
 const PEAK_H = [7,8,9,17,18,19];
@@ -989,6 +989,7 @@ function nearTerminal(lat,lon,L){ const tl=TLIN[L]; if(!tl||!tl.puntos) return f
 const semColor = r => r==null?"#94a1ba": r>=0.7?"#34d399": r>=0.4?"#fbbf24":"#fb7185";
 function renderOpNow(){
   const card=$("opnow-card"); if(!card) return;
+  card.style.display="none"; return;   // ELIMINADO: recuadro "En calle/terminal/detenidos" (no sincronizado con los gauges de arriba, redundante)
   const isLine=state.linea!=="TODAS", isCom=state.comuna!=="TODAS";
   if(state.vista!=="normal" || !LIVE || !LIVE.buses || (!isLine && !isCom)){ card.style.display="none"; return; }
   card.style.display="";
@@ -1551,20 +1552,8 @@ function renderMapa(){
         .bindTooltip(s[2],{direction:"top"}).addTo(stopLayer);
     });
     if(_isLive){
-      const tl = TLIN[state.linea];
-      if(tl && tl.puntos){
-        tl.puntos.forEach(t=>{
-          if(t.tipo==="terminal"){
-            const icon=L.divIcon({className:"term-ic",html:`<div class="term-box">▣ Terminal</div>`,iconSize:[58,18],iconAnchor:[29,9]});
-            L.marker([t.lat,t.lon],{icon,zIndexOffset:600}).bindTooltip(
-              `<b>Terminal · Línea ${state.linea}</b><br>${NF.format(t.det)} pulsos detenidos · ${t.buses} buses<br>intensidad ${t.intens} (reposo por bus/día)<br><span style="color:#fbbf24">se excluye del análisis en ruta</span>`,
-              {sticky:true,direction:"top"}).addTo(routeLayer);
-          } else {
-            L.circleMarker([t.lat,t.lon],{radius:6,weight:2,color:cssv("--ref"),fillColor:"#0b1220",fillOpacity:.5})
-              .bindTooltip(`Cabecera de ruta · Línea ${state.linea}`,{direction:"top"}).addTo(routeLayer);
-          }
-        });
-      }
+      // rótulos "▣ Terminal" + cabeceras en el mapa vivo por línea: ELIMINADOS (quedaban de una
+      // edición anterior; los terminales viven ahora en el modo mapa "Terminales").
       const nrec = new Set(GEOM[state.linea].map(s=>s.rec)).size;
       $("map-title").textContent = `Línea ${state.linea} · ${nrec} recorrido${nrec>1?"s":""} · ${ps.length} paraderos · color = velocidad`;
     }
@@ -1909,14 +1898,39 @@ function renderNarrative(){
 }
 
 function renderRanking(){
-  const box = $("rank-box"), hint = $("rank-hint");
+  const box = $("rank-box"), hint = $("rank-hint"), rt = $("rank-title");
+  // VISTA LÍNEA: reemplaza el ranking por la FRECUENCIA EXIGIDA por el GTFS estático (despachos/hora
+  // programados), para comparar con la "Frecuencia de salida" observada de arriba.
+  if(state.linea!=="TODAS"){
+    if(rt) rt.textContent = "Frecuencia exigida (GTFS estático)";
+    hint.textContent = `despachos/hora programados · línea ${state.linea}`;
+    const cd = CUMP && CUMP.lineas && CUMP.lineas[state.linea];
+    const nn=$("rank-narr");
+    if(!cd || !cd.prog || !CUMP.horas){ box.innerHTML=`<div class="empty">Sin frecuencia programada (GTFS) para esta línea.</div>`; if(nn) nn.innerHTML=""; return; }
+    box.innerHTML = `<div id="ch-rank-prog" style="height:230px"></div>`;
+    const th=TH(), x=CUMP.horas.map(h=>h+"h");
+    if(rankProgChart){ try{rankProgChart.dispose();}catch(e){} }
+    rankProgChart = echarts.init($("ch-rank-prog"));
+    const S=(nm,arr,col,area)=>({name:nm,type:"line",data:arr,smooth:true,symbol:"none",lineStyle:{width:2,color:col},itemStyle:{color:col},areaStyle:area?{color:col+"12"}:undefined});
+    rankProgChart.setOption({
+      textStyle:{fontFamily:th.font,color:th.tx},
+      grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
+      legend:{data:["Laborable","Sábado","Domingo"],textStyle:{color:th.mut},top:0},
+      tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+        formatter:p=>{let s=`${p[0].axisValue}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${x.value}</b><br>`;}); return s;}},
+      xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
+      yAxis:{type:"value",name:"despachos/h (GTFS)",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+      series:[S("Laborable",cd.prog.L,cssv("--live"),true),S("Sábado",cd.prog.S,cssv("--violet")),S("Domingo",cd.prog.D,"#fb923c")],
+    },true);
+    setTimeout(()=>rankProgChart.resize(),60);
+    if(nn) nn.innerHTML=`Frecuencia <b>exigida por el GTFS estático</b> (despachos/hora programados) para la línea ${state.linea}. Compárala con la <b>frecuencia de salida observada</b> de arriba: donde la observada cae bajo la exigida, hay subprestación de frecuencia.`;
+    return;
+  }
+  if(rt) rt.textContent = "Ranking de líneas";
   let rows;
   if(state.linea==="TODAS"){
     hint.textContent = state.comuna==="TODAS" ? "líneas con más actividad en el sistema" : `líneas con más actividad en ${state.comuna}`;
     rows = (T.lineas||[]).map(l=>{const c=T.cells[`${state.comuna}|${l.linea}`];return c&&c.kpi?{id:l.linea,nm:l.empresa,v:c.kpi.pulsos}:null;}).filter(Boolean);
-  } else {
-    hint.textContent = `comunas donde opera la línea ${state.linea}`;
-    rows = (GEO.features||[]).map(f=>{const c=T.cells[`${f.properties.name}|${state.linea}`];return c&&c.kpi?{id:f.properties.name,nm:"",v:c.kpi.pulsos}:null;}).filter(Boolean);
   }
   rows.sort((a,b)=>b.v-a.v); rows=rows.slice(0,12);
   if(!rows.length){ box.innerHTML=`<div class="empty">Sin datos.</div>`; return; }
@@ -2126,6 +2140,7 @@ function renderOperacion(){
 let varProfChart=null, varTrendChart=null;
 function renderVarFreq(){
   const card=$("var-freq-card"); if(!card) return;
+  card.style.display="none"; return;   // ELIMINADO temporalmente: "Frecuencia por variante" (puntos que se salen; revisar a fondo antes de reactivar)
   if(state.linea==="TODAS" || state.vista!=="normal" || !VFREQ){ card.style.display="none"; return; }
   const recs = Object.keys(VFREQ.variantes).filter(r=>VFREQ.variantes[r].linea===state.linea).sort();
   if(!recs.length){ card.style.display="none"; return; }
