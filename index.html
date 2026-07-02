@@ -590,7 +590,7 @@
               <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
               <div><h3 id="rank-title">Ranking de líneas</h3><span class="sub" id="rank-hint"></span></div>
             </div>
-            <div class="widget-b"><div id="rank-box"></div><p id="rank-narr" class="wnarr"></p></div>
+            <div class="widget-b"><div id="rank-cat-sel" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:11px"></div><div id="rank-box"></div><p id="rank-narr" class="wnarr"></p></div>
           </section>
         </div>
       </div>
@@ -607,15 +607,6 @@
           <div id="opnow-lines" style="margin-top:10px"></div>
           <p id="opnow-narr" class="wnarr"></p>
         </div>
-      </section>
-
-      <!-- Cumplimiento de frecuencia -->
-      <section class="widget">
-        <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shieldcheck.png?v=75" alt="" width="22" height="22"></span>
-          <div><h3>Cumplimiento de frecuencia</h3><span class="sub">programado (GTFS) vs observado (GPS)</span></div>
-        </div>
-        <div class="widget-b"><div id="cump-box"></div><p id="cump-narr" class="wnarr"></p></div>
       </section>
 
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
@@ -747,7 +738,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=120"></script>
+<script defer src="assets/app_shell.js?v=121"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

@@ -40,13 +40,14 @@ const BUILD = "2026-06-28 03:33";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null, AYERFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
+let RANK=null;               // ranking_lineas.json: exc100 (excesos/100km) + gini (trabajo en equipo) por línea
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stops:[]};
 let VCICLO=null, vcChart=null, vcPer="agregado", vcSm=0;
 let DETP=null, CLINE={lineas:[]}, BUNCH=null, BUNCHA=null, CICLO=null;
 let _nseTerciles=null;
-let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", freqDia:"L", cmpA:null, cmpB:null};
+let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", freqDia:"L", rankCat:"prud", cmpA:null, cmpB:null};
 let csChart, freqChart, linFreqChart, rankProgChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["terms","Terminales"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
@@ -261,7 +262,6 @@ function render(){
   renderCoverTable();
   renderBunchTable();
   renderRanking();
-  renderCump();
   renderCumpSem();
   renderEquidad();
   renderNseGap();
@@ -1953,25 +1953,54 @@ function renderRanking(){
     return;
   }
   if(rt) rt.textContent = "Ranking de líneas";
-  let rows;
-  if(state.linea==="TODAS"){
-    hint.textContent = state.comuna==="TODAS" ? "líneas con más actividad en el sistema" : `líneas con más actividad en ${state.comuna}`;
-    rows = (T.lineas||[]).map(l=>{const c=T.cells[`${state.comuna}|${l.linea}`];return c&&c.kpi?{id:l.linea,nm:l.empresa,v:c.kpi.pulsos}:null;}).filter(Boolean);
+  // SISTEMA/COMUNA: ranking multi-categoría con selector (excesos · frecuencia · trabajo en equipo)
+  const cat = RANK_CATS.find(c=>c.k===state.rankCat) || RANK_CATS[0];
+  const sel=$("rank-cat-sel");
+  if(sel){
+    sel.innerHTML = RANK_CATS.map(c=>{ const on=c.k===cat.k;
+      return `<b data-rc="${c.k}" title="${c.desc}" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:7px;font-size:12px;white-space:nowrap;${on?`background:${c.good?"var(--live-tint)":"#fb718522"};color:${c.good?"var(--live)":"#fb7185"};font-weight:700`:"color:var(--muted)"}">${c.ic} ${c.lab}</b>`;
+    }).join("");
+    sel.querySelectorAll("b[data-rc]").forEach(el=>el.onclick=()=>{ state.rankCat=el.dataset.rc; renderRanking(); });
   }
-  rows.sort((a,b)=>b.v-a.v); rows=rows.slice(0,12);
-  if(!rows.length){ box.innerHTML=`<div class="empty">Sin datos.</div>`; return; }
-  const mx = rows[0].v;
-  box.innerHTML = rows.map((r,i)=>`<div class="rank-row" ${state.linea==="TODAS"?`data-l="${r.id}"`:""}>
-    <span class="rk">${i+1}</span>
-    <span style="min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${state.linea==="TODAS"?`<b style="font-family:var(--mono)">${r.id}</b> ${r.nm}`:r.id}</span>
-    <span class="bar"><i style="width:${Math.round(100*r.v/mx)}%"></i></span>
-    <span class="val">${(r.v/1e6).toFixed(1)}M</span></div>`).join("");
-  if(state.linea==="TODAS") box.querySelectorAll(".rank-row").forEach(el=>el.onclick=()=>{state.linea=el.dataset.l;render();});
+  hint.textContent = cat.desc + " · " + (state.comuna==="TODAS"?"sistema":state.comuna);
+  let permit=null;
+  if(state.comuna!=="TODAS") permit=new Set((T.lineas||[]).map(l=>l.linea).filter(ln=>(T.cells||{})[`${state.comuna}|${ln}`]));
+  let rows=[];
+  if(cat.src==="rank"){
+    const R=(RANK&&RANK.lineas)||{};
+    rows=Object.keys(R).map(L=>({id:L,nm:empresaDe(L),v:R[L][cat.metric]})).filter(r=>r.v!=null);
+  } else {
+    const C=(typeof CUMP!=="undefined"&&CUMP&&CUMP.lineas)||{};
+    rows=Object.keys(C).map(L=>({id:L,nm:empresaDe(L),v:C[L].cumpl&&C[L].cumpl.L})).filter(r=>r.v!=null);
+  }
+  if(permit) rows=rows.filter(r=>permit.has(r.id));
+  if(!rows.length){ box.innerHTML=`<div class="empty">${cat.src==="rank"&&!RANK?"Cargando…":"Sin datos."}</div>`; const nn=$("rank-narr"); if(nn)nn.innerHTML=""; return; }
+  rows.sort((a,b)=> cat.asc ? a.v-b.v : b.v-a.v);
+  rows=rows.slice(0,12);
+  const vals=rows.map(r=>r.v), mn=Math.min(...vals), mx=Math.max(...vals), rng=(mx-mn)||1;
+  const col=cat.good?"var(--live)":"#fb7185";
+  box.innerHTML = rows.map((r,i)=>{
+    const t=(r.v-mn)/rng, bw=Math.round(100*(cat.asc?(1-t):t));   // #1 = barra más llena
+    return `<div class="rank-row" data-l="${r.id}">
+      <span class="rk">${i+1}</span>
+      <span style="min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="font-family:var(--mono)">${r.id}</b> ${r.nm}</span>
+      <span class="bar"><i style="width:${bw}%;background:${col}"></i></span>
+      <span class="val" style="color:${col}">${cat.fmt(r.v)}<span style="color:var(--muted);font-size:10px;margin-left:2px">${cat.unit}</span></span></div>`;
+  }).join("");
+  box.querySelectorAll(".rank-row").forEach(el=>el.onclick=()=>{state.linea=el.dataset.l;render();});
   const el=$("rank-narr");
-  if(el) el.innerHTML = state.linea==="TODAS"
-    ? `Líneas ordenadas por <b>actividad</b> (millones de registros GPS) en ${state.comuna==="TODAS"?"el sistema":state.comuna}. Aproxima qué líneas mueven más servicio aquí; clic en una para abrirla.`
-    : `Comunas donde la línea <b>${state.linea}</b> registra más actividad — dónde concentra su operación.`;
+  if(el) el.innerHTML = `Líneas ordenadas por <b>${cat.lab.toLowerCase()}</b> (${cat.desc}) en ${state.comuna==="TODAS"?"el sistema":state.comuna}. Excesos y reparto de flota: base granular por bus (mar-2026, metodología <code>vel>80 &amp; vel_ok</code> · Gini de km/bus); frecuencia: despachos observados/programados GTFS. Clic en una línea para abrirla.`;
 }
+
+// categorías del ranking de líneas (excesos normalizados · frecuencia · trabajo en equipo)
+const RANK_CATS = [
+  {k:"prud",       ic:"🐢", lab:"Más prudentes",          desc:"menos excesos /100 km",       src:"rank", metric:"exc100", asc:true,  good:true,  fmt:v=>v.toFixed(2), unit:"/100km"},
+  {k:"f1",         ic:"🏎️", lab:"Fórmula 1",              desc:"más excesos /100 km",         src:"rank", metric:"exc100", asc:false, good:false, fmt:v=>v.toFixed(2), unit:"/100km"},
+  {k:"freq_best",  ic:"🎯", lab:"Mejor frecuencia",        desc:"cumplen el plan del día",     src:"cump", metric:"cumpl", asc:false, good:true,  fmt:v=>Math.round(v), unit:"%"},
+  {k:"freq_worst", ic:"🐌", lab:"Peor frecuencia",         desc:"no cumplen el plan",          src:"cump", metric:"cumpl", asc:true,  good:false, fmt:v=>Math.round(v), unit:"%"},
+  {k:"team_best",  ic:"🤝", lab:"Mejor trabajo en equipo", desc:"reparto parejo de la flota",  src:"rank", metric:"gini", asc:true,  good:true,  fmt:v=>Math.round((1-v)*100), unit:"% reparto"},
+  {k:"team_worst", ic:"🦸", lab:"Peor trabajo en equipo",  desc:"concentrado en pocos buses",  src:"rank", metric:"gini", asc:false, good:false, fmt:v=>Math.round((1-v)*100), unit:"% reparto"},
+];
 
 const DIAS = {L:"Laborable", S:"Sábado", D:"Domingo"};
 const cumpCol = c => c==null ? "#64748b" : c>=120 ? "#22d3ee" : c>=95 ? "#34d399" : c>=80 ? "#fbbf24" : "#fb7185";
@@ -2475,6 +2504,7 @@ function renderEvolucion(){
     J("cobertura.json").then(d=>{ COB=d; renderNseGap(); if(state.mapMode!=="live") renderMapa();
       if(LIVE && state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS") renderLiveExtras();
     }).catch(()=>{});
+    J("ranking_lineas.json").then(d=>{ RANK=d; if(state.vista==="normal"&&state.linea==="TODAS") renderRanking(); }).catch(()=>{});
     J("flota_equidad.json").then(d=>{ EQ=d; renderEquidad(); }).catch(()=>{});
     J("operacion_linea.json").then(d=>{ OP=d; renderOperacion(); renderCalidad(); }).catch(()=>{});
     J("speed_grid_hora.json").then(d=>{ GRID=d; if(state.mapMode==="conges") renderMapa(); }).catch(()=>{});
