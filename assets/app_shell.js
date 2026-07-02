@@ -25,7 +25,7 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=89`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=90`).then(r=>r.json());
 const BUILD = "2026-06-28 03:33";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null, AYERFREQ=null;
@@ -196,7 +196,7 @@ function render(){
   // Cobertura dinámica también depende del período. El sub-selector está disponible en vista
   // SISTEMA (sin línea), pero el modo Cobertura+din también aplica en vista de LÍNEA.
   const coverDyn = state.mapMode==="cover" && (state.coverSub==="din" || state.coverSub==="od");
-  const periodoRelevante = state.vista==="ranking" || (state.vista==="normal" && (state.mapMode==="conges"||state.mapMode==="wait"||state.mapMode==="bunch"||coverDyn));
+  const periodoRelevante = state.vista==="ranking" || (state.vista==="normal" && (state.mapMode==="conges"||state.mapMode==="wait"||state.mapMode==="bunch"||state.mapMode==="det"||coverDyn));
   // F1: período visible siempre en home (vista normal). Si no aplica al modo actual,
   // se marca data-inactive=1 (opacity .5) — sigue siendo un control de contexto presente.
   const periodoVisible = state.vista==="normal" || state.vista==="ranking";
@@ -1227,48 +1227,34 @@ function congDetColor(t){ // t=0..1 (severidad) -> ámbar a rojo
 }
 function drawDetenciones(){
   if(!coverLayer) return; coverLayer.clearLayers();
-  let cong = (DET2||[]).filter(d=>inComuna(d.la,d.lo));
+  const per=state.periodo, lbl=periodoLbl(per);
+  // nodos de congestión POR PERÍODO (terminales/retornos ya excluidos en el dato offline)
+  let cong = (((DET2&&DET2.per)||{})[per]||[]).filter(d=>inComuna(d.la,d.lo));
   let terms = ((TERM&&TERM.terminales)||[]).filter(t=>inComuna(t.la,t.lo));
-  // excluir falsos focos: detenciones que caen sobre un TERMINAL real con reposo (no congestión).
-  // Combina terminales.json (TERM) + puntos tipo "terminal" por línea (TLIN); NO usa cabeceras
-  // (extremos geométricos del recorrido) para no borrar congestión legítima cercana.
-  const _termPts=[];
-  ((TERM&&TERM.terminales)||[]).forEach(t=>_termPts.push([t.la,t.lo]));
-  Object.values(TLIN||{}).forEach(tl=>((tl&&tl.puntos)||[]).forEach(p=>{
-    if(p.tipo==="terminal"){ const la=p.la??p.lat, lo=p.lo??p.lon; if(la&&lo) _termPts.push([la,lo]); }
-  }));
-  // terminales CONFIRMADOS por reposo GPS (capa limpia): excluir sus focos de detención falsos
-  // (es reposo de cabecera, no demora en marcha). Aplica en sistema y por línea.
-  ((TERMCONF&&TERMCONF.confirmados)||[]).forEach(t=>{ if(t.lat&&t.lon) _termPts.push([t.lat,t.lon]); });
-  if(_termPts.length){
-    const MXt=111320*Math.cos(-36.83*Math.PI/180), MYt=110540, RT=220;
-    cong = cong.filter(d=>!_termPts.some(t=>{ const dx=(d.lo-t[1])*MXt, dy=(d.la-t[0])*MYt; return dx*dx+dy*dy < RT*RT; }));
+  if(state.linea!=="TODAS"){
+    terms = terms.filter(t=>(t.lineas||[]).some(l=>l.linea===state.linea));
+    if(GEOM && GEOM[state.linea]){
+      const MX2=111320*Math.cos(-36.83*Math.PI/180), MY2=110540, R=400;
+      const allPts=[]; (GEOM[state.linea]||[]).forEach(r=>(r.p||[]).forEach(p=>allPts.push(p)));
+      cong = cong.filter(d=>allPts.some(p=>{ const dx=(d.lo-p[1])*MX2, dy=(d.la-p[0])*MY2; return dx*dx+dy*dy < R*R; }));
+    }
   }
-  if(state.linea!=="TODAS") terms = terms.filter(t=>(t.lineas||[]).some(l=>l.linea===state.linea));
-  if(state.linea!=="TODAS" && GEOM && GEOM[state.linea]){
-    const MX2=111320*Math.cos(-36.83*Math.PI/180), MY2=110540, R=400;
-    const allPts=[]; (GEOM[state.linea]||[]).forEach(r=>(r.p||[]).forEach(p=>allPts.push(p)));
-    cong = cong.filter(d=>allPts.some(p=>{ const dx=(d.lo-p[1])*MX2, dy=(d.la-p[0])*MY2; return dx*dx+dy*dy < R*R; }));
-  }
-  if(state.detTipo==="cong") cong = cong.filter(d=>(d.tipo||"").includes("demora"));
-  else cong = cong.filter(d=>!(d.tipo||"").includes("demora"));
-  // congestión: nodos reales de demora (terminales ya excluidos en el dato)
+  // "Congestión" (default) = TODOS los nodos de detención del período; "Paraderos" = solo troncal/parada
+  if(state.detTipo==="par") cong = cong.filter(d=>!(d.tipo||"").includes("demora"));
   if(cong.length){
     const mx=Math.max(...cong.map(d=>d.det));
     cong.forEach(d=>{
       const r=6+22*Math.sqrt(d.det/mx);
       L.circleMarker([d.la,d.lo],{renderer:coverCanvas,radius:r,weight:1,color:"rgba(0,0,0,.35)",fillColor:congDetColor(d.det/mx),fillOpacity:.6})
-        .bindTooltip(`<b>${d.calle||d.tipo}</b> · ${d.comuna||""}<br>${d.tipo}<br>Tiempo detenido: ${fmt(d.det)} pulsos · ${d.buses} buses distintos`,{sticky:true}).addTo(coverLayer);
+        .bindTooltip(`<b>${d.calle||d.tipo}</b> · ${d.comuna||""} (${lbl})<br>${d.tipo}<br>Tiempo detenido: ${fmt(d.det)} pulsos · ${d.buses} buses`,{sticky:true}).addTo(coverLayer);
     });
   }
-  // terminales / cabeceras: capa distinta con flota por línea
+  // terminales FORMALES confirmados (▣ verde numerado)
   terms.forEach(t=>{
-    const dom = (t.lineas&&t.lineas[0]) ? t.lineas[0].linea : "T";
-    const rows = (t.lineas||[]).map(l=>`<tr><td style="padding:0 8px 0 0">Línea ${l.linea}</td><td style="text-align:right"><b>${l.buses}</b> buses</td></tr>`).join("");
-    const icon = L.divIcon({className:"term-ic",html:`<div class="term-box">▣ ${dom}</div>`,iconSize:[36,18],iconAnchor:[18,9]});
+    const rows=(t.lineas||[]).map(l=>`L${l.linea}`).join(", ");
+    const icon=L.divIcon({className:"term-ic",html:`<div class="term-box">▣ ${t.n||""}</div>`,iconSize:[30,18],iconAnchor:[15,9]});
     L.marker([t.la,t.lo],{icon,zIndexOffset:500}).bindTooltip(
-      `<b>Terminal / cabecera · ${t.comuna||""}</b><br>Flota que opera desde aquí:<table style="margin-top:3px">${rows}</table>`,
-      {sticky:true,direction:"top"}).addTo(coverLayer);
+      `<b>Terminal #${t.n||""}${t.name?" · "+t.name:""}</b> · ${t.comuna||""}<br>Líneas: ${rows}`,{sticky:true,direction:"top"}).addTo(coverLayer);
   });
   setCoverLegend("det");
 }
@@ -1583,7 +1569,7 @@ function renderMapa(){
           :(state.linea==="TODAS"&&state.congSub==="crit")?`velocidad en los peores ~10% de días de cada eje en ${periodoLbl(state.periodo)} · rojo = colapsa en sus días malos · hover = % vs su día normal`
           :`velocidad efectiva (incluye detenido en tránsito) en ${periodoLbl(state.periodo)} · rojo = ejes lentos`,
         bunch:`regularidad de los buses (CV de headways) en ${periodoLbl(state.periodo)} · rojo = se apelotonan ⇒ peor espera efectiva`,
-        det:`${DET2.length} nodos de congestión (sin terminales) · ${(TERM&&TERM.terminales||[]).length} terminales detectados`,
+        det:`${((DET2&&DET2.per&&DET2.per[state.periodo])||[]).length} nodos de congestión en ${periodoLbl(state.periodo)} (sin terminales/retornos) · ${(TERM&&TERM.terminales||[]).length} terminales formales`,
         salud:`tiempo mediano a salud: ${R.salud_med} min`, edu:`tiempo mediano a educación: ${R.edu_med} min`,
         nse:"avalúo m² · azul bajo → ámbar alto"}[M];
       if(b) b.textContent = state.comuna==="TODAS" ? (badgeSys||"") : `${titulo} · ${state.comuna}`;
