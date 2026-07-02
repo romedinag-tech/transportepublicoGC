@@ -25,7 +25,7 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=91`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=92`).then(r=>r.json());
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
