@@ -428,6 +428,10 @@
     </span>
 
     <div class="ml-auto flex items-center gap-2">
+      <span id="hdr-reloj" class="hidden md:inline-flex items-center gap-1.5 text-[11.5px] font-mono text-[var(--muted)] px-2.5 py-1.5 rounded-lg border border-[var(--line2)] bg-[var(--chip)]" title="Fecha y hora en vivo (Chile)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span id="hdr-reloj-txt">—</span>
+      </span>
       <button id="theme-btn" class="themebtn" onclick="toggleTheme()" title="Tema claro/oscuro" aria-label="Tema">☀</button>
       <a href="https://github.com/romedinag-tech/transportepublicoGC" target="_blank" rel="noopener" class="grid place-items-center w-8 h-8 rounded-lg border border-[var(--line2)] text-[var(--muted)] hover:text-[var(--acc)] hover:border-[var(--acc)]" title="GitHub" aria-label="GitHub">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 8.84 21.5c.5.08.66-.22.66-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.57.67.48A10 10 0 0 0 12 2Z"/></svg>
@@ -743,7 +747,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=115"></script>
+<script defer src="assets/app_shell.js?v=116"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

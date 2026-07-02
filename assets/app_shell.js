@@ -25,7 +25,17 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=90`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=91`).then(r=>r.json());
+// reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
+function tickReloj(){
+  const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
+  const now = new Date();
+  let f = new Intl.DateTimeFormat("es-CL", {timeZone:"America/Santiago", weekday:"long", day:"numeric", month:"long"}).format(now).replace(",", "");
+  f = f.charAt(0).toUpperCase() + f.slice(1);
+  const h = new Intl.DateTimeFormat("es-CL", {timeZone:"America/Santiago", hour:"2-digit", minute:"2-digit", hour12:false}).format(now);
+  el.textContent = `${f} · ${h}`;
+}
+try{ tickReloj(); setInterval(tickReloj, 30000); }catch(e){}
 const BUILD = "2026-06-28 03:33";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null, AYERFREQ=null;
