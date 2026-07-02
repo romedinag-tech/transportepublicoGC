@@ -36,7 +36,7 @@ let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stop
 let VCICLO=null, vcChart=null, vcPer="agregado", vcSm=0;
 let DETP=null, CLINE={lineas:[]}, BUNCH=null, BUNCHA=null, CICLO=null;
 let _nseTerciles=null;
-let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", cmpA:null, cmpB:null};
+let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", freqDia:"L", cmpA:null, cmpB:null};
 let csChart, freqChart, linFreqChart, rankProgChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["terms","Terminales"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
@@ -793,46 +793,17 @@ function renderFreqChart(){
 }
 
 function renderLineFreqChart(){
+  // Panel de arriba RESERVADO para la frecuencia de salida EN TIEMPO REAL (se activará al cierre de la
+  // jornada, cuando esté lista la frecuencia en vivo). Por ahora vacío. La comparación promedio vs
+  // exigida (GTFS) vive en el panel de abajo (renderRanking, vista línea).
   const card=$("lin-freq-card"); if(!card) return;
   const lineActive = state.vista==="normal" && state.linea!=="TODAS";
-  if(!lineActive || !BASE30){ card.style.display="none"; return; }
-  const bins=BASE30.bins, i0=10, i1=47;
-  const fL=(BASE30.L&&BASE30.L.freq_lin||{})[state.linea];
-  const fS=(BASE30.S&&BASE30.S.freq_lin||{})[state.linea];
-  const fD=(BASE30.D&&BASE30.D.freq_lin||{})[state.linea];
-  if(!fL&&!fS&&!fD){ card.style.display="none"; return; }
+  if(!lineActive){ card.style.display="none"; return; }
   card.style.display="";
-  if(!linFreqChart) linFreqChart = echarts.init($("ch-lin-freq"));
-  // UNIDAD HORARIA (despachos/hora) para ser comparable con la frecuencia exigida (GTFS) de abajo:
-  // se suman los 2 bins de 30 min de cada hora (05h..23h = bins 10..47).
-  const HH=[]; for(let h=5;h<=23;h++) HH.push(h);
-  const x=HH.map(h=>h+"h");
-  const toHour=arr=>HH.map(h=>{ if(!arr) return null; const a=arr[2*h], b=arr[2*h+1]; return (a==null&&b==null)?null:(a||0)+(b||0); });
-  const vL=toHour(fL), vS=toHour(fS), vD=toHour(fD);
-  const hasLive=false;
-  const th=TH();
-  const legendData=["Laborable","Sábado","Domingo"];
-  // "Ayer" (último día completo observado) si está disponible — pendiente de la persistencia del capturador
-  const ayer = (AYERFREQ && AYERFREQ.freq_blk_serie_lin) ? AYERFREQ.freq_blk_serie_lin[state.linea] : null;
-  const vAyer = ayer ? toHour(ayer) : null;
-  const series=[
-    {name:"Laborable",type:"line",data:vL,smooth:true,symbol:"none",lineStyle:{width:2,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"12"}},
-    {name:"Sábado",type:"line",data:vS,smooth:true,symbol:"none",lineStyle:{width:2,color:cssv("--violet")},itemStyle:{color:cssv("--violet")}},
-    {name:"Domingo",type:"line",data:vD,smooth:true,symbol:"none",lineStyle:{width:2,color:"#fb923c"},itemStyle:{color:"#fb923c"}},
-  ];
-  if(vAyer){ legendData.push("Ayer"); series.push({name:"Ayer",type:"line",data:vAyer,smooth:false,symbol:"circle",symbolSize:4,lineStyle:{width:2.5,color:"#34d399",type:"dashed"},itemStyle:{color:"#34d399"}}); }
-  linFreqChart.setOption({
-    textStyle:{fontFamily:th.font,color:th.tx},
-    grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
-    legend:{data:legendData,textStyle:{color:th.mut},top:0},
-    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
-      formatter:p=>{const t=p[0].axisValue; let s=`${t}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${x.value.toFixed(1)}</b><br>`;}); return s;}},
-    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
-    yAxis:{type:"value",name:"despachos/hora",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
-    series:series,
-  },true);
-  setTimeout(()=>linFreqChart.resize(),60);
-  $("lin-freq-sub").textContent = `línea ${state.linea} · despachos/hora · promedio por tipo de día`+(vAyer?" + ayer":"");
+  if(linFreqChart){ try{linFreqChart.dispose();}catch(e){} linFreqChart=null; }
+  const el=$("ch-lin-freq");
+  if(el) el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:180px;text-align:center;color:var(--muted);font-size:12.5px;padding:0 16px">Reservado para la <b style="color:var(--live);margin:0 5px">frecuencia de salida en tiempo real</b> · se activará al cierre de la jornada</div>`;
+  $("lin-freq-sub").textContent = `línea ${state.linea} · en tiempo real (próximamente)`;
 }
 function renderExcesos(){
   const el = $("excesos-list"); if(!el) return;
@@ -1908,28 +1879,40 @@ function renderRanking(){
   // VISTA LÍNEA: reemplaza el ranking por la FRECUENCIA EXIGIDA por el GTFS estático (despachos/hora
   // programados), para comparar con la "Frecuencia de salida" observada de arriba.
   if(state.linea!=="TODAS"){
-    if(rt) rt.textContent = "Frecuencia exigida (GTFS estático)";
-    hint.textContent = `despachos/hora programados · línea ${state.linea}`;
-    const cd = CUMP && CUMP.lineas && CUMP.lineas[state.linea];
+    // COMBINADO: frecuencia de salida OBSERVADA (promedio) + EXIGIDA (GTFS estático), despachos/hora,
+    // con selector de tipo de día (default Laborable). Así se ve directo si se cumple o no.
+    if(rt) rt.textContent = "Frecuencia: salida vs exigida (GTFS)";
     const nn=$("rank-narr");
-    if(!cd || !cd.prog || !CUMP.horas){ box.innerHTML=`<div class="empty">Sin frecuencia programada (GTFS) para esta línea.</div>`; if(nn) nn.innerHTML=""; return; }
-    box.innerHTML = `<div id="ch-rank-prog" style="height:230px"></div>`;
+    const dia = state.freqDia || "L";
+    const DL = {L:"Laborable", S:"Sábado", D:"Domingo"};
+    const cd = CUMP && CUMP.lineas && CUMP.lineas[state.linea];
+    if(!cd || !cd.prog || !CUMP.horas || !BASE30){ box.innerHTML=`<div class="empty">Sin frecuencia programada (GTFS) para esta línea.</div>`; hint.textContent=""; if(nn) nn.innerHTML=""; return; }
+    hint.textContent = `despachos/hora · ${DL[dia]}`;
+    // selector de día + contenedor del chart
+    const dsel = ["L","S","D"].map(d=>`<b data-d="${d}" style="cursor:pointer;padding:2px 9px;border-radius:6px;font-size:11px;${d===dia?"background:var(--live-tint);color:var(--live);font-weight:700":"color:var(--muted)"}">${DL[d]}</b>`).join("");
+    box.innerHTML = `<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px"><span style="font-size:11px;color:var(--muted);margin-right:2px">Día:</span>${dsel}</div><div id="ch-rank-prog" style="height:215px"></div>`;
+    box.querySelectorAll("b[data-d]").forEach(el=>el.onclick=()=>{ state.freqDia=el.dataset.d; renderRanking(); });
     const th=TH(), x=CUMP.horas.map(h=>h+"h");
+    const fl=(BASE30[dia]&&BASE30[dia].freq_lin||{})[state.linea];
+    const salida=CUMP.horas.map(h=>{ if(!fl) return null; const a=fl[2*h], b=fl[2*h+1]; return (a==null&&b==null)?null:Math.round(((a||0)+(b||0))*10)/10; });
+    const exigida=cd.prog[dia]||[];
     if(rankProgChart){ try{rankProgChart.dispose();}catch(e){} }
     rankProgChart = echarts.init($("ch-rank-prog"));
-    const S=(nm,arr,col,area)=>({name:nm,type:"line",data:arr,smooth:true,symbol:"none",lineStyle:{width:2,color:col},itemStyle:{color:col},areaStyle:area?{color:col+"12"}:undefined});
     rankProgChart.setOption({
       textStyle:{fontFamily:th.font,color:th.tx},
       grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
-      legend:{data:["Laborable","Sábado","Domingo"],textStyle:{color:th.mut},top:0},
+      legend:{data:["Exigida (GTFS)","Salida (observada)"],textStyle:{color:th.mut},top:0},
       tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
         formatter:p=>{let s=`${p[0].axisValue}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${x.value}</b><br>`;}); return s;}},
       xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
-      yAxis:{type:"value",name:"despachos/h (GTFS)",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
-      series:[S("Laborable",cd.prog.L,cssv("--live"),true),S("Sábado",cd.prog.S,cssv("--violet")),S("Domingo",cd.prog.D,"#fb923c")],
+      yAxis:{type:"value",name:"despachos/hora",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+      series:[
+        {name:"Exigida (GTFS)",type:"line",data:exigida,smooth:true,symbol:"none",lineStyle:{width:2.5,color:"#fbbf24",type:"dashed"},itemStyle:{color:"#fbbf24"}},
+        {name:"Salida (observada)",type:"line",data:salida,smooth:true,symbol:"none",connectNulls:false,lineStyle:{width:2,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"12"}},
+      ],
     },true);
     setTimeout(()=>rankProgChart.resize(),60);
-    if(nn) nn.innerHTML=`Frecuencia <b>exigida por el GTFS estático</b> (despachos/hora programados) para la línea ${state.linea}. Compárala con la <b>frecuencia de salida observada</b> de arriba: donde la observada cae bajo la exigida, hay subprestación de frecuencia.`;
+    if(nn) nn.innerHTML=`Línea ${state.linea} · ${DL[dia]}: <b style="color:#fbbf24">exigida (GTFS)</b> vs <b style="color:var(--live)">salida observada</b> (promedio histórico), en despachos/hora. Donde la observada cae bajo la exigida hay <b>subprestación</b>. Clic en el día para comparar.`;
     return;
   }
   if(rt) rt.textContent = "Ranking de líneas";
