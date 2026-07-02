@@ -1974,6 +1974,7 @@ function renderRanking(){
     rows=Object.keys(C).map(L=>({id:L,nm:empresaDe(L),v:C[L].cumpl&&C[L].cumpl.L})).filter(r=>r.v!=null);
   }
   if(permit) rows=rows.filter(r=>permit.has(r.id));
+  if(cat.k==="freq_worst") rows=rows.filter(r=>r.v<=100);   // "peor frecuencia" = solo incumplidores (<=100%)
   if(!rows.length){ box.innerHTML=`<div class="empty">${cat.src==="rank"&&!RANK?"Cargando…":"Sin datos."}</div>`; const nn=$("rank-narr"); if(nn)nn.innerHTML=""; return; }
   rows.sort((a,b)=> cat.asc ? a.v-b.v : b.v-a.v);
   rows=rows.slice(0,12);
