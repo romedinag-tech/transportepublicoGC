@@ -25,7 +25,7 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=88`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=89`).then(r=>r.json());
 const BUILD = "2026-06-28 03:33";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null, AYERFREQ=null;
@@ -1345,20 +1345,21 @@ function drawBunching(){
 function drawTerminales(){
   if(!coverLayer) return; coverLayer.clearLayers();
   if(!TERMCONF){ setCoverLegend("terms"); return; }
-  // dudosos primero (debajo): extremos estáticos SIN reposo GPS -> ámbar tenue
-  (TERMCONF.dudosos||[]).forEach(t=>{
+  // PUNTOS DE RETORNO (validados por el usuario): no son terminal formal, pero el bus reposa ahí
+  // (excluidos de detención, no cuentan como terminal). Marcador cyan tenue.
+  (TERMCONF.retornos||[]).forEach(t=>{
     if(!inComuna(t.lat,t.lon)) return;
-    L.circleMarker([t.lat,t.lon],{renderer:coverCanvas,radius:6,weight:1.5,color:"#f59e0b",fillColor:"#f59e0b",fillOpacity:.15})
-      .bindTooltip(`<b>Extremo sin reposo (dudoso)</b><br>L${(t.lineas||[]).join(", ")}<br>reposo ${Math.round((t.fstop||0)*100)}% — no parece terminal real`,{sticky:true}).addTo(coverLayer);
+    L.circleMarker([t.lat,t.lon],{renderer:coverCanvas,radius:6,weight:1.5,color:"#22d3ee",fillColor:"#22d3ee",fillOpacity:.2})
+      .bindTooltip(`<b>Punto de retorno</b>${t.name?" · "+t.name:""}<br>Líneas: ${(t.lineas||[]).join(", ")}<br>fin de ruta con espera breve — no es terminal formal (excluido de detención)`,{sticky:true}).addTo(coverLayer);
   });
-  // confirmados encima: terminal físico con reposo GPS -> verde, tamaño según reposo.
-  // Número = índice (1-based) en terminales_confirmados.json, estable, para auditar cuáles son correctos.
+  // TERMINALES formales (verdad manual): verde, numerados 1..N (campo n).
   (TERMCONF.confirmados||[]).forEach((t,i)=>{
     if(!inComuna(t.lat,t.lon)) return;
-    L.circleMarker([t.lat,t.lon],{renderer:coverCanvas,radius:8+12*(t.fstop||0),weight:2,color:"#064e2b",fillColor:"#22c55e",fillOpacity:.6})
-      .bindTooltip(`<b>#${i+1} · Terminal confirmado</b>${t.name?" · "+t.name:""}<br>Líneas: ${(t.lineas||[]).join(", ")}<br>reposo <b>${Math.round((t.fstop||0)*100)}%</b> de los pulsos (GPS)`,{sticky:true}).addTo(coverLayer);
+    const num=t.n||(i+1);
+    L.circleMarker([t.lat,t.lon],{renderer:coverCanvas,radius:11,weight:2,color:"#064e2b",fillColor:"#22c55e",fillOpacity:.6})
+      .bindTooltip(`<b>#${num} · Terminal</b>${t.name?" · "+t.name:""}<br>Líneas: ${(t.lineas||[]).join(", ")}`,{sticky:true}).addTo(coverLayer);
     L.marker([t.lat,t.lon],{interactive:false,zIndexOffset:600,icon:L.divIcon({className:"term-num",
-      html:`<div style="font:700 10px/15px var(--font-data,monospace);color:#052e16;background:#fff;border:1.5px solid #052e16;border-radius:9px;min-width:16px;height:16px;padding:0 2px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.5)">${i+1}</div>`,
+      html:`<div style="font:700 10px/15px var(--font-data,monospace);color:#052e16;background:#fff;border:1.5px solid #052e16;border-radius:9px;min-width:16px;height:16px;padding:0 2px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.5)">${num}</div>`,
       iconSize:[16,16],iconAnchor:[8,8]})}).addTo(coverLayer);
   });
   setCoverLegend("terms");
@@ -1493,7 +1494,7 @@ function setCoverLegend(mode){
     : mode==="conges" ? [`Velocidad efectiva · ${periodoLbl(state.periodo)} (km/h)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(0,75%,50%),hsl(60,75%,50%),hsl(120,75%,50%))"></span>`,"<span class='lbls'><i>≤10</i><i>20</i><i>30+</i></span><span class='par'>incluye el tiempo detenido en tránsito</span>"]
     : mode==="bunch" ? [`Apelotonamiento · ${periodoLbl(state.periodo)} (CV de headways)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(120,75%,50%),hsl(60,75%,50%),hsl(0,75%,50%))"></span>`,"<span class='lbls'><i>regular</i><i></i><i>apelotonado</i></span><span class='par'>CV alto = buses pegados unos a otros</span>"]
     : mode==="det" ? ["Congestión: nodos de demora (sin terminales)",`<span class="grad" style="background:linear-gradient(90deg,hsl(45,85%,52%),hsl(0,85%,52%))"></span>`,"<span class='lbls'><i>menor</i><i>mayor</i></span><span class='par'><b style='color:#22d3ee'>▣</b> terminal · flota por línea al pasar</span>"]
-    : mode==="terms" ? ["Terminales detectados (estático + reposo GPS)",`<span class="grad" style="background:linear-gradient(90deg,#22c55e,#22c55e)"></span>`,"<span class='lbls'><i>● confirmado</i><i style='color:#f59e0b'>● dudoso</i></span><span class='par'>verde = extremo de ruta con reposo real (tamaño = % detenido) · ámbar = extremo sin reposo · activa la capa satelital para corroborar</span>"]
+    : mode==="terms" ? ["Terminales (validados manualmente)",`<span class="grad" style="background:linear-gradient(90deg,#22c55e,#22c55e)"></span>`,"<span class='lbls'><i style='color:#22c55e'>● terminal</i><i style='color:#22d3ee'>● punto de retorno</i></span><span class='par'>verde numerado = terminal formal · cyan = fin de ruta con espera breve (no es terminal, pero excluido de detención)</span>"]
     : mode==="exc" ? ["Excesos de velocidad (> 80 km/h · hoy)",`<span class="grad" style="background:linear-gradient(90deg,#fbbf24,#f87171,#dc2626)"></span>`,"<span class='lbls'><i>80</i><i>90</i><i>100+</i></span><span class='par'>episodios registrados durante la jornada</span>"]
     : ["NSE (avalúo CLP/m²)",`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
   coverLegend = L.control({position:"bottomleft"});
@@ -1888,8 +1889,8 @@ function renderNarrative(){
   } else if(M==="det"){
     txt=`<b>Detenciones</b>: nodos donde los buses pasan más tiempo detenidos, <b>excluyendo los terminales</b> (que distorsionan por la espera de cabecera). Los círculos ámbar→rojo son cuellos de demora en marcha; las cajas <b>▣</b> cyan son terminales, con su flota por línea al pasar el cursor.`;
   } else if(M==="terms"){
-    const nc=TERMCONF?(TERMCONF.confirmados||[]).length:0, nd=TERMCONF?(TERMCONF.dudosos||[]).length:0;
-    txt=`<b>Terminales</b> detectados cruzando la <b>referencia estática</b> (los extremos —bloque inicial y final— de cada recorrido GTFS) con el <b>reposo real del GPS</b> por bloque. <b style='color:#22c55e'>● Verde</b> = ${nc} terminales confirmados: el extremo coincide con un punto donde los buses efectivamente descansan (alta fracción de pulsos detenidos; el tamaño indica el % de reposo). <b style='color:#f59e0b'>● Ámbar</b> = ${nd} extremos sin reposo (cabeceras de paso o endpoint corrido). Activa la <b>capa satelital</b> (control de capas, arriba a la derecha) para corroborar cada punto con la foto aérea.`;
+    const nc=TERMCONF?(TERMCONF.confirmados||[]).length:0, nr=TERMCONF?(TERMCONF.retornos||[]).length:0;
+    txt=`<b>Terminales validados manualmente</b> (corregidos en Google Earth sobre la detección estático+GPS). <b style='color:#22c55e'>● Verde numerado</b> = ${nc} <b>terminales formales</b>: cuentan como "buses en terminal" y su reposo se excluye de la detención. <b style='color:#22d3ee'>● Cyan</b> = ${nr} <b>puntos de retorno</b>: fin de ruta donde el bus espera unos minutos para partir — NO es terminal formal (no suma a la flota en terminal), pero su reposo <b>igual se excluye de la detención</b> (no es congestión). Activa la <b>capa satelital</b> para corroborar.`;
   } else if(M==="salud"||M==="edu"){
     const v=scopeWavg(p=>M==="salud"?p.salud:p.edu);
     txt=`Tiempo de viaje en transporte público desde cada manzana al ${M==="salud"?"<b>centro de salud</b>":"<b>establecimiento educacional</b>"} más cercano (caminata + espera + bus). ${v!=null?`Mediana ${amb}: <b>${v.toFixed(0)} min</b>. `:""}Verde = cerca en tiempo real de viaje; rojo = lejos.`;
