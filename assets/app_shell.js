@@ -803,17 +803,49 @@ function renderFreqChart(){
 }
 
 function renderLineFreqChart(){
-  // Panel de arriba RESERVADO para la frecuencia de salida EN TIEMPO REAL (se activará al cierre de la
-  // jornada, cuando esté lista la frecuencia en vivo). Por ahora vacío. La comparación promedio vs
-  // exigida (GTFS) vive en el panel de abajo (renderRanking, vista línea).
+  // Panel superior de la vista LÍNEA: FRECUENCIA DE SALIDA EN TIEMPO REAL. Despacho = bus que sale de su
+  // terminal a la ruta (capturador; ventana móvil de 60 min = buses/hora). Se superpone la frecuencia
+  // EXIGIDA (GTFS) del día como referencia. La curva viva se dibuja hasta el bin actual.
   const card=$("lin-freq-card"); if(!card) return;
   const lineActive = state.vista==="normal" && state.linea!=="TODAS";
   if(!lineActive){ card.style.display="none"; return; }
   card.style.display="";
-  if(linFreqChart){ try{linFreqChart.dispose();}catch(e){} linFreqChart=null; }
-  const el=$("ch-lin-freq");
-  if(el) el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:180px;text-align:center;color:var(--muted);font-size:12.5px;padding:0 16px">Reservado para la <b style="color:var(--live);margin:0 5px">frecuencia de salida en tiempo real</b> · se activará al cierre de la jornada</div>`;
-  $("lin-freq-sub").textContent = `línea ${state.linea} · en tiempo real (próximamente)`;
+  const L = state.linea, el=$("ch-lin-freq");
+  const ser = (DIA && DIA.freq_out_serie_lin && DIA.freq_out_serie_lin[L]) || null;
+  const b = (DIA && typeof DIA.bin==="number") ? DIA.bin : -1;
+  if(!ser || b<0 || !CUMP || !CUMP.horas){
+    if(linFreqChart){ try{linFreqChart.dispose();}catch(e){} linFreqChart=null; }
+    if(el) el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:180px;text-align:center;color:var(--muted);font-size:12.5px;padding:0 16px">Aún sin despachos en tiempo real hoy para la línea ${L}</div>`;
+    $("lin-freq-sub").textContent = `línea ${L} · frecuencia de salida en tiempo real`;
+    return;
+  }
+  if(el) el.innerHTML="";
+  if(!linFreqChart) linFreqChart = echarts.init(el);
+  const horas = CUMP.horas, dia = (DIA && DIA.dia_tipo) || "L";
+  // curva viva: hasta el bin actual; cada bin YA es buses/hora (ventana 60 min). Usa :30 si ya llegó.
+  // Anula los ceros ANTERIORES al primer despacho del día (bins no capturados: p.ej. el día del deploy).
+  let first=-1; for(let k=0;k<=b&&k<ser.length;k++){ if(ser[k]>0){ first=k; break; } }
+  const vivo = horas.map(h=>{ const i0=2*h, i1=2*h+1; if(i0>b) return null; if(first>=0 && i1<first) return null; const v=(i1<=b)?ser[i1]:ser[i0]; return (v==null)?null:v; });
+  const exig = horas.map((h,idx)=>{ const p=CUMP.lineas[L]&&CUMP.lineas[L].prog&&CUMP.lineas[L].prog[dia]; return (p&&p[idx]!=null)?Math.round(p[idx]):null; });
+  const th=TH(), x=horas.map(h=>h+"h");
+  linFreqChart.setOption({
+    textStyle:{fontFamily:th.font,color:th.tx},
+    grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
+    legend:{data:["Exigida (GTFS)","Salida en vivo"],textStyle:{color:th.mut},top:0},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      formatter:p=>{const t=p[0].axisValue; let s=`${t}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${Math.round(x.value)}</b><br>`;}); return s;}},
+    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"despachos/hora",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    series:[
+      {name:"Exigida (GTFS)",type:"line",data:exig,smooth:true,symbol:"none",lineStyle:{width:2.5,color:"#fbbf24",type:"dashed"},itemStyle:{color:"#fbbf24"}},
+      {name:"Salida en vivo",type:"line",data:vivo,smooth:true,symbol:"none",lineStyle:{width:2.4,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"20"}},
+    ],
+  },true);
+  setTimeout(()=>{ if(linFreqChart) linFreqChart.resize(); },60);
+  const cur = (b>=0 && ser[b]!=null) ? ser[b] : 0;
+  const sent = (DIA.freq_out_sent_lin&&DIA.freq_out_sent_lin[L]) || null;
+  const sTxt = sent ? ` · <span style="color:var(--muted)">ida/regreso ${sent["0"]||0}/${sent["1"]||0}</span>` : "";
+  $("lin-freq-sub").innerHTML = `línea ${L} · <b style="color:var(--live)">${Math.round(cur)}</b> buses/h en vivo (últ. 60 min)${sTxt} · vs exigida GTFS`;
 }
 function renderExcesos(){
   const el = $("excesos-list"); if(!el) return;
