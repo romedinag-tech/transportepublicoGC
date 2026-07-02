@@ -25,7 +25,7 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=92`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=93`).then(r=>r.json());
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -316,7 +316,7 @@ let LIVE_KPIS = [
   // calidad de operación
   {k:"vel",      lab:"Velocidad media",        ic:IC.zap,  dir:1,  unit:" km/h",  f:v=>fmt1(v)},
   {k:"det",      lab:"Tiempo detenido",        ic:IC.stop, dir:-1, unit:" %",     f:v=>fmt1(v)},
-  {k:"freq",     lab:"Frecuencia terminales",  ic:IC.freq, dir:1,  unit:"/30min", f:v=>fmt(Math.round(v))},
+  {k:"freq",     lab:"Frecuencia salida",  ic:IC.freq, dir:1,  unit:"/h", f:v=>fmt(Math.round(v))},
 ];
 function gaugeColor(pct,dir){
   if(pct==null) return "#64748b";
@@ -444,10 +444,10 @@ function _comGPS(){
   return _comGPSdata;
 }
 function _liveVal(s, L){
-  // freq vivo: señal por bloques (dato disponible). Sin comparación al baseline (ver _baseVal):
-  // el método de EXPEDICIONES en vivo (freq_trm) está en calibración.
+  // freq vivo = frecuencia de SALIDA (freq_out): despachos en ventana móvil de 60 min = buses/hora.
+  // Se compara contra la exigida GTFS en _baseVal.
   if(L){
-    if(s.k==="freq") return (DIA.freq_blk_serie_lin||{})[L] ? (DIA.freq_blk_serie_lin[L][DIA.bin]||0) : 0;
+    if(s.k==="freq") return (DIA.freq_out_serie_lin||{})[L] ? (DIA.freq_out_serie_lin[L][DIA.bin]||0) : 0;
     const ld = DIA[s.k+"_lin"];
     if(!ld) return null;
     return ld[L] ?? 0;
@@ -458,7 +458,7 @@ function _liveVal(s, L){
     // (deriva de DIA.*_lin del capturador, no del GPS instantáneo). Coherente y comparable al baseline.
     const lines = CLIN[C]||[];
     if(s.k==="freq"){
-      const fsl = DIA.freq_blk_serie_lin||{};
+      const fsl = DIA.freq_out_serie_lin||{};
       return lines.reduce((sum,l)=>sum+((fsl[l]||[])[DIA.bin]||0),0);
     }
     if(s.k==="vel"||s.k==="det"){            // promedio ponderado por volumen (buses en ruta por línea)
@@ -471,14 +471,22 @@ function _liveVal(s, L){
     if(!ld) return null;
     return lines.reduce((sum,l)=>sum+(ld[l]||0),0);
   }
-  if(s.k==="freq") return DIA.freq_blk ?? 0;
+  if(s.k==="freq") return DIA.freq_out ?? 0;
   return DIA[s.k];
 }
 function _baseVal(s, base, b, L){
-  // freq: baseline por RUNS ya corregido, pero el VIVO de expediciones aún se calibra (map-matcher
-  // pierde lock en corredores; trip_id se resetea a mitad). Sin comparación % hasta tener vivo robusto.
-  const noBase = ["freq"];   // freq: vivo (expediciones por tramos) en calibración; muestra solo perfil normal
-  if(noBase.includes(s.k)) return null;
+  // freq: el KPI compara la frecuencia de SALIDA en vivo (freq_out, buses/h) contra la EXIGIDA por el
+  // GTFS a esta hora (no contra baseline histórico) -> "¿salen tan seguido como se debe?".
+  if(s.k==="freq"){
+    if(typeof CUMP==="undefined" || !CUMP || !CUMP.horas || !CUMP.lineas) return null;
+    const dia=(DIA&&DIA.dia_tipo)||"L", hi=CUMP.horas.indexOf(Math.floor(b/2));
+    if(hi<0) return null;
+    const exig=l=>{ const p=CUMP.lineas[l]&&CUMP.lineas[l].prog&&CUMP.lineas[l].prog[dia]; return (p&&p[hi]!=null)?p[hi]:0; };
+    if(L) return exig(L)||null;
+    const C = state.comuna!=="TODAS"?state.comuna:null;
+    if(C){ const sum=(CLIN[C]||[]).reduce((a,l)=>a+exig(l),0); return sum||null; }
+    return Object.keys(CUMP.lineas).reduce((a,l)=>a+exig(l),0)||null;
+  }
   if(L){
     const bl = base[s.k+"_lin"];
     return bl && bl[L] ? bl[L][b] : null;

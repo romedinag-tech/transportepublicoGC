@@ -58,10 +58,10 @@
     },
     {
       "k": "freq",
-      "lab": "Frecuencia",
+      "lab": "Frecuencia salida",
       "ic": "🟢",
       "dir": 1,
-      "unit": "/30min",
+      "unit": "/h",
       "fmt": "int",
       "group": "calidad"
     }
