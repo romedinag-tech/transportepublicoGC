@@ -125,7 +125,7 @@ function buildPeriodo(){
     PERIODOS.map(([k,l])=>`<b data-p="${k}" class="${state.periodo===k?"on":""}">${l}</b>`).join("")+`</div>`;
   box.querySelectorAll("b").forEach(el=>el.onclick=()=>{ state.periodo=el.dataset.p;
     box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.p===state.periodo));
-    if(state.mapMode==="conges" || state.mapMode==="wait" || state.mapMode==="bunch" || state.mapMode==="cover" || state.vista==="ranking") render(); });
+    if(state.mapMode==="conges" || state.mapMode==="wait" || state.mapMode==="bunch" || state.mapMode==="det" || state.mapMode==="cover" || state.vista==="ranking") render(); });
 }
 function buildCoverSub(){
   const box=$("cover-sub"); if(!box) return;
