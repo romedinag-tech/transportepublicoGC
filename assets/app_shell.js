@@ -827,8 +827,9 @@ function renderLineFreqChart(){
     $("lin-freq-sub").textContent = `línea ${L} · frecuencia de salida en tiempo real`;
     return;
   }
-  if(el) el.innerHTML="";
-  if(!linFreqChart) linFreqChart = echarts.init(el);
+  // Solo limpiar (quita el placeholder) al INICIALIZAR; si el chart ya existe, no borrar su canvas
+  // (hacerlo lo dejaba huérfano y el gráfico salía en blanco al cambiar de línea).
+  if(!linFreqChart){ if(el) el.innerHTML=""; linFreqChart = echarts.init(el); }
   const horas = CUMP.horas, dia = (DIA && DIA.dia_tipo) || "L";
   // curva viva: hasta el bin actual; cada bin YA es buses/hora (ventana 60 min). Usa :30 si ya llegó.
   // Anula los ceros ANTERIORES al primer despacho del día (bins no capturados: p.ej. el día del deploy).
