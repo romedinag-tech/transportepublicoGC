@@ -444,10 +444,10 @@ function _comGPS(){
   return _comGPSdata;
 }
 function _liveVal(s, L){
-  // freq vivo = frecuencia de SALIDA (freq_out): despachos en ventana móvil de 60 min = buses/hora.
-  // Se compara contra la exigida GTFS en _baseVal.
+  // freq vivo = frecuencia por RUNS (freq_trm): expedición = tramo continuo (recorrido+sentido), ventana
+  // 60 min = buses/hora. Es el método coherente con el registro histórico (el de terminal sobre-contaba).
   if(L){
-    if(s.k==="freq") return (DIA.freq_out_serie_lin||{})[L] ? (DIA.freq_out_serie_lin[L][DIA.bin]||0) : 0;
+    if(s.k==="freq") return (DIA.freq_trm_serie_lin||{})[L] ? (DIA.freq_trm_serie_lin[L][DIA.bin]||0) : 0;
     const ld = DIA[s.k+"_lin"];
     if(!ld) return null;
     return ld[L] ?? 0;
@@ -458,7 +458,7 @@ function _liveVal(s, L){
     // (deriva de DIA.*_lin del capturador, no del GPS instantáneo). Coherente y comparable al baseline.
     const lines = CLIN[C]||[];
     if(s.k==="freq"){
-      const fsl = DIA.freq_out_serie_lin||{};
+      const fsl = DIA.freq_trm_serie_lin||{};
       return lines.reduce((sum,l)=>sum+((fsl[l]||[])[DIA.bin]||0),0);
     }
     if(s.k==="vel"||s.k==="det"){            // promedio ponderado por volumen (buses en ruta por línea)
@@ -471,11 +471,11 @@ function _liveVal(s, L){
     if(!ld) return null;
     return lines.reduce((sum,l)=>sum+(ld[l]||0),0);
   }
-  if(s.k==="freq") return DIA.freq_out ?? 0;
+  if(s.k==="freq") return DIA.freq_trm ?? 0;
   return DIA[s.k];
 }
 function _baseVal(s, base, b, L){
-  // freq: el KPI compara la frecuencia de SALIDA en vivo (freq_out, buses/h) contra la EXIGIDA por el
+  // freq: el KPI compara la frecuencia en vivo por RUNS (freq_trm, buses/h) contra la EXIGIDA por el
   // GTFS a esta hora (no contra baseline histórico) -> "¿salen tan seguido como se debe?".
   if(s.k==="freq"){
     if(typeof CUMP==="undefined" || !CUMP || !CUMP.horas || !CUMP.lineas) return null;
@@ -819,7 +819,7 @@ function renderLineFreqChart(){
   if(!lineActive){ card.style.display="none"; return; }
   card.style.display="";
   const L = state.linea, el=$("ch-lin-freq");
-  const ser = (DIA && DIA.freq_out_serie_lin && DIA.freq_out_serie_lin[L]) || null;
+  const ser = (DIA && DIA.freq_trm_serie_lin && DIA.freq_trm_serie_lin[L]) || null;
   const b = (DIA && typeof DIA.bin==="number") ? DIA.bin : -1;
   if(!ser || b<0 || !CUMP || !CUMP.horas){
     if(linFreqChart){ try{linFreqChart.dispose();}catch(e){} linFreqChart=null; }
@@ -852,7 +852,7 @@ function renderLineFreqChart(){
   },true);
   setTimeout(()=>{ if(linFreqChart) linFreqChart.resize(); },60);
   const cur = (b>=0 && ser[b]!=null) ? ser[b] : 0;
-  const sent = (DIA.freq_out_sent_lin&&DIA.freq_out_sent_lin[L]) || null;
+  const sent = (DIA.freq_trm_sent_lin&&DIA.freq_trm_sent_lin[L]) || null;   // freq_trm no emite sentido -> null (sin split, ok)
   const sTxt = sent ? ` · <span style="color:var(--muted)">ida/regreso ${sent["0"]||0}/${sent["1"]||0}</span>` : "";
   $("lin-freq-sub").innerHTML = `línea ${L} · <b style="color:var(--live)">${Math.round(cur)}</b> buses/h en vivo (últ. 60 min)${sTxt} · vs exigida GTFS`;
 }
