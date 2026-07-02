@@ -755,41 +755,41 @@ function renderCobDinLinea(){
 function renderFreqChart(){
   const card=$("freq-card"); if(!card) return;
   const home = state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS";
-  const lineView = state.vista==="normal" && state.linea!=="TODAS";
   const comView = state.vista==="normal" && state.comuna!=="TODAS" && state.linea==="TODAS";
-  if(lineView || (!home && !comView) || !BASE30 || !DIA || !BASE30[DIA.dia_tipo]){ card.style.display="none"; return; }
+  if((!home && !comView) || !BASE30 || !CUMP || !CUMP.horas){ card.style.display="none"; return; }
   card.style.display="";
   if(!freqChart) freqChart = echarts.init($("ch-freq"));
-  const L = lineView ? state.linea : null;
-  const dt=DIA.dia_tipo, bins=BASE30.bins;
-  const bd=BASE30[dt]||{};
-  let serie, bserie;                                       // serie vivo (expediciones por tramos) + baseline (runs)
-  if(comView){
-    const fsl=DIA.freq_trm_serie_lin||{}, lines=CLIN[state.comuna]||[];
-    serie = Array.from({length:48},(_,i)=>lines.reduce((s,l)=>s+((fsl[l]||[])[i]||0),0));
-    const bfl=bd.freq_lin||{};
-    bserie = Array.from({length:48},(_,i)=>lines.reduce((s,l)=>s+((bfl[l]||[])[i]||0),0));
-  } else { serie = DIA.freq_trm_serie||[]; bserie = bd.freq||[]; }
-  const i0=10, i1=47;
-  const x=bins.slice(i0,i1+1);
-  const ovals=x.map((_,j)=>{const i=i0+j; return i<=DIA.bin ? (serie[i]||0) : null;});
-  const nvals=x.map((_,j)=>bserie[i0+j]??null);            // "normal" (perfil histórico por runs)
-  const th=TH();
+  const dia = state.freqDia || "L";
+  const DL = {L:"Laborable", S:"Sábado", D:"Domingo"};
+  const horas = CUMP.horas;
+  const lines = comView ? (CLIN[state.comuna]||[]) : Object.keys(CUMP.lineas||{});
+  // OBSERVADA (promedio histórico), agregada a hora: sistema = BASE30[dia].freq; comuna = suma de freq_lin
+  const bd = BASE30[dia]||{};
+  const obsBin = comView
+    ? Array.from({length:48},(_,i)=>lines.reduce((s,l)=>s+(((bd.freq_lin||{})[l]||[])[i]||0),0))
+    : (bd.freq||[]);
+  const salida = horas.map(h=>{ const a=obsBin[2*h], b=obsBin[2*h+1]; return (a==null&&b==null)?null:Math.round(((a||0)+(b||0))*10)/10; });
+  // EXIGIDA (GTFS): suma de despachos/hora programados sobre las líneas (todas = sistema, o de la comuna)
+  const exigida = horas.map((h,idx)=>{ let s=0,any=false; for(const l of lines){ const p=CUMP.lineas[l]&&CUMP.lineas[l].prog&&CUMP.lineas[l].prog[dia]; if(p&&p[idx]!=null){s+=p[idx];any=true;} } return any?Math.round(s):null; });
+  const th=TH(), x=horas.map(h=>h+"h");
   freqChart.setOption({
     textStyle:{fontFamily:th.font,color:th.tx},
     grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
-    legend:{show:false},
+    legend:{data:["Exigida (GTFS)","Salida (observada)"],textStyle:{color:th.mut},top:0},
     tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
       formatter:p=>{const t=p[0].axisValue; let s=`${t}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${Math.round(x.value)}</b><br>`;}); return s;}},
-    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:3},axisLine:{lineStyle:{color:th.axis}}},
-    yAxis:{type:"value",name:"expediciones/30min",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"despachos/hora",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
     series:[
-      {name:"Normal",type:"line",data:nvals,smooth:true,symbol:"none",
-        lineStyle:{width:2,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"18"}},
+      {name:"Exigida (GTFS)",type:"line",data:exigida,smooth:true,symbol:"none",lineStyle:{width:2.5,color:"#fbbf24",type:"dashed"},itemStyle:{color:"#fbbf24"}},
+      {name:"Salida (observada)",type:"line",data:salida,smooth:true,symbol:"none",lineStyle:{width:2,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"18"}},
     ],
   },true);
   setTimeout(()=>freqChart.resize(),60);
-  $("freq-sub").textContent = (comView ? `${state.comuna} · ` : "") + `expediciones/30 min · perfil normal (histórico)`;
+  const dsel = ["L","S","D"].map(d=>`<b data-fd="${d}" style="cursor:pointer;padding:1px 7px;border-radius:5px;${d===dia?"background:var(--live-tint);color:var(--live);font-weight:700":"color:var(--muted)"}">${DL[d]}</b>`).join(" ");
+  const sub=$("freq-sub");
+  sub.innerHTML = `${comView?state.comuna+" · ":""}despachos/hora · salida vs exigida &nbsp; ${dsel}`;
+  sub.querySelectorAll("b[data-fd]").forEach(el=>el.onclick=()=>{ state.freqDia=el.dataset.fd; renderFreqChart(); });
 }
 
 function renderLineFreqChart(){
