@@ -498,7 +498,7 @@
             </div>
           </div>
           <div class="widget-b !p-2.5 flex-1">
-            <div class="map-hero h-[58vh] xl:h-[600px]">
+            <div id="map-hero" class="map-hero h-[58vh] xl:h-[600px]">
               <span class="corner c-tl"></span><span class="corner c-tr"></span><span class="corner c-bl"></span><span class="corner c-br"></span>
               <div id="lmap" class="w-full h-full"></div>
             </div>
@@ -556,32 +556,26 @@
                 <button class="pill vc-per" data-p="fuera">Fuera punta</button>
                 <button class="pill vc-per" data-p="noche">Noche</button>
                 <span style="color:var(--mut);margin-left:8px">SUAVIZAR</span>
-                <button class="pill vc-sm active" data-s="0">Sin</button>
+                <button class="pill vc-sm" data-s="0">Sin</button>
                 <button class="pill vc-sm" data-s="3">3</button>
                 <button class="pill vc-sm" data-s="5">5</button>
-                <button class="pill vc-sm" data-s="7">7</button>
+                <button class="pill vc-sm active" data-s="7">7</button>
               </div>
               <div id="ch-velciclo" style="height:360px"></div>
             </div>
           </section>
 
-          <section class="widget" id="lin-freq-card" style="display:none">
+          <!-- Equidad de uso de flota (vista de línea): debajo de velociclo, en la columna derecha -->
+          <section class="widget" id="eq-flota-card" style="display:none">
             <div class="widget-h">
-              <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
-              <div><h3>Frecuencia de salida</h3><span class="sub" id="lin-freq-sub">perfil empírico por tipo de día</span></div>
-            </div>
-            <div class="widget-b"><div id="ch-lin-freq" style="height:340px"></div></div>
-          </section>
-
-          <!-- F6: Cobertura dinámica por línea — 6 KPIs (vista línea + sub-selector "din") -->
-          <section class="widget" id="cob-din-line" style="display:none">
-            <div class="widget-h">
-              <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a5 5 0 0 0 5 5 8 8 0 0 1 5 2 8 8 0 0 1 5-2 5 5 0 0 0 5-5"/><path d="M6 8a3 3 0 0 1 3-3c1 0 1.5.5 2 1l1 2a3 3 0 0 0 3 2h2"/></svg></span>
-              <div><h3>Cobertura dinámica de la línea</h3><span class="sub" id="cdl-sub">modelo cápsula 2 min · 300 m</span></div>
+              <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h12M3 18h6"/></svg></span>
+              <div class="min-w-0"><h3>Equidad de uso de flota</h3><span class="sub">¿se usan todos los buses con la misma intensidad?</span></div>
+              <span class="chip" id="eq-gini" style="margin-left:auto"></span>
             </div>
             <div class="widget-b">
-              <div id="cdl-grid" class="grid grid-cols-2 md:grid-cols-3 gap-2"></div>
-              <p id="cdl-narr" class="wnarr"></p>
+              <div id="eq-chart" style="height:240px"></div>
+              <div id="eq-stats" style="margin-top:8px"></div>
+              <p id="eq-narr" class="wnarr"></p>
             </div>
           </section>
 
@@ -594,6 +588,40 @@
           </section>
         </div>
       </div>
+
+      <!-- TERCER PANEL (vista de línea): frecuencia de salida en vivo + histórica vs exigida, lado a lado -->
+      <section class="widget" id="lin-freq-panel" style="display:none">
+        <div class="widget-h">
+          <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+          <div class="min-w-0"><h3>Frecuencia de salida de la línea</h3><span class="sub" id="lin-freq-sub">despachos por hora · en vivo vs plan exigido</span></div>
+        </div>
+        <div class="widget-b">
+          <div class="grid2" style="margin-bottom:0">
+            <div>
+              <div class="hint" style="margin-bottom:4px">Frecuencia de salida <b style="color:var(--live)">en vivo</b> <span style="color:var(--muted)">(despachos de hoy, minuto a minuto)</span></div>
+              <div id="ch-lin-freq" style="height:300px"></div>
+            </div>
+            <div>
+              <div class="hint" style="margin-bottom:4px">Frecuencia de salida <b>vs exigida</b> <span style="color:var(--muted)">(histórico: promedio observado vs plan GTFS)</span></div>
+              <div id="lin-freqhist-daysel" style="display:flex;gap:5px;align-items:center;margin-bottom:6px"></div>
+              <div id="ch-lin-freqhist" style="height:266px"></div>
+            </div>
+          </div>
+          <p id="lin-freqhist-narr" class="wnarr"></p>
+        </div>
+      </section>
+
+      <!-- Cobertura dinámica por línea (vista de línea), a ancho completo debajo del tercer panel -->
+      <section class="widget" id="cob-din-line" style="display:none">
+        <div class="widget-h">
+          <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a5 5 0 0 0 5 5 8 8 0 0 1 5 2 8 8 0 0 1 5-2 5 5 0 0 0 5-5"/><path d="M6 8a3 3 0 0 1 3-3c1 0 1.5.5 2 1l1 2a3 3 0 0 0 3 2h2"/></svg></span>
+          <div><h3>Cobertura dinámica de la línea</h3><span class="sub" id="cdl-sub">modelo cápsula 2 min · 300 m</span></div>
+        </div>
+        <div class="widget-b">
+          <div id="cdl-grid" class="grid grid-cols-2 md:grid-cols-3 gap-2"></div>
+          <p id="cdl-narr" class="wnarr"></p>
+        </div>
+      </section>
 
       <!-- Operación en tiempo real (vista de línea o comuna) -->
       <section class="widget" id="opnow-card" style="display:none">
@@ -638,22 +666,6 @@
             <div><div class="hint" style="margin-bottom:4px">Despachos/día por mes (variante vs línea)</div><div id="var-trend-chart" style="height:300px"></div></div>
           </div>
           <div class="hint" id="var-foot" style="margin-top:6px"></div>
-        </div>
-      </section>
-
-      <!-- Equidad de uso de flota (vista de línea) -->
-      <section class="widget" id="eq-flota-card" style="display:none">
-        <div class="widget-h">
-          <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h12M3 18h6"/></svg></span>
-          <div class="min-w-0"><h3>Equidad de uso de flota</h3><span class="sub">¿se usan todos los buses con la misma intensidad?</span></div>
-          <span class="chip" id="eq-gini" style="margin-left:auto"></span>
-        </div>
-        <div class="widget-b">
-          <div class="grid2" style="margin-bottom:0">
-            <div id="eq-chart" style="height:260px"></div>
-            <div id="eq-stats" style="align-self:center"></div>
-          </div>
-          <p id="eq-narr" class="wnarr"></p>
         </div>
       </section>
 
@@ -738,7 +750,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=124"></script>
+<script defer src="assets/app_shell.js?v=125"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

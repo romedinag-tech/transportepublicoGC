@@ -44,11 +44,11 @@ let RANK=null;               // ranking_lineas.json: exc100 (excesos/100km) + gi
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
 let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stops:[]};
-let VCICLO=null, vcChart=null, vcPer="agregado", vcSm=0;
+let VCICLO=null, vcChart=null, vcPer="agregado", vcSm=7;
 let DETP=null, CLINE={lineas:[]}, BUNCH=null, BUNCHA=null, CICLO=null;
 let _nseTerciles=null;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", freqDia:"L", rankCat:"prud", cmpA:null, cmpB:null};
-let csChart, freqChart, linFreqChart, rankProgChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
+let csChart, freqChart, linFreqChart, lineFreqHistChart, rankProgChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["terms","Terminales"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
 const PEAK_H = [7,8,9,17,18,19];
@@ -256,6 +256,7 @@ function render(){
   renderExcesos();
   renderFreqChart();
   renderLineFreqChart();
+  renderLineFreqHist();
   renderCobDinLinea();
   renderMapa();
   renderLineaKpis();
@@ -274,6 +275,19 @@ function render(){
   renderRecorridos();
   renderEvolucion();
   renderVelCiclo();
+  // El alto del mapa se ajusta al de velociclo+equidad (vista línea); se mide tras el resize async de los charts.
+  setTimeout(syncMapHeight, 150);
+}
+// Vista de LÍNEA: iguala el alto del mapa a la suma de las tarjetas de la columna derecha
+// (velocidad a lo largo del ciclo + equidad de flota). En otras vistas o en móvil, usa el alto por clase.
+function syncMapHeight(){
+  const mh=$("map-hero"); if(!mh) return;
+  const lineView = state.vista==="normal" && state.linea!=="TODAS";
+  if(!lineView || window.innerWidth < 1280){ if(mh.style.height){ mh.style.height=""; if(lmap) setTimeout(()=>lmap.invalidateSize(),0); } return; }
+  const vc=$("velciclo-card"), eq=$("eq-flota-card");
+  if(!vc||!eq||vc.offsetParent===null||eq.offsetParent===null){ if(mh.style.height){ mh.style.height=""; if(lmap) setTimeout(()=>lmap.invalidateSize(),0); } return; }
+  const h = vc.offsetHeight + eq.offsetHeight + 16;   // +16 = gap-4 entre ambas tarjetas
+  if(h>360 && String(Math.round(h))+"px" !== mh.style.height){ mh.style.height = Math.round(h) + "px"; if(lmap) setTimeout(()=>lmap.invalidateSize(),0); }
 }
 
 // estado semántico: "good"|"warning"|"critical"|"neutral" -> clases de valor y de tarjeta
@@ -640,6 +654,13 @@ function renderLiveExtras(){
   const C = state.comuna!=="TODAS" ? state.comuna : null;
   const ex = computeLiveExtras(L); if(!ex) return;
   const cont = $("kpis2"); if(!cont) return;
+  // 10º KPI: Eventos de excesos de velocidad (línea / comuna / sistema). Se agrega SIEMPRE al final.
+  const _exc=(DIA&&DIA.excesos_lin)||{};
+  let _en, _esub="&gt; 80 km/h · hoy";
+  if(L){ _en=_exc[L]||0; _esub=`&gt; 80 km/h · línea ${L}`; }
+  else if(C){ const _s=new Set(CLIN[C]||[]); _en=Object.entries(_exc).filter(([l])=>_s.has(l)).reduce((a,[,v])=>a+v,0); _esub=`&gt; 80 km/h · ${C}`; }
+  else { _en=Object.values(_exc).reduce((a,v)=>a+v,0); _esub="&gt; 80 km/h · sistema"; }
+  const _pushExc=()=>{ const e=cont.querySelector('.klive[data-k="excesos"]'); const h=liveBoxExcesos(_en,_esub); if(e) e.outerHTML=h; else cont.insertAdjacentHTML("beforeend",h); };
   if(C){
     const comHog = ex.cob_hog_com[C]||0, comTot = TOT_HOG_COM[C]||0;
     const pct = comTot>0 ? 100*comHog/comTot : null;
@@ -650,6 +671,7 @@ function renderLiveExtras(){
     if(c1) c1.outerHTML = c1HTML; else cont.insertAdjacentHTML("beforeend", c1HTML);
     const c2 = cont.querySelector('.klive[data-k="cob_com"]'); if(c2) c2.remove();
     const c3 = cont.querySelector('.klive[data-k="fleet_lin"]'); if(c3) c3.remove();
+    _pushExc();
     return;
   }
   const pct_tot = TOT_HOG_GLOBAL>0 ? 100*ex.cob_hog/TOT_HOG_GLOBAL : null;
@@ -667,6 +689,14 @@ function renderLiveExtras(){
     const c3 = cont.querySelector('.klive[data-k="fleet_lin"]');
     if(c3) c3.remove();
   }
+  _pushExc();
+}
+function liveBoxExcesos(n, sub){
+  const col = n>=10 ? "#f87171" : n>=5 ? "#fb923c" : n>0 ? "#fbbf24" : "#64748b";
+  return `<div class="kpi klive" data-k="excesos" style="border-color:${col}30"><div class="lab"><span class="ic">⚠️</span>Eventos de excesos de velocidad</div>`+
+    `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:96px;gap:2px">`+
+    `<span style="font-size:2.5rem;font-weight:800;line-height:1;color:${col}">${NF.format(Math.round(n))}</span>`+
+    `<span style="color:var(--muted);font-size:11px">${sub}</span></div></div>`;
 }
 function liveBoxCobAhora(hog, tot, pct, nb){
   const col = pct==null ? "#64748b" : pct>=60 ? "#34d399" : pct>=30 ? "#fbbf24" : "#f87171";
@@ -814,7 +844,7 @@ function renderLineFreqChart(){
   // Panel superior de la vista LÍNEA: FRECUENCIA DE SALIDA EN TIEMPO REAL. Despacho = bus que sale de su
   // terminal a la ruta (capturador; ventana móvil de 60 min = buses/hora). Se superpone la frecuencia
   // EXIGIDA (GTFS) del día como referencia. La curva viva se dibuja hasta el bin actual.
-  const card=$("lin-freq-card"); if(!card) return;
+  const card=$("lin-freq-panel"); if(!card) return;
   const lineActive = state.vista==="normal" && state.linea!=="TODAS";
   if(!lineActive){ card.style.display="none"; return; }
   card.style.display="";
@@ -856,20 +886,57 @@ function renderLineFreqChart(){
   const sTxt = sent ? ` · <span style="color:var(--muted)">ida/regreso ${sent["0"]||0}/${sent["1"]||0}</span>` : "";
   $("lin-freq-sub").innerHTML = `línea ${L} · <b style="color:var(--live)">${Math.round(cur)}</b> buses/h en vivo (últ. 60 min)${sTxt} · vs exigida GTFS`;
 }
+function renderLineFreqHist(){
+  // Panel derecho del tercer panel (vista línea): frecuencia de salida OBSERVADA (promedio histórico)
+  // vs EXIGIDA (GTFS), despachos/hora, con selector de tipo de día. Comparación puramente histórica.
+  const el=$("ch-lin-freqhist"); if(!el) return;
+  const dselBox=$("lin-freqhist-daysel"), nn=$("lin-freqhist-narr");
+  const lineActive = state.vista==="normal" && state.linea!=="TODAS";
+  if(!lineActive) return;
+  const dia = state.freqDia || "L";
+  const DL = {L:"Laborable", S:"Sábado", D:"Domingo"};
+  const cd = CUMP && CUMP.lineas && CUMP.lineas[state.linea];
+  if(!cd || !cd.prog || !CUMP.horas || !BASE30){
+    if(lineFreqHistChart){ try{lineFreqHistChart.dispose();}catch(e){} lineFreqHistChart=null; }
+    el.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:180px;text-align:center;color:var(--muted);font-size:12.5px;padding:0 16px">Sin frecuencia programada (GTFS) para esta línea.</div>`;
+    if(dselBox) dselBox.innerHTML=""; if(nn) nn.innerHTML=""; return;
+  }
+  if(dselBox){
+    dselBox.innerHTML = `<span style="font-size:11px;color:var(--muted);margin-right:2px">Día:</span>`+["L","S","D"].map(d=>`<b data-d="${d}" style="cursor:pointer;padding:2px 9px;border-radius:6px;font-size:11px;${d===dia?"background:var(--live-tint);color:var(--live);font-weight:700":"color:var(--muted)"}">${DL[d]}</b>`).join("");
+    dselBox.querySelectorAll("b[data-d]").forEach(elx=>elx.onclick=()=>{ state.freqDia=elx.dataset.d; renderLineFreqHist(); });
+  }
+  const th=TH(), x=CUMP.horas.map(h=>h+"h");
+  const fl=(BASE30[dia]&&BASE30[dia].freq_lin||{})[state.linea];
+  const salida=CUMP.horas.map(h=>{ if(!fl) return null; const a=fl[2*h], b=fl[2*h+1]; return (a==null&&b==null)?null:Math.round(((a||0)+(b||0))*10)/10; });
+  const exigida=cd.prog[dia]||[];
+  if(!lineFreqHistChart){ el.innerHTML=""; lineFreqHistChart = echarts.init(el); }
+  lineFreqHistChart.setOption({
+    textStyle:{fontFamily:th.font,color:th.tx},
+    grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
+    legend:{data:["Exigida (GTFS)","Salida (observada)"],textStyle:{color:th.mut},top:0},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      formatter:p=>{let s=`${p[0].axisValue}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${x.value}</b><br>`;}); return s;}},
+    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"despachos/hora",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    series:[
+      {name:"Exigida (GTFS)",type:"line",data:exigida,smooth:true,symbol:"none",lineStyle:{width:2.5,color:"#fbbf24",type:"dashed"},itemStyle:{color:"#fbbf24"}},
+      {name:"Salida (observada)",type:"line",data:salida,smooth:true,symbol:"none",connectNulls:false,lineStyle:{width:2,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"12"}},
+    ],
+  },true);
+  setTimeout(()=>{ if(lineFreqHistChart) lineFreqHistChart.resize(); },60);
+  if(nn) nn.innerHTML=`Línea ${state.linea} · ${DL[dia]}: <b style="color:#fbbf24">exigida (GTFS)</b> vs <b style="color:var(--live)">salida observada</b> (promedio histórico), en despachos/hora. Donde la observada cae bajo la exigida hay <b>subprestación</b>. Clic en el día para comparar.`;
+}
 function renderExcesos(){
   const el = $("excesos-list"); if(!el) return;
   const exc = (DIA && DIA.excesos_lin) ? DIA.excesos_lin : {};
   const L = state.linea !== "TODAS" ? state.linea : null;
+  const card = $("excesos-card");
   if(L){
-    const n = exc[L] || 0;
-    $("excesos-sub").textContent = `> 80 km/h · línea ${L} · hoy`;
-    if(!n){ el.innerHTML='<div style="text-align:center;padding:18px 0;color:var(--mut)">Sin episodios en esta línea hoy</div>'; return; }
-    const emp = empresaDe(L);
-    const nm = emp ? `<span class="lncode">${L}</span> ${emp}` : `<span class="lncode">${L}</span>`;
-    const col = n>=10 ? "#f87171" : n>=5 ? "#fb923c" : "#fbbf24";
-    el.innerHTML = `<div style="text-align:center;padding:14px 0"><span style="font-size:2rem;font-weight:700;color:${col}">${n}</span><div style="color:var(--mut);margin-top:4px">episodios</div></div>`;
+    // En vista por línea, los excesos son el 10º KPI de la tira superior -> el panel se oculta.
+    if(card) card.style.display = "none";
     return;
   }
+  if(card) card.style.display = "";
   const C = state.comuna !== "TODAS" ? state.comuna : null;
   const comLines = C ? new Set(CLIN[C]||[]) : null;
   const sorted = Object.entries(exc).filter(e=>e[1]>0 && (!comLines || comLines.has(e[0]))).sort((a,b)=>b[1]-a[1]);
@@ -1913,45 +1980,11 @@ function renderNarrative(){
 
 function renderRanking(){
   const box = $("rank-box"), hint = $("rank-hint"), rt = $("rank-title");
-  // VISTA LÍNEA: reemplaza el ranking por la FRECUENCIA EXIGIDA por el GTFS estático (despachos/hora
-  // programados), para comparar con la "Frecuencia de salida" observada de arriba.
-  if(state.linea!=="TODAS"){
-    // COMBINADO: frecuencia de salida OBSERVADA (promedio) + EXIGIDA (GTFS estático), despachos/hora,
-    // con selector de tipo de día (default Laborable). Así se ve directo si se cumple o no.
-    if(rt) rt.textContent = "Frecuencia: salida vs exigida (GTFS)";
-    const nn=$("rank-narr");
-    const dia = state.freqDia || "L";
-    const DL = {L:"Laborable", S:"Sábado", D:"Domingo"};
-    const cd = CUMP && CUMP.lineas && CUMP.lineas[state.linea];
-    if(!cd || !cd.prog || !CUMP.horas || !BASE30){ box.innerHTML=`<div class="empty">Sin frecuencia programada (GTFS) para esta línea.</div>`; hint.textContent=""; if(nn) nn.innerHTML=""; return; }
-    hint.textContent = `despachos/hora · ${DL[dia]}`;
-    // selector de día + contenedor del chart
-    const dsel = ["L","S","D"].map(d=>`<b data-d="${d}" style="cursor:pointer;padding:2px 9px;border-radius:6px;font-size:11px;${d===dia?"background:var(--live-tint);color:var(--live);font-weight:700":"color:var(--muted)"}">${DL[d]}</b>`).join("");
-    box.innerHTML = `<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px"><span style="font-size:11px;color:var(--muted);margin-right:2px">Día:</span>${dsel}</div><div id="ch-rank-prog" style="height:215px"></div>`;
-    box.querySelectorAll("b[data-d]").forEach(el=>el.onclick=()=>{ state.freqDia=el.dataset.d; renderRanking(); });
-    const th=TH(), x=CUMP.horas.map(h=>h+"h");
-    const fl=(BASE30[dia]&&BASE30[dia].freq_lin||{})[state.linea];
-    const salida=CUMP.horas.map(h=>{ if(!fl) return null; const a=fl[2*h], b=fl[2*h+1]; return (a==null&&b==null)?null:Math.round(((a||0)+(b||0))*10)/10; });
-    const exigida=cd.prog[dia]||[];
-    if(rankProgChart){ try{rankProgChart.dispose();}catch(e){} }
-    rankProgChart = echarts.init($("ch-rank-prog"));
-    rankProgChart.setOption({
-      textStyle:{fontFamily:th.font,color:th.tx},
-      grid:{left:8,right:12,top:30,bottom:20,containLabel:true},
-      legend:{data:["Exigida (GTFS)","Salida (observada)"],textStyle:{color:th.mut},top:0},
-      tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
-        formatter:p=>{let s=`${p[0].axisValue}<br>`; p.forEach(x=>{if(x.value!=null)s+=`${x.marker}${x.seriesName}: <b>${x.value}</b><br>`;}); return s;}},
-      xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
-      yAxis:{type:"value",name:"despachos/hora",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
-      series:[
-        {name:"Exigida (GTFS)",type:"line",data:exigida,smooth:true,symbol:"none",lineStyle:{width:2.5,color:"#fbbf24",type:"dashed"},itemStyle:{color:"#fbbf24"}},
-        {name:"Salida (observada)",type:"line",data:salida,smooth:true,symbol:"none",connectNulls:false,lineStyle:{width:2,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"12"}},
-      ],
-    },true);
-    setTimeout(()=>rankProgChart.resize(),60);
-    if(nn) nn.innerHTML=`Línea ${state.linea} · ${DL[dia]}: <b style="color:#fbbf24">exigida (GTFS)</b> vs <b style="color:var(--live)">salida observada</b> (promedio histórico), en despachos/hora. Donde la observada cae bajo la exigida hay <b>subprestación</b>. Clic en el día para comparar.`;
-    return;
-  }
+  const rw = box ? box.closest(".widget") : null;
+  // VISTA LÍNEA: el ranking de líneas no aplica; la frecuencia salida-vs-exigida se muestra ahora en el
+  // tercer panel (renderLineFreqHist), a ancho completo. Se oculta esta tarjeta.
+  if(state.linea!=="TODAS"){ if(rw) rw.style.display="none"; return; }
+  if(rw) rw.style.display="";
   if(rt) rt.textContent = "Ranking de líneas";
   // SISTEMA/COMUNA: ranking multi-categoría con selector (excesos · frecuencia · trabajo en equipo)
   const cat = RANK_CATS.find(c=>c.k===state.rankCat) || RANK_CATS[0];
@@ -2551,6 +2584,6 @@ function renderEvolucion(){
     J("baseline_30min.json").then(d=>{ BASE30=d; loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
     J("cobertura_din_lineas.json").then(d=>{ DINL=d; renderCobDinLinea(); if(state.mapMode==="cover" && state.coverSub==="din") render(); }).catch(()=>{});
     setInterval(loadDia, 60000);                 // dia.json (vivo vs normal), refresco 60 s
-    addEventListener("resize", ()=>{ [csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart,freqChart,linFreqChart,vcChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); });
+    addEventListener("resize", ()=>{ [csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart,freqChart,linFreqChart,lineFreqHistChart,vcChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); syncMapHeight(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();
