@@ -611,6 +611,18 @@
         </div>
       </section>
 
+      <!-- BLOQUE 3 (vista línea): frecuencia observada por VARIANTE/recorrido -->
+      <section class="widget" id="var-obs-panel" style="display:none">
+        <div class="widget-h">
+          <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l5-6 4 4 5-9 4 6"/></svg></span>
+          <div class="min-w-0"><h3>Frecuencia observada por variante</h3><span class="sub" id="var-obs-sub">despachos/hora · en vivo vs histórico, por recorrido</span></div>
+        </div>
+        <div class="widget-b">
+          <div id="var-obs-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+          <p id="var-obs-narr" class="wnarr"></p>
+        </div>
+      </section>
+
       <!-- Cobertura dinámica por línea (vista de línea), a ancho completo debajo del tercer panel -->
       <section class="widget" id="cob-din-line" style="display:none">
         <div class="widget-h">
@@ -750,7 +762,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=125"></script>
+<script defer src="assets/app_shell.js?v=127"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

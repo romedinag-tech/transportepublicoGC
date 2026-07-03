@@ -40,6 +40,7 @@ const BUILD = "2026-06-28 03:33";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null, AYERFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
+let BVAR=null;               // baseline por VARIANTE (baseline_var.json) — Bloque 3 comparación por recorrido
 let RANK=null;               // ranking_lineas.json: exc100 (excesos/100km) + gini (trabajo en equipo) por línea
 let eqChart, nseChart, rankChart, cmpChart, empresasChart, heatChart, recChart, evolChart;
 let EMPR=[], MESH=[], DOWH=[], DET2=[], TERM={terminales:[]}, DEST={destinos:[]}, REC={top:[],lentos:[],reg:[],corr:[]}, EVOL={meses:[],comunas:{}};
@@ -257,6 +258,7 @@ function render(){
   renderFreqChart();
   renderLineFreqChart();
   renderLineFreqHist();
+  renderVarObserved();
   renderCobDinLinea();
   renderMapa();
   renderLineaKpis();
@@ -925,6 +927,68 @@ function renderLineFreqHist(){
   },true);
   setTimeout(()=>{ if(lineFreqHistChart) lineFreqHistChart.resize(); },60);
   if(nn) nn.innerHTML=`Línea ${state.linea} · ${DL[dia]}: <b style="color:#fbbf24">exigida (GTFS)</b> vs <b style="color:var(--live)">salida observada</b> (promedio histórico), en despachos/hora. Donde la observada cae bajo la exigida hay <b>subprestación</b>. Clic en el día para comparar.`;
+}
+// Bloque 3 (vista línea): frecuencia observada EN VIVO por VARIANTE/recorrido (DIA.freq_trm_serie_var).
+// Cada recorrido de la línea es una serie; permite ver el detalle fino (ej. la 40 = 401 + 40BP + 40GN).
+let varObsCharts = {};   // recorrido -> instancia echarts (small-multiples, cacheadas)
+function renderVarObserved(){
+  const card=$("var-obs-panel"), grid=$("var-obs-grid"); if(!card||!grid) return;
+  const lineActive = state.vista==="normal" && state.linea!=="TODAS";
+  const fv=(DIA&&DIA.freq_trm_serie_var)||{};
+  const bv=(BVAR&&BVAR.var)||{};
+  const L=state.linea;
+  // recorridos de la línea = los que tienen dato vivo O histórico
+  const vars=[...new Set([...Object.keys(fv),...Object.keys(bv)])]
+    .filter(k=>k.slice(0,2)===L && ((Array.isArray(fv[k])&&fv[k].some(x=>x>0)) || (bv[k]&&["L","S","D"].some(dt=>(bv[k][dt]||[]).some(x=>x>0)))))
+    .sort();
+  if(!lineActive || !vars.length || !CUMP || !CUMP.horas){ card.style.display="none"; return; }
+  card.style.display="";
+  // limpiar charts de recorridos que ya no aplican
+  Object.keys(varObsCharts).forEach(r=>{ if(!vars.includes(r)){ try{varObsCharts[r].dispose();}catch(e){} delete varObsCharts[r]; const c=grid.querySelector(`[data-rec="${r}"]`); if(c) c.remove(); } });
+  const b=(DIA&&typeof DIA.bin==="number")?DIA.bin:-1;
+  const dia=(DIA&&DIA.dia_tipo)||"L";
+  const horas=CUMP.horas, th=TH(), x=horas.map(h=>h+"h");
+  let sinHist=0;
+  vars.forEach(v=>{
+    // serie viva (rolling buses/h hasta el bin) y serie histórica (slot[2h]+slot[2h+1])
+    const sv=fv[v]||null;
+    const vivo=horas.map(h=>{ if(!sv) return null; const i0=2*h,i1=2*h+1; if(i0>b) return null; const val=(i1<=b)?sv[i1]:sv[i0]; return (val==null)?null:val; });
+    const hb=(bv[v]&&bv[v][dia])||null;
+    const hist=horas.map(h=>{ if(!hb) return null; const a=hb[2*h],c=hb[2*h+1]; return (a==null&&c==null)?null:Math.round(((a||0)+(c||0))*10)/10; });
+    const tieneHist=hb && hist.some(z=>z);
+    if(!tieneHist) sinHist++;
+    // tarjeta
+    let cardEl=grid.querySelector(`[data-rec="${v}"]`);
+    if(!cardEl){
+      cardEl=document.createElement("div"); cardEl.dataset.rec=v;
+      cardEl.className="widget"; cardEl.style.cssText="padding:0;background:var(--chip);border:1px solid var(--line2)";
+      cardEl.innerHTML=`<div style="display:flex;align-items:baseline;gap:8px;padding:8px 10px 0"><b style="font-size:13px">${v}</b><span class="hint" data-note style="font-size:10.5px"></span></div><div data-ch style="height:150px"></div>`;
+      grid.appendChild(cardEl);
+    }
+    cardEl.querySelector("[data-note]").innerHTML = tieneHist ? "en vivo vs histórico" : `<span style="color:#fbbf24">histórico en construcción</span>`;
+    const chEl=cardEl.querySelector("[data-ch]");
+    let ch=varObsCharts[v];
+    if(!ch){ ch=echarts.init(chEl); varObsCharts[v]=ch; }
+    const series=[];
+    if(tieneHist) series.push({name:"histórico",type:"line",data:hist,smooth:true,symbol:"none",lineStyle:{width:2,color:"#fbbf24",type:"dashed"},itemStyle:{color:"#fbbf24"}});
+    series.push({name:"en vivo",type:"line",data:vivo,smooth:true,symbol:"none",connectNulls:false,lineStyle:{width:2.2,color:cssv("--live")},itemStyle:{color:cssv("--live")},areaStyle:{color:cssv("--live")+"14"}});
+    ch.setOption({
+      textStyle:{fontFamily:th.font,color:th.tx},
+      grid:{left:6,right:8,top:22,bottom:16,containLabel:true},
+      legend:{show:true,data:series.map(s=>s.name),textStyle:{color:th.mut,fontSize:9.5},top:0,right:4,itemWidth:14,itemHeight:8},
+      tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx,fontSize:11},
+        formatter:p=>{let s=`${p[0].axisValue}<br>`; p.forEach(q=>{if(q.value!=null)s+=`${q.marker}${q.seriesName}: <b>${Math.round(q.value)}</b><br>`;}); return s;}},
+      xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:8,interval:3},axisLine:{lineStyle:{color:th.axis}}},
+      yAxis:{type:"value",axisLabel:{color:th.mut,fontSize:9},splitLine:{lineStyle:{color:th.grid}}},
+      series,
+    },true);
+    setTimeout(()=>{ if(varObsCharts[v]) varObsCharts[v].resize(); },60);
+  });
+  const DL={L:"laborable",S:"sábado",D:"domingo"};
+  $("var-obs-sub").innerHTML=`línea ${L} · ${vars.length} recorridos · despachos/hora · <b style="color:var(--live)">vivo</b> vs <b style="color:#fbbf24">histórico</b> (${DL[dia]})`;
+  const nn=$("var-obs-narr");
+  if(nn) nn.innerHTML=`Cada recorrido de la línea ${L} comparado consigo mismo: frecuencia <b style="color:var(--live)">en vivo</b> vs su <b style="color:#fbbf24">histórico</b> capturado (mismo vocabulario granular).`+
+    (sinHist?` ${sinHist} recorrido(s) aún sin histórico comparable suficiente — se muestran solo en vivo, sin juzgar sub/sobreoferta.`:``);
 }
 function renderExcesos(){
   const el = $("excesos-list"); if(!el) return;
@@ -2582,8 +2646,9 @@ function renderEvolucion(){
       if(s && Array.isArray(s.kpis)) LIVE_KPIS = s.kpis.map(o=>({...o, f:(_LIVE_FMT[o.fmt]||_LIVE_FMT.int)}));
     }).catch(()=>{});
     J("baseline_30min.json").then(d=>{ BASE30=d; loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
+    J("baseline_var.json").then(d=>{ BVAR=d; if(state.vista==="normal"&&state.linea!=="TODAS") renderVarObserved(); }).catch(()=>{});   // baseline por variante (Bloque 3)
     J("cobertura_din_lineas.json").then(d=>{ DINL=d; renderCobDinLinea(); if(state.mapMode==="cover" && state.coverSub==="din") render(); }).catch(()=>{});
     setInterval(loadDia, 60000);                 // dia.json (vivo vs normal), refresco 60 s
-    addEventListener("resize", ()=>{ [csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart,freqChart,linFreqChart,lineFreqHistChart,vcChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); syncMapHeight(); });
+    addEventListener("resize", ()=>{ [csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart,freqChart,linFreqChart,lineFreqHistChart,vcChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); Object.values(varObsCharts||{}).forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); syncMapHeight(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();
