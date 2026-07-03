@@ -264,17 +264,17 @@
   .cdl-pill .val{font:700 18px/1.1 var(--font-data);color:var(--tx);margin-top:4px;letter-spacing:-.01em}
   .cdl-pill .sub{font-size:11px;color:var(--dim);margin-top:2px}
   /* ── KPI gauges — compact mode for gauge cards ── */
-  .kpi.klive{padding:6px 10px 5px;height:130px;overflow:hidden;display:flex;flex-direction:column}
-  .kpi.klive .lab{justify-content:center;text-align:center;font-size:9.5px;
-    text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-  .kpi.klive .gauge{width:95%;height:auto;display:block;margin:0 auto;max-height:66px}
-  .kpi.klive .g-val{font:700 18px/1 var(--font-data);letter-spacing:-.01em}
-  .kpi.klive .g-unit{font-size:10px;font-weight:500;fill:var(--text-mid)}
-  .kpi.klive .g-pct{font:700 12px/1 var(--font-ui)}
-  .kpi.klive .sub{margin-top:1px;font-size:10.5px;color:var(--muted);text-align:center;line-height:1.3}
-  .kpi.klive .sub .g-norm{font-family:var(--font-data);color:var(--tx);font-weight:600}
-  .kpi.klive .sub .g-delta{display:inline-block;margin-left:4px;font-family:var(--font-data);font-weight:700;
-    padding:1px 5px;border-radius:5px;font-size:10px;background:var(--hover)}
+  .kpi.klive{padding:8px 10px 7px;min-height:146px;display:flex;flex-direction:column}
+  .kpi.klive .lab{justify-content:center;text-align:center;font-size:11px;
+    text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .kpi.klive .gauge{width:98%;height:auto;display:block;margin:1px auto 0;max-height:88px}
+  .kpi.klive .g-val{font:800 34px/1 var(--font-data);letter-spacing:-.02em}
+  .kpi.klive .g-unit{font-size:15px;font-weight:600;fill:var(--text-mid)}
+  .kpi.klive .g-pct{font:700 15px/1 var(--font-ui)}
+  .kpi.klive .sub{margin-top:2px;font-size:13px;color:var(--muted);text-align:center;line-height:1.35}
+  .kpi.klive .sub .g-norm{font-family:var(--font-data);color:var(--tx);font-weight:700}
+  .kpi.klive .sub .g-delta{display:inline-block;margin-left:5px;font-family:var(--font-data);font-weight:700;
+    padding:1px 6px;border-radius:5px;font-size:12.5px;background:var(--hover)}
   /* Fleet toggle selector */
   .fleet-toggle{display:flex;justify-content:center;gap:2px;margin:4px 0 2px}
   .fleet-toggle button{font-size:10px;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);
@@ -762,7 +762,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=127"></script>
+<script defer src="assets/app_shell.js?v=128"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

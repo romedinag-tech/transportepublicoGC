@@ -696,9 +696,9 @@ function renderLiveExtras(){
 function liveBoxExcesos(n, sub){
   const col = n>=10 ? "#f87171" : n>=5 ? "#fb923c" : n>0 ? "#fbbf24" : "#64748b";
   return `<div class="kpi klive" data-k="excesos" style="border-color:${col}30"><div class="lab"><span class="ic">⚠️</span>Eventos de excesos de velocidad</div>`+
-    `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:96px;gap:2px">`+
-    `<span style="font-size:2.5rem;font-weight:800;line-height:1;color:${col}">${NF.format(Math.round(n))}</span>`+
-    `<span style="color:var(--muted);font-size:11px">${sub}</span></div></div>`;
+    `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:0;gap:2px">`+
+    `<span style="font-size:2.4rem;font-weight:800;line-height:1;color:${col}">${NF.format(Math.round(n))}</span>`+
+    `<span style="color:var(--muted);font-size:12px;text-align:center">${sub}</span></div></div>`;
 }
 function liveBoxCobAhora(hog, tot, pct, nb){
   const col = pct==null ? "#64748b" : pct>=60 ? "#34d399" : pct>=30 ? "#fbbf24" : "#f87171";
