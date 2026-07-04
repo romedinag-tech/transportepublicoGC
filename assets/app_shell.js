@@ -1014,8 +1014,10 @@ function iInitMap(){
   L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:20,subdomains:"abcd",attribution:"© OSM © CARTO"}).addTo(imap);
 }
 function iClear(){ infraLayers.forEach(l=>{try{imap.removeLayer(l);}catch(e){}}); infraLayers=[]; }
-function iPoly(coords,color,weight,dash,onClick,tip,opacity){
-  const pl=L.polyline(coords.map(c=>[c[1],c[0]]),{color,weight,opacity:opacity==null?.92:opacity,dashArray:dash||null,lineCap:"round"}).addTo(imap);
+function iPoly(segs,color,weight,dash,onClick,tip,opacity){
+  // segs = lista de segmentos [[[lon,lat],...],...] → multi-polilínea (no conecta tramos disjuntos)
+  const latlngs=segs.map(seg=>seg.map(c=>[c[1],c[0]]));
+  const pl=L.polyline(latlngs,{color,weight,opacity:opacity==null?.92:opacity,dashArray:dash||null,lineCap:"round"}).addTo(imap);
   if(tip) pl.bindTooltip(tip,{sticky:true}); if(onClick) pl.on("click",onClick); infraLayers.push(pl); return pl;
 }
 window.__isel=function(kind,key){
@@ -1048,7 +1050,7 @@ function renderInfraPlan(){
     ["En proyecto",(INFRAE.total_km-INFRAE.km_operacion).toFixed(1),"km","#f5a524"],["N.º ejes",P.length,"","#94a3b8"],
     ["Corredor",t["Corredor"]||0,"km",ITIPO["Corredor"]],["Pista Solo Bus",t["Pista Solo Bus"]||0,"km",ITIPO["Pista Solo Bus"]],
     ["Vía Exclusiva",t["Vía Exclusiva"]||0,"km",ITIPO["Vía Exclusiva"]],["Mixto",t["Mixto"]||0,"km",ITIPO["Mixto"]]].map(k=>ikpi(...k)).join("");
-  P.forEach(e=>{ const on=sel===e; iPoly(e.coords,ITIPO[e.tipo]||"#64748b",on?7:(e.tipo==="Corredor"?5:4),e.estado!=="Operación"?"6 7":null,()=>{state.infraSel={kind:"plan",e};renderInfra();},`${e.eje} · ${e.tipo} · ${e.km} km · ${e.estado}`); });
+  P.forEach(e=>{ const on=sel===e; iPoly(e.segs,ITIPO[e.tipo]||"#64748b",on?7:(e.tipo==="Corredor"?5:4),e.estado!=="Operación"?"6 7":null,()=>{state.infraSel={kind:"plan",e};renderInfra();},`${e.eje} · ${e.tipo} · ${e.km} km · ${e.estado}`); });
   $("infra-legend").innerHTML=Object.entries(ITIPO).filter(([k])=>k!=="—").map(([k,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${c}"></i>${k}</span>`).join("")+`<span style="font-size:12px;color:var(--muted)">╌ en proyecto</span>`;
   $("infra-narr").innerHTML=`<b>Plan de infraestructura declarada</b>: ${P.length} ejes (${INFRAE.km_operacion} km en operación · ${(INFRAE.total_km-INFRAE.km_operacion).toFixed(1)} en proyecto). Color por tipo; punteado = proyectado.`;
   $("infra-list-title").textContent="Ejes del plan"; $("infra-list-hint").textContent=`${P.length} ejes · ${INFRAE.total_km} km`;
@@ -1071,7 +1073,7 @@ function renderInfraFlujo(sub){
   C.forEach(c=>{ const on=selNm===c.nm, col=sub==="brechas"?ibrechaCol(c.brecha):iflowCol(c._pico), p=c._pico;
     const w = p>=200?6.5 : p>=100?4.5 : p>=40?2.8 : 1.4;   // grosor por flujo → los menores adelgazan
     const op = on?1 : (p<40?0.4 : p<100?0.75 : 0.95);       // los de bajo flujo se atenúan → legible
-    iPoly(c.coords,col,on?w+3:w,null,()=>{state.infraSel={kind:"cor",c};renderInfra();},`${c.nm} · pico ${Math.round(p)} b/h · ${c.vel} km/h · infra ${Math.round(c.cov*100)}%`,op); });
+    iPoly(c.segs,col,on?w+3:w,null,()=>{state.infraSel={kind:"cor",c};renderInfra();},`${c.nm} · pico ${Math.round(p)} b/h · ${c.vel} km/h · infra ${Math.round(c.cov*100)}%`,op); });
   $("infra-legend").innerHTML= sub==="brechas"
     ? `<span style="font-size:12px;color:var(--muted)">Color = severidad (flujo × déficit de infra × lentitud) · grosor = flujo</span>`
     : [[">=200","#fb7185"],["100–199","#f5a524"],["40–99","#22d3ee"],["<40","#64748b"]].map(([l,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${c}"></i>${l} b/h</span>`).join("");
