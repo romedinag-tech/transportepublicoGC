@@ -453,14 +453,26 @@
 
     <!-- ===== SIDEBAR DE FILTROS (colapsable) ===== -->
     <aside id="sidebar" class="thin-scroll w-[296px] shrink-0 overflow-y-auto border-r border-[var(--line)] bg-[var(--bg2)] px-3 py-4">
-      <!-- Operador / Líneas -->
-      <div class="flex items-center gap-2 px-1 mb-2">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[var(--dim)]"><rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 11h16M8 21l1-3M16 21l-1-3"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg>
-        <span class="text-[10.5px] font-semibold tracking-[.12em] text-[var(--dim)] uppercase">Operador · Líneas</span>
+      <!-- Operador / Líneas (modo Operación) -->
+      <div id="oper-sidebar">
+        <div class="flex items-center gap-2 px-1 mb-2">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[var(--dim)]"><rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 11h16M8 21l1-3M16 21l-1-3"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg>
+          <span class="text-[10.5px] font-semibold tracking-[.12em] text-[var(--dim)] uppercase">Operador · Líneas</span>
+        </div>
+        <input class="side-search" id="linea-search" placeholder="Buscar línea o empresa…" autocomplete="off">
+        <div id="linea-hint" class="text-[10px] text-[var(--dim)] px-1 pt-1 pb-0.5"></div>
+        <div id="linea-list"></div>
       </div>
-      <input class="side-search" id="linea-search" placeholder="Buscar línea o empresa…" autocomplete="off">
-      <div id="linea-hint" class="text-[10px] text-[var(--dim)] px-1 pt-1 pb-0.5"></div>
-      <div id="linea-list"></div>
+      <!-- Ejes / Corredores (modo Infraestructura) -->
+      <div id="infra-sidebar" style="display:none">
+        <div class="flex items-center gap-2 px-1 mb-2">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[var(--dim)]"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>
+          <span id="infra-list-title" class="text-[10.5px] font-semibold tracking-[.12em] text-[var(--dim)] uppercase">Ejes · Corredores</span>
+        </div>
+        <input class="side-search" id="infra-search" placeholder="Buscar corredor…" autocomplete="off">
+        <div id="infra-list-hint" class="text-[10px] text-[var(--dim)] px-1 pt-1 pb-0.5"></div>
+        <div id="infra-list"></div>
+      </div>
     </aside>
 
     <!-- ===== ÁREA PRINCIPAL ===== -->
@@ -468,13 +480,65 @@
 
       <!-- Cabecera de ámbito -->
       <div class="flex items-center gap-3 flex-wrap">
+        <div id="modo-switch" class="modo-seg">
+          <button data-modo="operacion" class="on">Operación</button>
+          <button data-modo="infra">Infraestructura</button>
+        </div>
         <h2 id="scope-title" class="text-[21px] font-semibold tracking-tight">Sistema completo</h2>
         <span class="chip" id="scope-sub"></span>
         <button class="reset hovo" id="reset-btn" style="display:none">✕ volver al sistema</button>
       </div>
+      <style>
+        .modo-seg{display:inline-flex;gap:3px;background:var(--panel2,#0f1c33);border:1px solid var(--line2,#2c3e60);border-radius:11px;padding:3px}
+        .modo-seg button{background:none;border:none;color:var(--muted,#8ea3c2);font-weight:700;font-size:13px;padding:7px 15px;border-radius:8px;cursor:pointer;transition:.15s}
+        .modo-seg button.on{background:linear-gradient(180deg,#12406a,#0e3357);color:var(--live,#22d3ee);box-shadow:0 1px 0 #2c69a0 inset}
+        body.modo-infra #normal-view,body.modo-infra #special-view,body.modo-infra #oper-sidebar{display:none!important}
+        body.modo-infra #infra-sidebar{display:block!important}
+        #infra-view .ic-dot{width:12px;height:5px;border-radius:3px;display:inline-block}
+        #infra-view .icard{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:7px 9px;border-radius:9px;cursor:pointer;font-size:12.5px;border:1px solid transparent}
+        #infra-view .icard:hover{background:#16233f} #infra-view .icard.sel{background:#16294a;border-color:#22d3ee55}
+        #infra-view .icard .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx,#eaf1fb)}
+        #infra-view .icard .mt{color:var(--muted,#8ea3c2);font-variant-numeric:tabular-nums;font-size:11.5px;text-align:right}
+        #infra-view .ipill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+      </style>
 
       <!-- Vistas especiales del territorio (Ranking / Comparador de comunas) -->
       <div id="special-view" class="space-y-4" style="display:none"></div>
+
+      <!-- ===== VISTA INFRAESTRUCTURA ===== -->
+      <div id="infra-view" class="space-y-4" style="display:none">
+        <div id="infra-kpis" class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3"></div>
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="seg" id="infra-sub"></div>
+          <div class="seg" id="infra-dia" style="display:none"></div>
+          <span class="sub" id="infra-sub-hint" style="color:var(--muted)"></span>
+        </div>
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <section class="widget xl:col-span-2 flex flex-col">
+            <div class="widget-h">
+              <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></span>
+              <div class="min-w-0"><h3 id="infra-map-title">Red de corredores</h3><span class="sub" id="infra-map-sub">plan de infraestructura vs operación real de buses</span></div>
+            </div>
+            <div class="widget-b !p-2.5 flex-1">
+              <div class="map-hero h-[58vh] xl:h-[560px]"><span class="corner c-tl"></span><span class="corner c-tr"></span><span class="corner c-bl"></span><span class="corner c-br"></span><div id="imap" class="w-full h-full"></div></div>
+              <div class="undermap"><div class="undermap-ctrls" id="infra-legend" style="gap:16px"></div><p id="infra-narr" class="map-narr"></p></div>
+            </div>
+          </section>
+          <div class="flex flex-col gap-4 thin-scroll xl:pr-1">
+            <section class="widget flex-1" id="infra-detail-card">
+              <div class="widget-h">
+                <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l5-6 4 4 5-9 4 6"/></svg></span>
+                <div class="min-w-0"><h3 id="infra-detail-title">Detalle del corredor</h3><span class="sub" id="infra-detail-sub">elegí un eje a la izquierda</span></div>
+              </div>
+              <div class="widget-b">
+                <div id="infra-detail-empty" class="sub" style="color:var(--muted);padding:24px 4px;text-align:center;line-height:1.6">Seleccioná un corredor en la lista de la izquierda o en el mapa para ver su <b>curva horaria de buses/h</b>, velocidad y cobertura de infraestructura.</div>
+                <div id="infra-chart" style="height:300px;display:none"></div>
+                <p id="infra-detail-narr" class="wnarr"></p>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
 
       <!-- ===== VISTA NORMAL ===== -->
       <div id="normal-view" class="space-y-4">
@@ -762,7 +826,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=128"></script>
+<script defer src="assets/app_shell.js?v=131"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

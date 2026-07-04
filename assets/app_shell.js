@@ -48,7 +48,9 @@ let VFREQ=null, VTREND=null, curVar=null, lastFitScope=null, TLIN={}, PESP={stop
 let VCICLO=null, vcChart=null, vcPer="agregado", vcSm=7;
 let DETP=null, CLINE={lineas:[]}, BUNCH=null, BUNCHA=null, CICLO=null;
 let _nseTerciles=null;
-let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", freqDia:"L", rankCat:"prud", cmpA:null, cmpB:null};
+let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", freqDia:"L", rankCat:"prud", cmpA:null, cmpB:null, modo:"operacion", infraSub:"realidad", infraDia:"L", infraSel:null};
+let INFRAE=null, imap=null, infraChart=null, infraLayers=[];   // observatorio de infraestructura
+const ITIPO={"Corredor":"#22d3ee","Pista Solo Bus":"#f5a524","Vía Exclusiva":"#34d399","Mixto":"#94a3b8","—":"#64748b"};
 let csChart, freqChart, linFreqChart, lineFreqHistChart, rankProgChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["terms","Terminales"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
@@ -227,6 +229,18 @@ function render(){
   // por línea aún no hay estadística día-a-día por arco (fase posterior).
   const congsubRel = state.vista==="normal" && state.mapMode==="conges";   // ahora también en vista línea (crit/estab por arco)
   if($("congsub-sel")) $("congsub-sel").style.display = congsubRel ? "flex" : "none";
+
+  // MODO INFRAESTRUCTURA (lente de nivel superior): oculta la vista operacional y muestra el observatorio de red
+  if(state.modo==="infra"){
+    document.body.classList.add("modo-infra");
+    $("infra-view").style.display="";
+    $("scope-title").textContent="Infraestructura de transporte"; $("scope-sub").textContent="Gran Concepción · red y flujo de buses";
+    $("reset-btn").style.display="none";
+    renderInfra();
+    return;
+  }
+  document.body.classList.remove("modo-infra");
+  $("infra-view").style.display="none";
 
   // VISTAS ESPECIALES (territorio): ranking / comparador de comunas
   if(state.vista==="ranking" || state.vista==="comparador"){
@@ -989,6 +1003,109 @@ function renderVarObserved(){
   const nn=$("var-obs-narr");
   if(nn) nn.innerHTML=`Cada recorrido de la línea ${L} comparado consigo mismo: frecuencia <b style="color:var(--live)">en vivo</b> vs su <b style="color:#fbbf24">histórico</b> capturado (mismo vocabulario granular).`+
     (sinHist?` ${sinHist} recorrido(s) aún sin histórico comparable suficiente — se muestran solo en vivo, sin juzgar sub/sobreoferta.`:``);
+}
+// ==================== OBSERVATORIO DE INFRAESTRUCTURA ====================
+function iflowCol(p){ return p>=200?"#fb7185":p>=100?"#f5a524":p>=40?"#22d3ee":"#64748b"; }
+function ibrechaCol(s){ return s>=120?"#fb7185":s>=60?"#f59e0b":s>=25?"#fbbf24":"#64748b"; }
+function ikpi(l,v,u,c){ return `<div class="kpi" style="border-color:${c}30"><div class="lab"><span class="ic-dot" style="background:${c};margin-right:6px;width:10px;height:10px;border-radius:3px;display:inline-block"></span>${l}</div><div class="val" style="color:${c};font-size:26px;margin-top:6px">${v}<span style="font-size:13px;color:var(--muted);font-weight:600"> ${u||""}</span></div></div>`; }
+function iInitMap(){
+  if(imap) return;
+  imap=L.map("imap",{center:[-36.83,-73.05],zoom:12,zoomControl:true});
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:20,subdomains:"abcd",attribution:"© OSM © CARTO"}).addTo(imap);
+}
+function iClear(){ infraLayers.forEach(l=>{try{imap.removeLayer(l);}catch(e){}}); infraLayers=[]; }
+function iPoly(coords,color,weight,dash,onClick,tip,opacity){
+  const pl=L.polyline(coords.map(c=>[c[1],c[0]]),{color,weight,opacity:opacity==null?.92:opacity,dashArray:dash||null,lineCap:"round"}).addTo(imap);
+  if(tip) pl.bindTooltip(tip,{sticky:true}); if(onClick) pl.on("click",onClick); infraLayers.push(pl); return pl;
+}
+window.__isel=function(kind,key){
+  if(kind==="plan") state.infraSel={kind:"plan",e:INFRAE.plan[+key]};
+  else { const c=INFRAE.corredores.find(x=>x.nm===decodeURIComponent(key)); if(c) state.infraSel={kind:"cor",c}; }
+  renderInfra();
+};
+function renderInfra(){
+  if(!INFRAE){ $("infra-kpis").innerHTML='<div class="sub" style="color:var(--muted);padding:20px">Cargando red de infraestructura…</div>'; return; }
+  iInitMap();
+  const sub=state.infraSub;
+  $("infra-sub").innerHTML=[["plan","Plan"],["realidad","Realidad"],["brechas","Brechas"]].map(([k,l])=>`<b data-s="${k}" style="cursor:pointer;padding:6px 14px;border-radius:8px;font-size:12.5px;${k===sub?"background:var(--live-tint);color:var(--live);font-weight:700":"color:var(--muted)"}">${l}</b>`).join("");
+  $("infra-sub").querySelectorAll("b[data-s]").forEach(el=>el.onclick=()=>{ state.infraSub=el.dataset.s; state.infraSel=null; renderInfra(); });
+  const diaEl=$("infra-dia"), DL={L:"Laborable",S:"Sábado",D:"Domingo"};
+  if(sub!=="plan"){ diaEl.style.display="";
+    diaEl.innerHTML=["L","S","D"].map(d=>`<b data-d="${d}" style="cursor:pointer;padding:6px 11px;border-radius:8px;font-size:12px;${d===state.infraDia?"background:var(--live-tint);color:var(--live);font-weight:700":"color:var(--muted)"}">${DL[d]}</b>`).join("");
+    diaEl.querySelectorAll("b[data-d]").forEach(el=>el.onclick=()=>{ state.infraDia=el.dataset.d; renderInfra(); });
+  } else diaEl.style.display="none";
+  $("infra-sub-hint").textContent = sub==="plan"?"infraestructura declarada":sub==="realidad"?"dónde y cuánto circulan los buses":"prioridades: mucho flujo, poca infra";
+  iClear();
+  if(sub==="plan") renderInfraPlan(); else renderInfraFlujo(sub);
+  if(!imap._ifit){ const bb=INFRAE.bbox; imap.fitBounds([[bb[1],bb[0]],[bb[3],bb[2]]]); imap._ifit=1; }
+  setTimeout(()=>{ if(imap) imap.invalidateSize(); },90);
+  renderInfraDetail(state.infraSel);
+}
+function renderInfraPlan(){
+  const P=INFRAE.plan, t=INFRAE.agg_tipo, sel=state.infraSel&&state.infraSel.kind==="plan"?state.infraSel.e:null;
+  $("infra-kpis").className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3";
+  $("infra-kpis").innerHTML=[["Red total",INFRAE.total_km,"km","#22d3ee"],["En operación",INFRAE.km_operacion,"km","#34d399"],
+    ["En proyecto",(INFRAE.total_km-INFRAE.km_operacion).toFixed(1),"km","#f5a524"],["N.º ejes",P.length,"","#94a3b8"],
+    ["Corredor",t["Corredor"]||0,"km",ITIPO["Corredor"]],["Pista Solo Bus",t["Pista Solo Bus"]||0,"km",ITIPO["Pista Solo Bus"]],
+    ["Vía Exclusiva",t["Vía Exclusiva"]||0,"km",ITIPO["Vía Exclusiva"]],["Mixto",t["Mixto"]||0,"km",ITIPO["Mixto"]]].map(k=>ikpi(...k)).join("");
+  P.forEach(e=>{ const on=sel===e; iPoly(e.coords,ITIPO[e.tipo]||"#64748b",on?7:(e.tipo==="Corredor"?5:4),e.estado!=="Operación"?"6 7":null,()=>{state.infraSel={kind:"plan",e};renderInfra();},`${e.eje} · ${e.tipo} · ${e.km} km · ${e.estado}`); });
+  $("infra-legend").innerHTML=Object.entries(ITIPO).filter(([k])=>k!=="—").map(([k,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${c}"></i>${k}</span>`).join("")+`<span style="font-size:12px;color:var(--muted)">╌ en proyecto</span>`;
+  $("infra-narr").innerHTML=`<b>Plan de infraestructura declarada</b>: ${P.length} ejes (${INFRAE.km_operacion} km en operación · ${(INFRAE.total_km-INFRAE.km_operacion).toFixed(1)} en proyecto). Color por tipo; punteado = proyectado.`;
+  $("infra-list-title").textContent="Ejes del plan"; $("infra-list-hint").textContent=`${P.length} ejes · ${INFRAE.total_km} km`;
+  $("infra-list").innerHTML=P.map((e,i)=>`<div class="icard${sel===e?" sel":""}" onclick="__isel('plan',${i})"><span class="nm"><span class="ic-dot" style="background:${ITIPO[e.tipo]||'#64748b'};margin-right:6px"></span>${e.eje}</span><span class="mt">${e.km} km</span></div>`).join("");
+}
+function renderInfraFlujo(sub){
+  const dia=state.infraDia, selNm=state.infraSel&&state.infraSel.kind==="cor"?state.infraSel.c.nm:null;
+  let C=INFRAE.corredores.map(c=>({...c,_pico:Math.max(...(c.flujo[dia]||[0]))}));
+  const brechaSet=INFRAE.corredores.filter(c=>c.cov<0.30 && Math.max(...(c.flujo.L||[0]))>=8);
+  if(sub==="brechas"){ C=C.filter(c=>c.cov<0.30 && c._pico>=8).sort((a,b)=>b.brecha-a.brecha); }
+  else C.sort((a,b)=>b._pico-a._pico);
+  $("infra-kpis").className="grid grid-cols-2 md:grid-cols-4 gap-3";
+  $("infra-kpis").innerHTML=(sub==="brechas"
+    ? [["Brechas detectadas",brechaSet.length,"","#fb7185"],["Corredores con buses",INFRAE.corredores.length,"","#22d3ee"],
+       ["Peor brecha",Math.round((brechaSet.slice().sort((a,b)=>b.brecha-a.brecha)[0]||{}).brecha||0),"","#f59e0b"],
+       ["Críticas <15 km/h",brechaSet.filter(c=>c.vel<15).length,"","#fb7185"]]
+    : [["Corredores con buses",INFRAE.corredores.length,"","#22d3ee"],["Máx flujo",Math.round(Math.max(...C.map(c=>c._pico))),"b/h","#f5a524"],
+       ["≥100 buses/h",C.filter(c=>c._pico>=100).length,"","#f5a524"],["Vel. media red",Math.round(C.reduce((s,c)=>s+c.vel,0)/Math.max(1,C.length)),"km/h","#34d399"]]
+  ).map(k=>ikpi(...k)).join("");
+  C.forEach(c=>{ const on=selNm===c.nm, col=sub==="brechas"?ibrechaCol(c.brecha):iflowCol(c._pico), p=c._pico;
+    const w = p>=200?6.5 : p>=100?4.5 : p>=40?2.8 : 1.4;   // grosor por flujo → los menores adelgazan
+    const op = on?1 : (p<40?0.4 : p<100?0.75 : 0.95);       // los de bajo flujo se atenúan → legible
+    iPoly(c.coords,col,on?w+3:w,null,()=>{state.infraSel={kind:"cor",c};renderInfra();},`${c.nm} · pico ${Math.round(p)} b/h · ${c.vel} km/h · infra ${Math.round(c.cov*100)}%`,op); });
+  $("infra-legend").innerHTML= sub==="brechas"
+    ? `<span style="font-size:12px;color:var(--muted)">Color = severidad (flujo × déficit de infra × lentitud) · grosor = flujo</span>`
+    : [[">=200","#fb7185"],["100–199","#f5a524"],["40–99","#22d3ee"],["<40","#64748b"]].map(([l,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${c}"></i>${l} b/h</span>`).join("");
+  $("infra-narr").innerHTML= sub==="brechas"
+    ? `<b>Brechas</b>: ${C.length} corredores con operación intensa y baja cobertura de infraestructura exclusiva — prioridades de inversión. Clic para ver su perfil horario.`
+    : `<b>Operación real</b> (histórico, ${DL2(dia)}): flujo de buses/hora por corredor. Color/grosor = pico de flujo. Clic para ver la curva.`;
+  $("infra-list-title").textContent= sub==="brechas"?"Brechas (prioridades)":"Corredores por flujo";
+  $("infra-list-hint").textContent=`${C.length} corredores · ${DL2(dia)}`;
+  $("infra-list").innerHTML=C.map(c=>{ const col=sub==="brechas"?ibrechaCol(c.brecha):iflowCol(c._pico);
+    return `<div class="icard${selNm===c.nm?" sel":""}" onclick="__isel('cor','${encodeURIComponent(c.nm).replace(/'/g,'%27')}')"><span class="nm"><span class="ic-dot" style="background:${col};margin-right:6px"></span>${c.nm}</span><span class="mt">${Math.round(c._pico)} b/h${sub==="brechas"?` · ${Math.round(c.cov*100)}%`:""}</span></div>`; }).join("");
+}
+function DL2(d){ return {L:"laborable",S:"sábado",D:"domingo"}[d]||d; }
+function renderInfraDetail(sel){
+  const empty=$("infra-detail-empty"), chartEl=$("infra-chart");
+  if(!sel || sel.kind!=="cor"){ if(empty)empty.style.display=""; if(chartEl)chartEl.style.display="none";
+    $("infra-detail-title").textContent="Detalle del corredor"; $("infra-detail-sub").textContent="elegí un eje a la izquierda"; $("infra-detail-narr").innerHTML=""; return; }
+  if(empty)empty.style.display="none"; if(chartEl)chartEl.style.display="";
+  const c=sel.c;
+  $("infra-detail-title").textContent=c.nm;
+  $("infra-detail-sub").innerHTML=`${c.lines} líneas · <b style="color:${c.vel<15?'#fb7185':'#34d399'}">${c.vel} km/h</b> · infra exclusiva ${Math.round(c.cov*100)}%`;
+  const th=TH(), horas=[...Array(24).keys()].filter(h=>h>=5&&h<=23), x=horas.map(h=>h+"h");
+  const series=[["L","Laborable","#22d3ee"],["S","Sábado","#f5a524"],["D","Domingo","#94a3b8"]].map(([k,nm,col])=>({
+    name:nm,type:"line",smooth:true,symbol:"none",connectNulls:false,
+    data:horas.map(h=>(c.flujo[k]&&c.flujo[k][h])?Math.round(c.flujo[k][h]):null),
+    lineStyle:{width:k==="L"?2.6:1.8,color:col},itemStyle:{color:col},areaStyle:k==="L"?{color:col+"18"}:undefined}));
+  if(!infraChart) infraChart=echarts.init($("infra-chart"));
+  infraChart.setOption({textStyle:{fontFamily:th.font,color:th.tx},grid:{left:8,right:12,top:28,bottom:20,containLabel:true},
+    legend:{data:["Laborable","Sábado","Domingo"],textStyle:{color:th.mut,fontSize:10},top:0},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},formatter:p=>{let s=`${p[0].axisValue}<br>`;p.forEach(q=>{if(q.value!=null)s+=`${q.marker}${q.seriesName}: <b>${q.value}</b> b/h<br>`;});return s;}},
+    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"buses/hora",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    series},true);
+  setTimeout(()=>{ if(infraChart) infraChart.resize(); },60);
+  $("infra-detail-narr").innerHTML=`Flujo horario de buses en <b>${c.nm}</b>.`+(c.cov<0.30&&c.vel<15?` <b style="color:#fb7185">Brecha crítica</b>: alto flujo, poca infraestructura y baja velocidad.`:"");
 }
 function renderExcesos(){
   const el = $("excesos-list"); if(!el) return;
@@ -2647,8 +2764,16 @@ function renderEvolucion(){
     }).catch(()=>{});
     J("baseline_30min.json").then(d=>{ BASE30=d; loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
     J("baseline_var.json").then(d=>{ BVAR=d; if(state.vista==="normal"&&state.linea!=="TODAS") renderVarObserved(); }).catch(()=>{});   // baseline por variante (Bloque 3)
+    J("infraestructura.json").then(d=>{ INFRAE=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // observatorio de infraestructura
+    document.querySelectorAll("#modo-switch button").forEach(b=>b.onclick=()=>{
+      state.modo=b.dataset.modo;
+      document.querySelectorAll("#modo-switch button").forEach(x=>x.classList.toggle("on",x===b));
+      render();
+    });
+    const _isr=$("infra-search"); if(_isr) _isr.oninput=()=>{ const q=_isr.value.toLowerCase().trim();
+      document.querySelectorAll("#infra-list .icard").forEach(el=>{ el.style.display = (!q||el.textContent.toLowerCase().includes(q))?"":"none"; }); };
     J("cobertura_din_lineas.json").then(d=>{ DINL=d; renderCobDinLinea(); if(state.mapMode==="cover" && state.coverSub==="din") render(); }).catch(()=>{});
     setInterval(loadDia, 60000);                 // dia.json (vivo vs normal), refresco 60 s
-    addEventListener("resize", ()=>{ [csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart,freqChart,linFreqChart,lineFreqHistChart,vcChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); Object.values(varObsCharts||{}).forEach(c=>{try{c&&c.resize();}catch(e){}}); if(lmap) lmap.invalidateSize(); syncMapHeight(); });
+    addEventListener("resize", ()=>{ [csChart,eqChart,nseChart,rankChart,cmpChart,empresasChart,heatChart,recChart,evolChart,freqChart,linFreqChart,lineFreqHistChart,vcChart].forEach(c=>{try{c&&c.resize();}catch(e){}}); Object.values(varObsCharts||{}).forEach(c=>{try{c&&c.resize();}catch(e){}}); try{infraChart&&infraChart.resize();}catch(e){} if(lmap) lmap.invalidateSize(); if(imap) imap.invalidateSize(); syncMapHeight(); });
   }catch(e){ console.error(e); $("kpis2").innerHTML=`<div class="empty">No se pudieron cargar los datos.</div>`; }
 })();
