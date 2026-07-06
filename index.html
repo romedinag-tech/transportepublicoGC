@@ -32,8 +32,8 @@
 <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=75"/>
 <script defer src="assets/vendor/leaflet/leaflet.js?v=75"></script>
 <!-- Component styles (consume tokens via legacy bridge vars) -->
-<link rel="stylesheet" href="assets/styles.css?v=92">
-<link rel="stylesheet" href="assets/shell.css?v=92">
+<link rel="stylesheet" href="assets/styles.css?v=93">
+<link rel="stylesheet" href="assets/shell.css?v=93">
 <!-- Tailwind purged utilities (~12 KB static, no runtime recompilation) -->
 <link rel="stylesheet" href="assets/tw.css?v=92">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
@@ -87,6 +87,18 @@
     box-shadow:0 0 0 1px rgba(52,225,196,.08) inset,0 4px 14px -8px rgba(52,225,196,.35)}
   .tb-pill-val{font:700 17px/1 var(--font-data);color:var(--tx);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
   .tb-pill-lbl{font-size:11px;color:var(--muted);letter-spacing:.04em}
+  /* Block 1 — ROL 1: título/identidad. Domina por tamaño+peso+fuente display; capado a 32px para caber
+     en el header de 56px con su subtítulo. Subtítulo (eyebrow) mucho más chico en --text-mid. */
+  .tb-title{font-family:var(--font-display);font-size:clamp(24px,2.4vw,32px);font-weight:700;line-height:1.02;
+    letter-spacing:-.02em;color:var(--text-hi)}
+  .tb-sub{display:block;font-family:var(--font-ui);font-size:11px;color:var(--text-mid);letter-spacing:.14em;
+    text-transform:uppercase;font-weight:500;margin-top:1px}
+  /* Block 1b — header en 3 zonas: LEDs a la izquierda · marca centrada · estado/fecha a la derecha.
+     Izq y der con flex:1 empujan el centro al medio real (independiente de sus anchos). */
+  header .hdr-left{flex:1 1 0;display:flex;align-items:center;gap:12px;min-width:0}
+  header .hdr-center{flex:0 1 auto;text-align:center}
+  header .hdr-center .leading-tight{text-align:center}
+  header .hdr-right{flex:1 1 0;display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
   /* Dataflow line */
   @keyframes tbDataflow {
     0%   { background-position:-100% 0; opacity:0 }
@@ -101,6 +113,9 @@
   @media (prefers-reduced-motion: reduce) {
     header.relative-flow::after{display:none}
     .dot-live{animation:none;background:var(--live)}
+    /* Block 6 — reset integral: sin barridos de gauge, pulsos estáticos, sin transiciones */
+    *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
+      transition-duration:.001ms!important;scroll-behavior:auto!important}
   }
 
   /* ── Trend badge ── */
@@ -171,8 +186,14 @@
 
   /* ── Phase 2: Bento visual hierarchy ── */
   #kpis2{position:relative}
+  /* Block 4 — RITMO REGULAR: todas las celdas del mismo alto (grilla bento uniforme). Las tarjetas con
+     lista larga (cobertura por comuna) scrollean dentro de su celda; el sub de cobertura-ahora en 1 línea. */
+  @media(min-width:768px){ #kpis2{grid-auto-rows:150px} }
+  #kpis2 .kpi.klive{min-height:0}
+  #kpis2 .kpi.klive .kcr-list{flex:1 1 auto;min-height:0;overflow-y:auto}
+  #kpis2 .kpi.klive[data-k="cob_now"] .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   @media(min-width:1280px){
-    #kpis2::after{content:"";position:absolute;left:4%;right:4%;top:138px;height:1px;
+    #kpis2::after{content:"";position:absolute;left:4%;right:4%;top:156px;height:1px;
       background:linear-gradient(90deg,transparent,var(--warn) 12%,var(--warn) 88%,transparent);
       opacity:.4;pointer-events:none;z-index:1}
     #kpis2 .klive[data-k="vel"]{border-left:2px solid var(--line);padding-left:12px;margin-left:4px}
@@ -194,24 +215,44 @@
   .skel-line.w80{width:80%}
 
   /* ── Comuna bar ── */
-  .comuna-bar{display:flex;align-items:center;gap:6px;padding:var(--s2) var(--s3);white-space:nowrap;
+  /* Block 1c — ROL 3: comuna-bar CENTRADA y envuelta en un rectángulo (se lee como grupo de botones).
+     Activo en ÁMBAR (--warn = luz de bus), no verde. */
+  .comuna-bar{display:flex;justify-content:center;align-items:center;gap:6px;padding:var(--s2) var(--s3);white-space:nowrap;
     border-bottom:1px solid var(--line);background:var(--topbar);backdrop-filter:blur(8px);flex:none;z-index:40}
-  .comuna-bar #comuna-tabs{flex:1;min-width:0;overflow-x:auto;display:flex;align-items:center;gap:3px}
+  .comuna-bar #comuna-tabs{flex:0 1 auto;min-width:0;overflow-x:auto;display:flex;align-items:center;gap:3px;
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-pill);padding:4px 5px}
   .comuna-bar .ctab{flex:none}
+  .comuna-bar .ctab.active{background:var(--warn-tint);color:var(--warn);border-color:var(--warn-border);box-shadow:inset 0 -2px 0 var(--warn)}
   .comuna-bar .vsep{width:1px;height:20px;background:var(--line);margin:0 7px;flex:none}
   .comuna-bar .ctab.special{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line)}
-  .comuna-bar .ctab.special.active{border-color:var(--live)}
+  .comuna-bar .ctab.special.active{border-color:var(--warn)}
   .comuna-bar .cb-aside{display:flex;align-items:center;gap:10px;flex:none;border-left:1px solid var(--line);padding-left:12px;margin-left:6px}
   .comuna-bar .cb-live{display:inline-flex;align-items:center;gap:7px;font-size:var(--fs-caption);color:var(--muted);
     padding:5px 11px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--chip)}
   .comuna-bar .cb-live b{color:var(--tx);font-family:var(--font-data);font-weight:700}
   /* Selector de modo (Operación / Infraestructura): dos botones grandes centrados, bajo el título */
   .modo-bar{display:flex;justify-content:center;padding:11px 16px;border-bottom:1px solid var(--line);background:var(--bg2)}
-  .modo-big{display:inline-flex;gap:6px;background:var(--panel2,#0f1c33);border:1px solid var(--line2,#2c3e60);border-radius:14px;padding:5px}
-  .modo-big button{display:inline-flex;align-items:center;gap:9px;background:none;border:none;color:var(--muted,#8ea3c2);font-weight:700;font-size:14.5px;letter-spacing:.02em;padding:11px 30px;border-radius:10px;cursor:pointer;transition:background .15s,color .15s}
+  /* Block 1b — segmented control a ANCHO COMPLETO: los 2 botones llenan el ancho interior de la página */
+  .modo-big{display:flex;width:100%;gap:6px;background:var(--panel2);border:1px solid var(--line2);border-radius:14px;padding:5px}
+  /* Block 1 — ROL 2: pestañas = SEGMENTED CONTROL (no titulares). Fuente UI, peso/tamaño de control,
+     activo con tint+subrayado --live (tokens; se quitó el gradiente hex azul). */
+  .modo-big button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:none;border:none;color:var(--muted);font-family:var(--font-ui);font-weight:600;font-size:13.5px;letter-spacing:.01em;padding:8px 22px;border-radius:10px;cursor:pointer;transition:background .15s,color .15s}
   .modo-big button svg{opacity:.7}
   .modo-big button:hover{color:var(--tx);background:var(--hover)}
-  .modo-big button.on{background:linear-gradient(180deg,#12406a,#0e3357);color:var(--live,#22d3ee);box-shadow:0 1px 0 #2c69a0 inset}
+  .modo-big button.on{background:var(--live-tint);color:var(--live);box-shadow:inset 0 -2px 0 var(--live)}
+  /* Block 1c — cabecera de ámbito sobre los KPIs: se oculta el "Gran Concepción · 36 líneas · 12 comunas"
+     (redundante con la comuna-bar y el menú de líneas). El elemento queda en DOM para el JS. */
+  #scope-title,#scope-sub{display:none}
+  /* Block 6 — responsive: barras de control anchas (modos del mapa, selectores) no se recortan en
+     móvil/tablet; scrollean horizontal dentro de su contenedor. Tap targets cómodos en móvil. */
+  @media(max-width:1024px){
+    .cs-controls{max-width:100%;min-width:0}
+    .seg,#map-mode,#periodo-sel{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  }
+  @media(max-width:640px){
+    .modo-big button{min-height:44px}
+    .comuna-bar .ctab{min-height:38px;display:inline-flex;align-items:center}
+  }
   .modo-big button.on svg{opacity:1}
   @media(max-width:520px){.modo-big button{padding:10px 18px;font-size:13px}}
   .periodo-sel{display:inline-flex;align-items:center;gap:6px;flex:none}
@@ -274,16 +315,21 @@
   .cdl-pill .sub{font-size:11px;color:var(--dim);margin-top:2px}
   /* ── KPI gauges — compact mode for gauge cards ── */
   .kpi.klive{padding:8px 10px 7px;min-height:146px;display:flex;flex-direction:column}
-  .kpi.klive .lab{justify-content:center;text-align:center;font-size:11px;
-    text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  /* Block 2 — NIVEL 1 (eyebrow): legible por contraste, no por tamaño. font-ui, uppercase, tracking .08em, --text-lo */
+  .kpi.klive .lab{justify-content:center;text-align:center;font-family:var(--font-ui);font-size:var(--fs-kpi-lab);font-weight:600;
+    text-transform:uppercase;letter-spacing:.08em;color:var(--text-lo)}
   .kpi.klive .gauge{width:98%;height:auto;display:block;margin:1px auto 0;max-height:88px}
-  .kpi.klive .g-val{font:800 34px/1 var(--font-data);letter-spacing:-.02em}
+  /* Block 3 — pista del arco (semicírculo completo) siempre --line-soft; el color va por CSS, no por atributo SVG */
+  .kpi.klive .g-track{stroke:var(--line-soft)}
+  /* Block 2/3 — NIVEL 2 (dato primario): grande, mono, tabular-nums, PROTAGONISTA en --text-hi */
+  .kpi.klive .g-val{font:800 34px/1 var(--font-data);letter-spacing:-.02em;font-variant-numeric:tabular-nums;fill:var(--text-hi)}
   .kpi.klive .g-unit{font-size:15px;font-weight:600;fill:var(--text-mid)}
   .kpi.klive .g-pct{font:700 15px/1 var(--font-ui)}
-  .kpi.klive .sub{margin-top:2px;font-size:13px;color:var(--muted);text-align:center;line-height:1.35}
-  .kpi.klive .sub .g-norm{font-family:var(--font-data);color:var(--tx);font-weight:700}
-  .kpi.klive .sub .g-delta{display:inline-block;margin-left:5px;font-family:var(--font-data);font-weight:700;
-    padding:1px 6px;border-radius:5px;font-size:12.5px;background:var(--hover)}
+  /* Block 2 — NIVEL 3 (referencia + delta): mono tabular; el delta va en CHIP con tinte de su color semántico y AIRE */
+  .kpi.klive .sub{margin-top:3px;font-size:13px;color:var(--text-mid);text-align:center;line-height:1.5}
+  .kpi.klive .sub .g-norm{font-family:var(--font-data);font-variant-numeric:tabular-nums;color:var(--text-mid);font-weight:700}
+  .kpi.klive .sub .g-delta{display:inline-block;margin-left:8px;font-family:var(--font-data);font-weight:700;font-variant-numeric:tabular-nums;
+    padding:1px 7px;border-radius:var(--r-pill);font-size:12.5px;background:color-mix(in srgb,currentColor 15%,transparent)}
   /* Fleet toggle selector */
   .fleet-toggle{display:flex;justify-content:center;gap:2px;margin:4px 0 2px}
   .fleet-toggle button{font-size:10px;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);
@@ -377,6 +423,7 @@
 
   <!-- ============ BARRA DE COMANDO (compacta, h-14 para acomodar el título más grande) ============ -->
   <header class="flex items-center gap-3 px-3 sm:px-4 h-14 shrink-0 z-50 border-b border-[var(--line)] bg-[var(--topbar)] backdrop-blur-xl relative relative-flow">
+    <div class="hdr-left">
     <button id="side-toggle" class="grid place-items-center w-8 h-8 rounded-lg border border-[var(--line2)] text-[var(--muted)] hover:text-[var(--acc)] hover:border-[var(--acc)]" title="Mostrar/ocultar filtros" aria-label="Filtros">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
@@ -386,7 +433,8 @@
       <span class="tb-led tb-led--rx"></span>
       <span class="tb-led tb-led--tx"></span>
     </div>
-    <div class="flex items-center gap-3 min-w-0">
+    </div><!-- /hdr-left -->
+    <div class="hdr-center flex items-center gap-3 min-w-0">
       <!-- F5++: logo SVG inline — Campanil de la Universidad de Concepción, ícono geográfico
            emblemático de la ciudad. Torre vertical estilizada (base, cuerpo, cabezal con reloj, pico). -->
       <svg class="tb-logo" viewBox="0 0 32 40" width="38" height="46" aria-label="Transporte Gran Concepción · Campanil UdeC" role="img">
@@ -419,24 +467,21 @@
         </g>
       </svg>
       <div class="leading-tight min-w-0 hidden xs:block sm:block">
-        <!-- F5++: título grande (24px ≈ 2× del original 14px), eyebrow compacto -->
-        <b class="block truncate tracking-tight" style="font-size:24px;font-weight:700;line-height:1.05">Transporte · Gran Concepción</b>
-        <span class="text-[10px] text-[var(--muted)] tracking-[.14em] uppercase font-medium">Centro de Mando · Analítica GPS</span>
+        <!-- Block 1: ROL 1 — título/identidad dominante (font-display, tokens). Ancla visual #1. -->
+        <b class="tb-title block truncate">Transporte · Gran Concepción</b>
+        <span class="tb-sub">Centro de Mando · Analítica GPS</span>
       </div>
-    </div>
+    </div><!-- /hdr-center -->
 
-    <!-- F2: estado vivo enriquecido (reemplaza "Sistema operativo" estático) -->
-    <span class="status ml-3 hidden md:inline-flex" title="Última actualización del feed GTFS-RT">
+    <div class="hdr-right">
+    <!-- estado vivo: última actualización del feed GTFS-RT -->
+    <span class="status hidden md:inline-flex" title="Última actualización del feed GTFS-RT">
       <span class="dot-live"></span>
       <span>actualizado hace <span id="live-age" class="font-mono text-[var(--tx)]">—</span></span>
     </span>
-    <!-- F2: pill prominente de buses operando, cerca del encabezado -->
-    <span class="tb-pill ml-2 hidden lg:inline-flex" title="Buses operando ahora (GTFS-RT)">
-      <span class="tb-pill-val" id="hdr-live-big">—</span>
-      <span class="tb-pill-lbl">buses operando</span>
-    </span>
+    <!-- Block 1b: pill "buses operando" removida del header (dato redundante con los KPIs) -->
 
-    <div class="ml-auto flex items-center gap-2">
+    <div class="flex items-center gap-2">
       <span id="hdr-reloj" class="hidden md:inline-flex items-center gap-1.5 text-[11.5px] font-mono text-[var(--muted)] px-2.5 py-1.5 rounded-lg border border-[var(--line2)] bg-[var(--chip)]" title="Fecha y hora en vivo (Chile)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
         <span id="hdr-reloj-txt">—</span>
@@ -446,6 +491,7 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 8.84 21.5c.5.08.66-.22.66-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.57.67.48A10 10 0 0 0 12 2Z"/></svg>
       </a>
     </div>
+    </div><!-- /hdr-right -->
   </header>
 
   <!-- ============ SELECTOR DE MODO (Operación / Infraestructura) ============ -->
@@ -464,11 +510,8 @@
 
   <!-- ============ BARRA SUPERIOR: TERRITORIO (comunas) ============ -->
   <div class="comuna-bar thin-scroll">
+    <!-- Block 1c: comunas centradas y envueltas en rectángulo; pill "buses operando" removida (redundante) -->
     <nav id="comuna-tabs" class="thin-scroll"></nav>
-    <div class="cb-aside">
-      <!-- pill vivo: resumen "en vivo" balanceando la fila -->
-      <span class="cb-live" title="Buses operando en este momento (GTFS-RT)"><span class="dot-live"></span> <b id="hdr-live">—</b> buses operando</span>
-    </div>
   </div>
 
   <!-- ============ ESPACIO DE TRABAJO ============ -->
@@ -510,7 +553,7 @@
       <style>
         .modo-seg{display:inline-flex;gap:3px;background:var(--panel2,#0f1c33);border:1px solid var(--line2,#2c3e60);border-radius:11px;padding:3px}
         .modo-seg button{background:none;border:none;color:var(--muted,#8ea3c2);font-weight:700;font-size:13px;padding:7px 15px;border-radius:8px;cursor:pointer;transition:.15s}
-        .modo-seg button.on{background:linear-gradient(180deg,#12406a,#0e3357);color:var(--live,#22d3ee);box-shadow:0 1px 0 #2c69a0 inset}
+        .modo-seg button.on{background:var(--live-tint);color:var(--live);box-shadow:inset 0 -2px 0 var(--live)}
         body.modo-infra #normal-view,body.modo-infra #special-view,body.modo-infra #oper-sidebar{display:none!important}
         body.modo-infra #infra-sidebar{display:block!important}
         #infra-view .ic-dot{width:12px;height:5px;border-radius:3px;display:inline-block}
@@ -845,11 +888,13 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=141"></script>
+<script defer src="assets/app_shell.js?v=144"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
     var btn=document.getElementById("side-toggle"), sb=document.getElementById("sidebar");
+    // Móvil (≤640px): el menú de líneas arranca COLAPSADO; el botón de filtros lo abre.
+    if(window.matchMedia("(max-width:640px)").matches) sb.classList.add("side-collapsed");
     btn.addEventListener("click", function(){
       sb.classList.toggle("side-collapsed");
       setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 280);

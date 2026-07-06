@@ -48,9 +48,11 @@ header{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);
 .kpi::after{content:"";position:absolute;inset:0 0 auto 0;height:3px;
   background:linear-gradient(90deg,var(--live),var(--ref));opacity:0;transition:opacity var(--dur-base) var(--ease)}
 .kpi:hover::after{opacity:.85}
-.kpi .lab{font-size:var(--fs-body);color:var(--muted);font-weight:600;display:flex;align-items:center;gap:var(--s2)}
-.kpi .val{font-family:var(--font-data);font-size:32px;font-weight:700;letter-spacing:-.02em;margin-top:var(--s3);line-height:1;color:var(--tx)}
-.kpi .sub{font-size:var(--fs-body);color:var(--dim);margin-top:var(--s3);line-height:1.4}
+/* Block 2 — 3 niveles por contraste: eyebrow (font-ui uppercase tracking .08em --text-lo, legible por
+   contraste no por tamaño), dato primario (mono tabular grande --text-hi), referencia con aire (1.5). */
+.kpi .lab{font-family:var(--font-ui);font-size:var(--fs-kpi-lab);text-transform:uppercase;letter-spacing:.08em;color:var(--text-lo);font-weight:600;display:flex;align-items:center;gap:var(--s2)}
+.kpi .val{font-family:var(--font-data);font-variant-numeric:tabular-nums;font-size:32px;font-weight:700;letter-spacing:-.02em;margin-top:var(--s2);line-height:1;color:var(--tx)}
+.kpi .sub{font-size:var(--fs-body);color:var(--dim);margin-top:var(--s3);line-height:1.5}
 .kpi .ic{font-size:18px;opacity:.95;line-height:1}
 /* Semantic value color */
 .kpi .val.is-critical{color:var(--alert)}
