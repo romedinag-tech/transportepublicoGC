@@ -36,7 +36,7 @@ function tickReloj(){
   el.textContent = `${f} · ${h}`;
 }
 try{ tickReloj(); setInterval(tickReloj, 30000); }catch(e){}
-const BUILD = "2026-07-05 22:00";
+const BUILD = "2026-07-05 22:20";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null, AYERFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -50,8 +50,9 @@ let DETP=null, CLINE={lineas:[]}, BUNCH=null, BUNCHA=null, CICLO=null;
 let _nseTerciles=null;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", freqDia:"L", rankCat:"prud", cmpA:null, cmpB:null, modo:"operacion", infraSub:"realidad", infraDia:"L", infraSel:null};
 let INFRAE=null, imap=null, infraChart=null, infraLayers=[];   // observatorio de infraestructura
-const ITIPO={"Corredor":"#22d3ee","Pista Solo Bus":"#f5a524","Vía Exclusiva":"#34d399","Mixto":"#94a3b8","—":"#64748b"};
+const ITIPO={"Corredor":"#ec4899","Pista Solo Bus":"#f5a524","Vía Exclusiva":"#34d399","Mixto":"#94a3b8","—":"#64748b"};
 const IEFECT="#e879f9";   // capa "ejes efectivos" (corredores reales dibujados a mano) — color propio
+const SHOW_EFECTIVOS=false;   // Carrera/PAC ya están en el plan → la capa efectivos quedó redundante; se oculta (reversible)
 let csChart, freqChart, linFreqChart, lineFreqHistChart, rankProgChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = "https://storage.googleapis.com/gccp-transporte-live/live.json";
 const MAP_MODES = [["live","En vivo"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["conges","Congestión"],["bunch","Bunching"],["det","Detenciones"],["terms","Terminales"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
@@ -1035,16 +1036,16 @@ function infraStrip(){
   const proy=(INFRAE.total_km-INFRAE.km_operacion);
   const kel=$("infra-kpis"); kel.className="";   // grilla auto-fit por estilo (xl:grid-cols-8 no está en el tw.css compilado)
   kel.style.display="grid"; kel.style.gap="12px"; kel.style.gridTemplateColumns="repeat(auto-fit,minmax(135px,1fr))";
-  kel.innerHTML=[
+  const fijos=[
     ["Red plan",INFRAE.total_km,"km","#e2e8f0"],
     ["En operación",INFRAE.km_operacion,"km","#34d399"],
-    ["En proyecto",km1(proy),"km","#f5a524"],
-    ["Ejes efectivos",INFRAE.km_efectivo||0,"km",IEFECT],
-    ["Corredor",km1(t["Corredor"]),"km",ITIPO["Corredor"]],
-    ["Pista Solo Bus",km1(t["Pista Solo Bus"]),"km",ITIPO["Pista Solo Bus"]],
-    ["Vía Exclusiva",km1(t["Vía Exclusiva"]),"km",ITIPO["Vía Exclusiva"]],
-    ["Mixto",km1(t["Mixto"]),"km",ITIPO["Mixto"]],
-  ].map(k=>ikpi(...k)).join("");
+    ["En proyecto",km1(proy),"km","#fbbf24"],
+  ];
+  if(SHOW_EFECTIVOS) fijos.push(["Ejes efectivos",INFRAE.km_efectivo||0,"km",IEFECT]);
+  // km por tipo de infraestructura (solo los presentes), mismos colores que el mapa
+  const porTipo=Object.entries(t).filter(([,v])=>v>0.05).sort((a,b)=>b[1]-a[1])
+    .map(([k,v])=>[k,km1(v),"km",ITIPO[k]||"#64748b"]);
+  kel.innerHTML=fijos.concat(porTipo).map(k=>ikpi(...k)).join("");
 }
 function renderInfra(){
   if(!INFRAE){ $("infra-kpis").innerHTML='<div class="sub" style="color:var(--muted);padding:20px">Cargando red de infraestructura…</div>'; return; }
@@ -1068,7 +1069,7 @@ function iSwatch(tipos){   // indicador de tipo en el slot .ln (mismo lugar que 
   return `<span class="ln" style="min-width:26px;display:inline-flex;gap:2px;justify-content:flex-end;align-items:center">${ts.slice(0,3).map(t=>`<i style="background:${ITIPO[t]||'#64748b'};width:6px;height:6px;border-radius:50%;display:inline-block"></i>`).join("")}</span>`;
 }
 function renderInfraPlan(){
-  const P=INFRAE.plan, EF=INFRAE.efectivos||[];
+  const P=INFRAE.plan, EF=SHOW_EFECTIVOS?(INFRAE.efectivos||[]):[];
   // agrupar los ejes del plan por NOMBRE (Colón, Carrera… aparecen varias veces con distintos tramos/tipos)
   const groups={};
   P.forEach(e=>{ const g=groups[e.eje]||(groups[e.eje]={eje:e.eje,km:0,tipos:{},estados:{}});
@@ -1080,7 +1081,8 @@ function renderInfraPlan(){
   P.forEach(e=>{ const on=selName===e.eje; iPoly(e.segs,ITIPO[e.tipo]||"#64748b",on?7:(e.tipo==="Corredor"?5:4.2),e.estado!=="Operación"?"6 7":null,()=>{state.infraSel={kind:"plangrp",name:e.eje};renderInfra();},`${e.eje} · ${e.tipo} · ${e.km} km · ${e.estado}`); });
   EF.forEach(e=>{ const on=selEf===e; iPoly(e.segs,IEFECT,on?7.5:5.5,null,()=>{state.infraSel={kind:"efec",e};renderInfra();},`${e.eje} · efectivo · ${e.km} km`,0.95); });
   // LEYENDA por tipo de infraestructura + proyecto + efectivo
-  $("infra-legend").innerHTML=Object.entries(ITIPO).filter(([k])=>k!=="—").map(([k,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${c}"></i>${k}</span>`).join("")+`<span style="font-size:12px;color:var(--muted)">╌ en proyecto</span>`+(EF.length?`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${IEFECT}"></i>Efectivo (real)</span>`:"");
+  const tAgg=INFRAE.agg_tipo||{};
+  $("infra-legend").innerHTML=Object.entries(ITIPO).filter(([k])=>k!=="—" && (tAgg[k]||0)>0.05).map(([k,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${c}"></i>${k}</span>`).join("")+`<span style="font-size:12px;color:var(--muted)">╌ en proyecto</span>`+(EF.length?`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${IEFECT}"></i>Efectivo (real)</span>`:"");
   $("infra-narr").innerHTML=`<b>Plan de infraestructura declarada</b>: ${GA.length} ejes (${INFRAE.km_operacion} km en operación · ${(INFRAE.total_km-INFRAE.km_operacion).toFixed(1)} en proyecto). Color por <b>tipo</b> de infraestructura; punteado = proyectado.`+(EF.length?` En <span style="color:${IEFECT}">magenta</span>, los <b>ejes efectivos</b> (dónde circulan los buses), ${INFRAE.km_efectivo||0} km.`:"");
   $("infra-list-title").textContent="Ejes del plan"; $("infra-list-hint").textContent=`${GA.length} ejes · ${INFRAE.total_km} km`;
   // LISTA: mismo formato que las líneas del modo Operación (.litem/.ln/.nm), agrupada por nombre → cada fila = un link a la ficha del eje.
