@@ -875,8 +875,13 @@ function renderLineFreqChart(){
   const b = (DIA && typeof DIA.bin==="number") ? DIA.bin : -1;
   if(!ser || b<0 || !CUMP || !CUMP.horas){
     if(linFreqChart){ try{linFreqChart.dispose();}catch(e){} linFreqChart=null; }
-    if(el) el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:180px;text-align:center;color:var(--muted);font-size:12.5px;padding:0 16px">Aún sin despachos en tiempo real hoy para la línea ${L}</div>`;
-    $("lin-freq-sub").textContent = `línea ${L} · frecuencia de salida en tiempo real`;
+    // KPI señal: distingue "sin frecuencia por feed roto" (transmitiendo GPS) de "sin señal" (no reporta).
+    const _pul = (DIA && DIA.pulsos_lin && DIA.pulsos_lin[L]) || 0;
+    const _sig = _pul>0
+      ? `<b style="color:var(--live)">${_pul} bus${_pul>1?"es":""} transmitiendo GPS ahora</b><br>sin frecuencia medida (feed sin identificador de viaje)`
+      : `sin señal GPS de la línea en este momento`;
+    if(el) el.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;height:100%;min-height:180px;text-align:center;color:var(--muted);font-size:12.5px;padding:0 16px"><span>Aún sin despachos en tiempo real hoy para la línea ${L}</span><span style="font-size:11.5px;line-height:1.5">${_sig}</span></div>`;
+    $("lin-freq-sub").textContent = `línea ${L} · frecuencia de salida en tiempo real${_pul>0?` · 📡 ${_pul} con señal`:""}`;
     return;
   }
   // Solo limpiar (quita el placeholder) al INICIALIZAR; si el chart ya existe, no borrar su canvas
