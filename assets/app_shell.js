@@ -871,6 +871,9 @@ function renderLineFreqChart(){
   if(!lineActive){ card.style.display="none"; return; }
   card.style.display="";
   const L = state.linea, el=$("ch-lin-freq");
+  // Aviso de método: si la línea estima frecuencia SIN trip_id (fallback por rumbo), avisarlo en pantalla.
+  const _sinId = ((DIA && DIA.fb_lines) || []).includes(L)
+    ? ` · <b style="color:var(--warn)" title="Sin identificador de viaje (trip_id) en el feed GTFS-RT; la frecuencia se estima por rumbo y bloques">⚠ frecuencia estimada sin ID de viaje</b>` : "";
   const ser = (DIA && DIA.freq_trm_serie_lin && DIA.freq_trm_serie_lin[L]) || null;
   const b = (DIA && typeof DIA.bin==="number") ? DIA.bin : -1;
   if(!ser || b<0 || !CUMP || !CUMP.horas){
@@ -881,7 +884,7 @@ function renderLineFreqChart(){
       ? `<b style="color:var(--live)">${_pul} bus${_pul>1?"es":""} transmitiendo GPS ahora</b><br>sin frecuencia medida (feed sin identificador de viaje)`
       : `sin señal GPS de la línea en este momento`;
     if(el) el.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;height:100%;min-height:180px;text-align:center;color:var(--muted);font-size:12.5px;padding:0 16px"><span>Aún sin despachos en tiempo real hoy para la línea ${L}</span><span style="font-size:11.5px;line-height:1.5">${_sig}</span></div>`;
-    $("lin-freq-sub").textContent = `línea ${L} · frecuencia de salida en tiempo real${_pul>0?` · 📡 ${_pul} con señal`:""}`;
+    $("lin-freq-sub").innerHTML = `línea ${L} · frecuencia de salida en tiempo real${_pul>0?` · 📡 ${_pul} con señal`:""}` + _sinId;
     return;
   }
   // Solo limpiar (quita el placeholder) al INICIALIZAR; si el chart ya existe, no borrar su canvas
@@ -911,7 +914,7 @@ function renderLineFreqChart(){
   const cur = (b>=0 && ser[b]!=null) ? ser[b] : 0;
   const sent = (DIA.freq_trm_sent_lin&&DIA.freq_trm_sent_lin[L]) || null;   // freq_trm no emite sentido -> null (sin split, ok)
   const sTxt = sent ? ` · <span style="color:var(--muted)">ida/regreso ${sent["0"]||0}/${sent["1"]||0}</span>` : "";
-  $("lin-freq-sub").innerHTML = `línea ${L} · <b style="color:var(--live)">${Math.round(cur)}</b> buses/h en vivo (últ. 60 min)${sTxt} · vs exigida GTFS`;
+  $("lin-freq-sub").innerHTML = `línea ${L} · <b style="color:var(--live)">${Math.round(cur)}</b> buses/h en vivo (últ. 60 min)${sTxt} · vs exigida GTFS` + _sinId;
 }
 function renderLineFreqHist(){
   // Panel derecho del tercer panel (vista línea): frecuencia de salida OBSERVADA (promedio histórico)
