@@ -36,7 +36,7 @@ function tickReloj(){
   el.textContent = `${f} · ${h}`;
 }
 try{ tickReloj(); setInterval(tickReloj, 30000); }catch(e){}
-const BUILD = "2026-07-05 22:20";
+const BUILD = "2026-07-05 23:10";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null, AYERFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -49,7 +49,7 @@ let VCICLO=null, vcChart=null, vcPer="agregado", vcSm=7;
 let DETP=null, CLINE={lineas:[]}, BUNCH=null, BUNCHA=null, CICLO=null;
 let _nseTerciles=null;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", freqDia:"L", rankCat:"prud", cmpA:null, cmpB:null, modo:"operacion", infraSub:"realidad", infraDia:"L", infraSel:null};
-let INFRAE=null, imap=null, infraChart=null, infraLayers=[];   // observatorio de infraestructura
+let INFRAE=null, imap=null, infraChart=null, infraLayers=[], FLUJOEJES=null;   // observatorio de infraestructura
 const ITIPO={"Corredor":"#ec4899","Pista Solo Bus":"#f5a524","Vía Exclusiva":"#34d399","Mixto":"#94a3b8","—":"#64748b"};
 const IEFECT="#e879f9";   // capa "ejes efectivos" (corredores reales dibujados a mano) — color propio
 const SHOW_EFECTIVOS=false;   // Carrera/PAC ya están en el plan → la capa efectivos quedó redundante; se oculta (reversible)
@@ -1128,15 +1128,37 @@ function renderInfraDetail(sel){
     const km=items.reduce((s,p)=>s+p.km,0);
     const porTipo={}; items.forEach(p=>porTipo[p.tipo]=(porTipo[p.tipo]||0)+p.km);
     const estados=[...new Set(items.map(p=>p.estado))];
-    if(chartEl)chartEl.style.display="none";
-    if(empty){ empty.style.display="";
-      empty.innerHTML=`<div style="text-align:left;line-height:1.7">`
-        +Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).map(([t,k])=>`<div><i class="ic-dot" style="background:${ITIPO[t]||'#64748b'};margin-right:7px"></i><b>${t}</b> · ${k.toFixed(1)} km</div>`).join("")
-        +`<div style="margin-top:8px;color:var(--muted)">Estado: ${estados.join(", ")} · ${items.length} tramo${items.length>1?"s":""}</div>`
-        +`<div style="margin-top:10px;color:var(--muted)">La ficha del eje (flujo de buses/h, velocidad por tramo, día crítico) se conectará desde el barrido histórico.</div></div>`; }
+    const tiposTxt=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).map(([t,k])=>`<span style="color:${ITIPO[t]||'#64748b'}">${t}</span> ${k.toFixed(1)}km`).join(" · ");
     $("infra-detail-title").textContent=sel.name;
-    $("infra-detail-sub").innerHTML=`${Object.keys(porTipo).join(" · ")} · <b>${km.toFixed(1)} km</b>`;
-    $("infra-detail-narr").innerHTML=""; return;
+    $("infra-detail-sub").innerHTML=`${Object.keys(porTipo).join(" · ")} · <b>${km.toFixed(1)} km</b> · ${estados.join(", ")}`;
+    const fe=FLUJOEJES&&FLUJOEJES.ejes&&FLUJOEJES.ejes[sel.name];
+    if(fe){
+      if(empty)empty.style.display="none"; if(chartEl)chartEl.style.display="";
+      const th=TH(), horas=[...Array(24).keys()].filter(h=>h>=5&&h<=23), x=horas.map(h=>h+"h");
+      const series=[["s1",(fe.lbl&&fe.lbl[0])||"sentido A","#22d3ee"],["s2",(fe.lbl&&fe.lbl[1])||"sentido B","#f59e0b"]].map(([k,nm,col])=>({
+        name:nm,type:"line",smooth:true,symbol:"none",connectNulls:false,
+        data:horas.map(h=>(fe[k]&&fe[k].L&&fe[k].L[h])?Math.round(fe[k].L[h]):null),
+        lineStyle:{width:2.4,color:col},itemStyle:{color:col},areaStyle:{color:col+"14"}}));
+      if(!infraChart) infraChart=echarts.init($("infra-chart"));
+      infraChart.setOption({textStyle:{fontFamily:th.font,color:th.tx},grid:{left:8,right:12,top:28,bottom:20,containLabel:true},
+        legend:{data:series.map(s=>s.name),textStyle:{color:th.mut,fontSize:10},top:0},
+        tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},formatter:p=>{let s=`${p[0].axisValue}<br>`;p.forEach(q=>{if(q.value!=null)s+=`${q.marker}${q.seriesName}: <b>${q.value}</b> b/h<br>`;});return s;}},
+        xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
+        yAxis:{type:"value",name:"buses/hora",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+        series},true);
+      setTimeout(()=>{if(infraChart)infraChart.resize();},60);
+      const pk=Math.max(...(fe.tot&&fe.tot.L||[0]));
+      $("infra-detail-narr").innerHTML=`Flujo de buses/hora por sentido en <b>${sel.name}</b> (histórico, laborable). Pico total <b>${Math.round(pk)}</b> b/h. Infra: ${tiposTxt}.`;
+    } else {
+      if(chartEl)chartEl.style.display="none";
+      if(empty){ empty.style.display="";
+        empty.innerHTML=`<div style="text-align:left;line-height:1.7">`
+          +Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).map(([t,k])=>`<div><i class="ic-dot" style="background:${ITIPO[t]||'#64748b'};margin-right:7px"></i><b>${t}</b> · ${k.toFixed(1)} km</div>`).join("")
+          +`<div style="margin-top:8px;color:var(--muted)">Estado: ${estados.join(", ")} · ${items.length} tramo${items.length>1?"s":""}</div>`
+          +`<div style="margin-top:10px;color:var(--muted)">Sin flujo GPS en este eje: lo sirven líneas fuera del perímetro del AVL (p. ej. intercomunales a Lota/Coronel).</div></div>`; }
+      $("infra-detail-narr").innerHTML="";
+    }
+    return;
   }
   if(!sel || sel.kind!=="cor"){ if(empty){empty.style.display="";empty.innerHTML=empty.dataset.def;} if(chartEl)chartEl.style.display="none";
     $("infra-detail-title").textContent="Detalle del eje"; $("infra-detail-sub").textContent="elegí un eje a la izquierda"; $("infra-detail-narr").innerHTML=""; return; }
@@ -2817,6 +2839,7 @@ function renderEvolucion(){
     J("baseline_30min.json").then(d=>{ BASE30=d; loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
     J("baseline_var.json").then(d=>{ BVAR=d; if(state.vista==="normal"&&state.linea!=="TODAS") renderVarObserved(); }).catch(()=>{});   // baseline por variante (Bloque 3)
     J("infraestructura.json").then(d=>{ INFRAE=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // observatorio de infraestructura
+    J("flujo_ejes.json").then(d=>{ FLUJOEJES=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // flujo buses/h por eje×sentido
     document.querySelectorAll("#modo-switch button").forEach(b=>b.onclick=()=>{
       state.modo=b.dataset.modo;
       document.querySelectorAll("#modo-switch button").forEach(x=>x.classList.toggle("on",x===b));
