@@ -36,7 +36,7 @@ function tickReloj(){
   el.textContent = `${f} · ${h}`;
 }
 try{ tickReloj(); setInterval(tickReloj, 30000); }catch(e){}
-const BUILD = "2026-07-05 23:10";
+const BUILD = "2026-07-05 23:30";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null, AYERFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
