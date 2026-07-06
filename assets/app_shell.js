@@ -36,7 +36,7 @@ function tickReloj(){
   el.textContent = `${f} · ${h}`;
 }
 try{ tickReloj(); setInterval(tickReloj, 30000); }catch(e){}
-const BUILD = "2026-07-05 21:15";
+const BUILD = "2026-07-05 21:30";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null, AYERFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -1036,8 +1036,9 @@ function infraStrip(){
   const ge100=C.filter(c=>picoDe(c)>=100).length;
   const brech=C.filter(c=>c.cov<0.30 && picoDe(c)>=8 && c.vel<15).length;
   const proy=(INFRAE.total_km-INFRAE.km_operacion);
-  $("infra-kpis").className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3";
-  $("infra-kpis").innerHTML=[
+  const kel=$("infra-kpis"); kel.className="";   // grilla auto-fit por estilo (xl:grid-cols-8 no está en el tw.css compilado)
+  kel.style.display="grid"; kel.style.gap="12px"; kel.style.gridTemplateColumns="repeat(auto-fit,minmax(135px,1fr))";
+  kel.innerHTML=[
     ["Red plan",INFRAE.total_km,"km","#22d3ee"],
     ["En operación",INFRAE.km_operacion,"km","#34d399"],
     ["En proyecto",proy.toFixed(1),"km","#f5a524"],
