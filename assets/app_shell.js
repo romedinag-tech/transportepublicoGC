@@ -1235,7 +1235,8 @@ function renderInfraDetail(sel){
       const series=[["s1",(fe.lbl&&fe.lbl[0])||"sentido A","#22d3ee"],["s2",(fe.lbl&&fe.lbl[1])||"sentido B","#f59e0b"]].map(([k,nm,col])=>({
         name:nm,type:"line",smooth:true,symbol:"none",connectNulls:false,
         data:horas.map(h=>(fe[k]&&fe[k].L&&fe[k].L[h])?Math.round(fe[k].L[h]):null),
-        lineStyle:{width:2.4,color:col},itemStyle:{color:col},areaStyle:{color:col+"14"}}));
+        lineStyle:{width:2.4,color:col},itemStyle:{color:col},areaStyle:{color:col+"14"}}))
+        .filter(s=>s.data.some(v=>v!=null&&v>0));   // una-vía: no dibujar el sentido sin flujo
       if(!infraChart) infraChart=echarts.init($("infra-chart"));
       infraChart.setOption({textStyle:{fontFamily:th.font,color:th.tx},grid:{left:8,right:12,top:28,bottom:20,containLabel:true},
         legend:{data:series.map(s=>s.name),textStyle:{color:th.mut,fontSize:10},top:0},
@@ -1245,7 +1246,7 @@ function renderInfraDetail(sel){
         series},true);
       setTimeout(()=>{if(infraChart)infraChart.resize();},60);
       const pk=Math.max(...(fe.tot&&fe.tot.L||[0]));
-      $("infra-detail-narr").innerHTML=`Flujo de buses/hora por sentido en <b>${sel.name}</b> (histórico, laborable). Pico total <b>${Math.round(pk)}</b> b/h. Infra: ${tiposTxt}.`;
+      $("infra-detail-narr").innerHTML=`Flujo de buses/hora ${fe.ow?"(<b>una vía</b>)":"por sentido"} en <b>${sel.name}</b> (histórico, laborable · por expedición). Pico total <b>${Math.round(pk)}</b> b/h. Infra: ${tiposTxt}.`;
     } else {
       if(chartEl)chartEl.style.display="none";
       if(empty){ empty.style.display="";
