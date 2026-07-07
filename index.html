@@ -27,12 +27,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Design tokens: single source of truth for color/type/space (loaded FIRST) -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=92">
+<link rel="stylesheet" href="assets/css/tokens.css?v=94">
 <!-- Leaflet self-hosted -->
 <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=75"/>
 <script defer src="assets/vendor/leaflet/leaflet.js?v=75"></script>
 <!-- Component styles (consume tokens via legacy bridge vars) -->
-<link rel="stylesheet" href="assets/styles.css?v=93">
+<link rel="stylesheet" href="assets/styles.css?v=94">
 <link rel="stylesheet" href="assets/shell.css?v=93">
 <!-- Tailwind purged utilities (~12 KB static, no runtime recompilation) -->
 <link rel="stylesheet" href="assets/tw.css?v=92">
@@ -558,7 +558,7 @@
         body.modo-infra #infra-sidebar{display:block!important}
         #infra-view .ic-dot{width:12px;height:5px;border-radius:3px;display:inline-block}
         #infra-view .icard{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:7px 9px;border-radius:9px;cursor:pointer;font-size:12.5px;border:1px solid transparent}
-        #infra-view .icard:hover{background:#16233f} #infra-view .icard.sel{background:#16294a;border-color:#22d3ee55}
+        #infra-view .icard:hover{background:var(--hover)} #infra-view .icard.sel{background:var(--live-tint);border-color:var(--live-border)}
         #infra-view .icard .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx,#eaf1fb)}
         #infra-view .icard .mt{color:var(--muted,#8ea3c2);font-variant-numeric:tabular-nums;font-size:11.5px;text-align:right}
         #infra-view .ipill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}

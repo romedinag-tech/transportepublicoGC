@@ -116,42 +116,59 @@
   --mono:  var(--font-data);
 }
 
-/* ─── Light theme ─── */
+/* ─── Light theme — INSTITUCIONAL (papel · tinta navy · azul), emula el panel de uso de suelo ─── */
 :root[data-theme="light"] {
+  /* Superficies — papel institucional (bg gris muy claro, tarjetas blancas) */
   --bg-void:    #F4F6FA;
   --bg-base:    #FFFFFF;
-  --surface-1:  #F0F2F7;
-  --surface-2:  #E6E9F0;
-  --line:       #D1D5DE;
-  --line-soft:  #E2E5EC;
+  --surface-1:  #FFFFFF;
+  --surface-2:  #EEF2F7;
+  --line:       #E3E8EF;
+  --line-soft:  #EDF1F6;
 
-  --text-hi:    #1A202C;
-  --text-mid:   #4A5568;
-  --text-lo:    #8492A6;
+  /* Tinta — navy casi negro (autoridad institucional) */
+  --text-hi:    #0E2338;
+  --text-mid:   #4A5A70;
+  --text-lo:    #7C8AA0;
 
-  --live:   #0D9B84;
-  --ref:    #4A6FE3;
-  --warn:   #D4920A;
-  --alert:  #E04358;
+  /* Señales — AZUL institucional como acento primario (reemplaza el teal del modo oscuro) */
+  --live:   #1F6FEB;   /* azul: operando ahora / activo / selección */
+  --ref:    #8A6FB0;   /* púrpura mudo: baseline / histórico (distinguible del azul) */
+  --warn:   #C08A1E;   /* ámbar mudo: exceso de velocidad */
+  --alert:  #B2182B;   /* rojo divergente institucional: crítico */
 
-  --topbar: rgba(255, 255, 255, .9);
-  --hover:  rgba(15,23,42,.04);
-  --chip:   rgba(240, 242, 247, .85);
-  --glow1:  rgba(13, 155, 132, .08);
-  --glow2:  rgba(74, 111, 227, .06);
-  --live-tint:   rgba(13, 155, 132, .10);
-  --live-border: rgba(13, 155, 132, .30);
-  --alert-tint:  rgba(224, 67, 88, .10);
-  --warn-tint:   rgba(212, 146, 10, .06);
-  --warn-border: rgba(212, 146, 10, .20);
-  --warn-text:   #92400e;
-  --ico-bg:      rgba(13, 155, 132, .08);
-  --subtle:      rgba(15, 23, 42, .05);
-  --ref-tint:    rgba(74, 111, 227, .10);
-  --shadow-card:   0 2px 8px -2px rgba(0,0,0,.08), 0 1px 2px -1px rgba(0,0,0,.04);
-  --shadow-widget: 0 4px 16px -8px rgba(0,0,0,.1), 0 1px 3px -1px rgba(0,0,0,.06);
-  --shadow-hover:  0 8px 24px -6px rgba(0,0,0,.12);
-  --grad-shine: linear-gradient(180deg, rgba(255,255,255,.6) 0%, transparent 40%);
+  /* Superficies compuestas / bridge */
+  --topbar: rgba(255,255,255,.92);
+  --hover:  rgba(14,35,56,.045);
+  --chip:   #F1F4F8;
+  --glow1:  rgba(31,111,235,.05);
+  --glow2:  rgba(22,54,90,.04);
+  --live-tint:   rgba(31,111,235,.10);
+  --live-border: rgba(31,111,235,.28);
+  --alert-tint:  rgba(178,24,43,.09);
+  --warn-tint:   rgba(192,138,30,.08);
+  --warn-border: rgba(192,138,30,.22);
+  --warn-text:   #8A5A0F;
+  --ico-bg:      rgba(31,111,235,.08);
+  --subtle:      rgba(14,35,56,.05);
+  --ref-tint:    rgba(138,111,176,.12);
+  --track:       #E6EAF1;
+
+  /* Marca institucional: navy → azul */
+  --grad-brand:  linear-gradient(135deg, #16365A, #1F6FEB);
+  --grad-panel:  #FFFFFF;
+  --grad-shine:  linear-gradient(180deg, rgba(255,255,255,.5) 0%, transparent 40%);
+
+  /* Sombras institucionales — sutiles, planas, tinte navy */
+  --shadow-card:      0 1px 2px rgba(14,35,56,.05), 0 1px 3px rgba(14,35,56,.05);
+  --shadow-widget:    0 1px 3px rgba(14,35,56,.05), 0 10px 28px rgba(14,35,56,.07);
+  --shadow-hover:     0 8px 24px rgba(14,35,56,.11);
+  --shadow-glow-live: 0 0 0 3px rgba(31,111,235,.12);
+
+  /* Charts (ECharts los lee vía getComputedStyle) */
+  --ch-grid: #EDF1F6;
+  --ch-axis: #7C8AA0;
+  --ch-tip:  #FFFFFF;
 }
 
 /* ─── Reduced motion ─── */
