@@ -1085,6 +1085,21 @@ function infraStrip(){
     .map(([k,v])=>[k,km1(v),"km",ITIPO[k]||"#64748b"]);
   kel.innerHTML=fijos.concat(porTipo).map(k=>ikpi(...k)).join("");
 }
+// Banderita: marca el ESLABÓN PICO (dónde se mide el flujo del corredor) del eje seleccionado. El flujo
+// no es parejo a lo largo del eje (los buses entran y viran); acá se reporta el punto más cargado.
+function _renderFlujoMarker(){
+  if(!imap || !FLUJOEJES || !FLUJOEJES.ejes) return;
+  const sel=state.infraSel; if(!sel || sel.kind!=="plangrp") return;
+  const fe=FLUJOEJES.ejes[sel.name]; if(!fe) return;
+  [["mk1",(fe.lbl&&fe.lbl[0]),fe.s1],["mk2",(fe.lbl&&fe.lbl[1]),fe.s2]].forEach(([k,dlbl,ser])=>{
+    const mk=fe[k]; if(!mk||mk.length!==2) return;
+    const pk=(ser&&ser.L)?Math.round(Math.max(...ser.L)):0; if(!pk) return;
+    const html=`<div style="transform:translate(-50%,-100%);white-space:nowrap;font:700 11px system-ui;color:#04211d;background:var(--live,#34E1C4);padding:2px 7px;border-radius:9px;box-shadow:0 1px 5px rgba(0,0,0,.45);border:1px solid rgba(0,0,0,.25)">📍 ${pk} <span style="font-weight:500">b/h ${dlbl||""}</span></div>`;
+    const m=L.marker([mk[0],mk[1]],{icon:L.divIcon({className:"flujo-mk",html,iconSize:[0,0],iconAnchor:[0,0]}),interactive:true,zIndexOffset:1000}).addTo(imap);
+    m.bindTooltip(`Medición: <b>eslabón pico</b> del corredor${dlbl?(" · "+dlbl):""} · <b>${pk}</b> b/h.<br>El flujo varía a lo largo del eje; acá está el punto más cargado.`,{direction:"top",sticky:true});
+    infraLayers.push(m);
+  });
+}
 function renderInfra(){
   if(!INFRAE){ $("infra-kpis").innerHTML='<div class="sub" style="color:var(--muted);padding:20px">Cargando red de infraestructura…</div>'; return; }
   iInitMap();
@@ -1096,6 +1111,7 @@ function renderInfra(){
   $("infra-sub-hint").textContent="infraestructura declarada";
   iClear();
   renderInfraPlan();
+  _renderFlujoMarker();
   _ediagClear();
   if(state.ejeDiag){ _renderEjeDiag();
     const selN=state.infraSel&&state.infraSel.kind==="plangrp"?state.infraSel.name:null;
@@ -1246,7 +1262,7 @@ function renderInfraDetail(sel){
         series},true);
       setTimeout(()=>{if(infraChart)infraChart.resize();},60);
       const pk=Math.max(...(fe.tot&&fe.tot.L||[0]));
-      $("infra-detail-narr").innerHTML=`Flujo de buses/hora ${fe.ow?"(<b>una vía</b>)":"por sentido"} en <b>${sel.name}</b> (histórico, laborable · por expedición). Pico total <b>${Math.round(pk)}</b> b/h. Infra: ${tiposTxt}.`;
+      $("infra-detail-narr").innerHTML=`Flujo de buses/hora ${fe.ow?"(<b>una vía</b>)":"por sentido"} en <b>${sel.name}</b>, medido en el <b>eslabón más cargado</b> del corredor (📍 en el mapa) — el flujo no es parejo a lo largo del eje. Histórico laborable · por expedición. Pico <b>${Math.round(pk)}</b> b/h. Infra: ${tiposTxt}.`;
     } else {
       if(chartEl)chartEl.style.display="none";
       if(empty){ empty.style.display="";
