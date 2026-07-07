@@ -871,20 +871,21 @@ function renderLineFreqChart(){
   if(!lineActive){ card.style.display="none"; return; }
   card.style.display="";
   const L = state.linea, el=$("ch-lin-freq");
-  // Aviso de método: si la línea estima frecuencia SIN trip_id (fallback por rumbo), avisarlo en pantalla.
-  const _sinId = ((DIA && DIA.fb_lines) || []).includes(L)
-    ? ` · <b style="color:var(--warn)" title="Sin identificador de viaje (trip_id) en el feed GTFS-RT; la frecuencia se estima por rumbo y bloques">⚠ frecuencia estimada sin ID de viaje</b>` : "";
+  // fb_lines = líneas cuyo feed en vivo el operador re-sirve CONGELADO (mismo reporte viejo repetido: sin
+  // trip_id, posición y bearing estancados). No hay dato vivo útil; el histórico sí sirve. Avisarlo honesto.
+  const _feedFrozen = ((DIA && DIA.fb_lines) || []).includes(L);
+  const _sinId = _feedFrozen
+    ? ` · <b style="color:var(--warn)" title="El operador re-sirve un reporte GPS viejo (misma posición repetida, sin identificador de viaje). No hay frecuencia ni ubicación en vivo; el histórico sí está disponible.">⚠ sin datos en vivo (feed del operador congelado)</b>` : "";
   const ser = (DIA && DIA.freq_trm_serie_lin && DIA.freq_trm_serie_lin[L]) || null;
   const b = (DIA && typeof DIA.bin==="number") ? DIA.bin : -1;
   if(!ser || b<0 || !CUMP || !CUMP.horas){
     if(linFreqChart){ try{linFreqChart.dispose();}catch(e){} linFreqChart=null; }
-    // KPI señal: distingue "sin frecuencia por feed roto" (transmitiendo GPS) de "sin señal" (no reporta).
-    const _pul = (DIA && DIA.pulsos_lin && DIA.pulsos_lin[L]) || 0;
-    const _sig = _pul>0
-      ? `<b style="color:var(--live)">${_pul} bus${_pul>1?"es":""} transmitiendo GPS ahora</b><br>sin frecuencia medida (feed sin identificador de viaje)`
-      : `sin señal GPS de la línea en este momento`;
-    if(el) el.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;height:100%;min-height:180px;text-align:center;color:var(--muted);font-size:12.5px;padding:0 16px"><span>Aún sin despachos en tiempo real hoy para la línea ${L}</span><span style="font-size:11.5px;line-height:1.5">${_sig}</span></div>`;
-    $("lin-freq-sub").innerHTML = `línea ${L} · frecuencia de salida en tiempo real${_pul>0?` · 📡 ${_pul} con señal`:""}` + _sinId;
+    // Feed congelado (fb_lines): el operador re-sirve un reporte viejo → sin dato vivo útil. Honesto:
+    const _sig = _feedFrozen
+      ? `El operador manda una <b style="color:var(--warn)">posición congelada</b> para esta línea (mismo reporte viejo<br>repetido, sin identificador de viaje). No hay frecuencia ni ubicación en vivo — el histórico sí está disponible.`
+      : `sin despachos en tiempo real todavía para la línea ${L}`;
+    if(el) el.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;height:100%;min-height:180px;text-align:center;color:var(--muted);font-size:12.5px;padding:0 16px"><span>${_feedFrozen?`Sin datos en vivo · línea ${L}`:`Aún sin despachos en tiempo real hoy · línea ${L}`}</span><span style="font-size:11.5px;line-height:1.5">${_sig}</span></div>`;
+    $("lin-freq-sub").innerHTML = `línea ${L} · frecuencia de salida en tiempo real` + _sinId;
     return;
   }
   // Solo limpiar (quita el placeholder) al INICIALIZAR; si el chart ya existe, no borrar su canvas
