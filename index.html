@@ -595,6 +595,14 @@
               <div class="widget-b">
                 <div id="infra-detail-empty" class="sub" style="color:var(--muted);padding:24px 4px;text-align:center;line-height:1.6">Seleccioná un corredor en la lista de la izquierda o en el mapa para ver su <b>curva horaria de buses/h</b>, velocidad y cobertura de infraestructura.</div>
                 <div id="infra-chart" style="height:300px;display:none"></div>
+                <div id="infra-vel-wrap" style="display:none">
+                  <div class="sub" style="margin:14px 0 2px;font-weight:600;color:var(--text-mid)">Velocidad operativa del corredor <span style="font-weight:400;font-size:10.5px;color:var(--text-lo)">· física (ventana 1&nbsp;km) · laborable · banda p15–p85</span></div>
+                  <div id="infra-chart-vel" style="height:230px"></div>
+                </div>
+                <div id="infra-exc-wrap" style="display:none">
+                  <div class="sub" style="margin:14px 0 2px;font-weight:600;color:var(--text-mid)">Excesos de velocidad sostenidos <span style="font-weight:400;font-size:10.5px;color:var(--text-lo)">· por línea y mes · física (&gt;70 km/h en 1&nbsp;km)</span></div>
+                  <div id="infra-chart-exc" style="height:230px"></div>
+                </div>
                 <p id="infra-detail-narr" class="wnarr"></p>
               </div>
             </section>
@@ -888,7 +896,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=147"></script>
+<script defer src="assets/app_shell.js?v=149"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

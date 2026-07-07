@@ -50,6 +50,7 @@ let DETP=null, CLINE={lineas:[]}, BUNCH=null, BUNCHA=null, CICLO=null;
 let _nseTerciles=null;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", freqDia:"L", rankCat:"prud", cmpA:null, cmpB:null, modo:"operacion", infraSub:"realidad", infraDia:"L", infraSel:null};
 let INFRAE=null, imap=null, infraChart=null, infraLayers=[], FLUJOEJES=null;   // observatorio de infraestructura
+let infraVelChart=null, infraExcChart=null, VELEJE=null;   // velocidad física + excesos por eje (v_1km)
 const ITIPO={"Corredor":"#ec4899","Pista Solo Bus":"#f5a524","Vía Exclusiva":"#34d399","Mixto":"#94a3b8","—":"#64748b"};
 const IEFECT="#e879f9";   // capa "ejes efectivos" (corredores reales dibujados a mano) — color propio
 const SHOW_EFECTIVOS=false;   // Carrera/PAC ya están en el plan → la capa efectivos quedó redundante; se oculta (reversible)
@@ -1128,6 +1129,54 @@ function renderInfraFlujo(sub){
     return `<div class="icard${selNm===c.nm?" sel":""}" onclick="__isel('cor','${encodeURIComponent(c.nm).replace(/'/g,'%27')}')"><span class="nm"><span class="ic-dot" style="background:${col};margin-right:6px"></span>${c.nm}</span><span class="mt">${Math.round(c._pico)} b/h${sub==="brechas"?` · ${Math.round(c.cov*100)}%`:""}</span></div>`; }).join("");
 }
 function DL2(d){ return {L:"laborable",S:"sábado",D:"domingo"}[d]||d; }
+// #1+#3 — velocidad operativa del corredor por hora (v50) + banda de dispersión p15–p85 (física, v_1km)
+function _renderInfraVel(ejeName){
+  const wrap=$("infra-vel-wrap"), ve=VELEJE&&VELEJE.ejes&&VELEJE.ejes[ejeName];
+  if(!wrap) return;
+  if(!ve || !ve.vel || !ve.vel.some(v=>v!=null)){ wrap.style.display="none"; return; }
+  wrap.style.display="";
+  const th=TH(), col=(getComputedStyle(document.documentElement).getPropertyValue('--live').trim()||'#34E1C4');
+  const horas=[...Array(24).keys()].filter(h=>h>=5&&h<=23), x=horas.map(h=>h+"h");
+  const v50=horas.map(h=>ve.vel[h]), v15=horas.map(h=>ve.v15[h]), v85=horas.map(h=>ve.v85[h]);
+  const band=horas.map((h,i)=>(v85[i]!=null&&v15[i]!=null)?Math.round((v85[i]-v15[i])*10)/10:null);
+  if(!infraVelChart) infraVelChart=echarts.init($("infra-chart-vel"));
+  infraVelChart.setOption({textStyle:{fontFamily:th.font,color:th.tx},grid:{left:8,right:12,top:14,bottom:20,containLabel:true},
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      formatter:p=>{const q=p.find(z=>z.seriesName==="v50"); if(!q||q.value==null) return p[0].axisValue;
+        const i=horas.indexOf(parseInt(p[0].axisValue)); return `${p[0].axisValue}<br><b>${Math.round(q.value)}</b> km/h (mediana)<br>p15–p85: ${v15[i]}–${v85[i]} km/h`;}},
+    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"km/h",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    series:[
+      {name:"_base",type:"line",data:v15,stack:"b",lineStyle:{opacity:0},symbol:"none",silent:true,areaStyle:{opacity:0},tooltip:{show:false}},
+      {name:"_band",type:"line",data:band,stack:"b",lineStyle:{opacity:0},symbol:"none",silent:true,areaStyle:{color:col,opacity:0.12},tooltip:{show:false}},
+      {name:"v50",type:"line",data:v50,smooth:true,symbol:"none",lineStyle:{width:2.6,color:col},itemStyle:{color:col}}
+    ]},true);
+  setTimeout(()=>{if(infraVelChart)infraVelChart.resize();},60);
+}
+// #2 — excesos de velocidad sostenidos por línea × mes (barras apiladas)
+function _renderInfraExc(ejeName){
+  const wrap=$("infra-exc-wrap"), ve=VELEJE&&VELEJE.ejes&&VELEJE.ejes[ejeName], meses=(VELEJE&&VELEJE.meses)||[];
+  if(!wrap) return;
+  const lines = ve&&ve.exc ? Object.keys(ve.exc) : [];
+  if(!lines.length || !meses.length){ wrap.style.display="none"; return; }
+  wrap.style.display="";
+  const th=TH();
+  const PAL=["#34E1C4","#6C8FF5","#F4B740","#FF5D73","#a78bfa","#22d3ee","#f472b6","#4ade80","#fb923c","#38bdf8"];
+  const tot=L=>meses.reduce((s,m)=>s+((ve.exc[L]||{})[m]||0),0);
+  const ord=lines.slice().sort((a,b)=>tot(b)-tot(a)).slice(0,10);
+  const xlbl=meses.map(m=>m.slice(5)+"/"+m.slice(2,4));
+  const series=ord.map((L,i)=>({name:"L"+L,type:"bar",stack:"exc",barMaxWidth:26,
+    data:meses.map(m=>(ve.exc[L]||{})[m]||0),itemStyle:{color:PAL[i%PAL.length]}}));
+  if(!infraExcChart) infraExcChart=echarts.init($("infra-chart-exc"));
+  infraExcChart.setOption({textStyle:{fontFamily:th.font,color:th.tx},grid:{left:8,right:12,top:30,bottom:18,containLabel:true},
+    legend:{data:series.map(s=>s.name),textStyle:{color:th.mut,fontSize:10},top:0,type:"scroll"},
+    tooltip:{trigger:"axis",axisPointer:{type:"shadow"},backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
+      order:"valueDesc",valueFormatter:v=>v?v+" excesos":"—"},
+    xAxis:{type:"category",data:xlbl,axisLabel:{color:th.mut,fontSize:9,interval:0},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"excesos",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    series},true);
+  setTimeout(()=>{if(infraExcChart)infraExcChart.resize();},60);
+}
 function renderInfraDetail(sel){
   const empty=$("infra-detail-empty"), chartEl=$("infra-chart");
   if(empty && !empty.dataset.def) empty.dataset.def=empty.innerHTML;
@@ -1171,6 +1220,8 @@ function renderInfraDetail(sel){
           +`<div style="margin-top:10px;color:var(--muted)">Sin flujo GPS en este eje: lo sirven líneas fuera del perímetro del AVL (p. ej. intercomunales a Lota/Coronel).</div></div>`; }
       $("infra-detail-narr").innerHTML="";
     }
+    _renderInfraVel(sel.name);
+    _renderInfraExc(sel.name);
     return;
   }
   if(!sel || sel.kind!=="cor"){ if(empty){empty.style.display="";empty.innerHTML=empty.dataset.def;} if(chartEl)chartEl.style.display="none";
@@ -2853,6 +2904,7 @@ function renderEvolucion(){
     J("baseline_var.json").then(d=>{ BVAR=d; if(state.vista==="normal"&&state.linea!=="TODAS") renderVarObserved(); }).catch(()=>{});   // baseline por variante (Bloque 3)
     J("infraestructura.json").then(d=>{ INFRAE=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // observatorio de infraestructura
     J("flujo_ejes.json").then(d=>{ FLUJOEJES=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // flujo buses/h por eje×sentido
+    J("vel_eje.json").then(d=>{ VELEJE=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // velocidad física + excesos por eje (v_1km)
     document.querySelectorAll("#modo-switch button").forEach(b=>b.onclick=()=>{
       state.modo=b.dataset.modo;
       document.querySelectorAll("#modo-switch button").forEach(x=>x.classList.toggle("on",x===b));
