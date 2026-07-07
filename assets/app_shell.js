@@ -51,6 +51,7 @@ let _nseTerciles=null;
 let state = {comuna:"TODAS", linea:"TODAS", csDia:"L", csVar:"freq", mapMode:"live", vista:"normal", periodo:"agg", purpose:"all", coverSub:"est", sentido:"amb", detTipo:"cong", congSub:"prom", freqDia:"L", rankCat:"prud", cmpA:null, cmpB:null, modo:"operacion", infraSub:"realidad", infraDia:"L", infraSel:null};
 let INFRAE=null, imap=null, infraChart=null, infraLayers=[], FLUJOEJES=null;   // observatorio de infraestructura
 let infraVelChart=null, infraExcChart=null, VELEJE=null;   // velocidad física + excesos por eje (v_1km)
+let EJEDIAG=null, ejeDiagLayers=[];   // diagnóstico: bloques (eslabones) que alimentan cada eje
 const ITIPO={"Corredor":"#ec4899","Pista Solo Bus":"#f5a524","Vía Exclusiva":"#34d399","Mixto":"#94a3b8","—":"#64748b"};
 const IEFECT="#e879f9";   // capa "ejes efectivos" (corredores reales dibujados a mano) — color propio
 const SHOW_EFECTIVOS=false;   // Carrera/PAC ya están en el plan → la capa efectivos quedó redundante; se oculta (reversible)
@@ -1030,6 +1031,29 @@ function iInitMap(){
   L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:20,subdomains:"abcd",attribution:"© OSM © CARTO"}).addTo(imap);
 }
 function iClear(){ infraLayers.forEach(l=>{try{imap.removeLayer(l);}catch(e){}}); infraLayers=[]; }
+function _ediagClear(){ ejeDiagLayers.forEach(l=>{try{imap.removeLayer(l);}catch(e){}}); ejeDiagLayers=[]; }
+// DIAGNÓSTICO 'eslabones': dibuja los bloques que alimentan el conteo del eje seleccionado.
+//   verde = sentido + (avanza s_eje) · rojo = sentido − · tamaño ∝ pulsos de bus reales · gris = bloque de OTRO eje (contexto → revela fugas)
+function _renderEjeDiag(){
+  _ediagClear();
+  if(!EJEDIAG||!imap) return;
+  const sel=state.infraSel, selName=sel&&sel.kind==="plangrp"?sel.name:null;
+  const ei = selName!=null ? EJEDIAG.ejes.indexOf(selName) : -1;
+  const B=EJEDIAG.blocks;
+  let bb=null, maxP=1;
+  if(ei>=0){ for(const b of B){ if(b[2]===ei){ maxP=Math.max(maxP,b[4]);
+    if(!bb) bb=[b[0],b[0],b[1],b[1]]; else { bb[0]=Math.min(bb[0],b[0]);bb[1]=Math.max(bb[1],b[0]);bb[2]=Math.min(bb[2],b[1]);bb[3]=Math.max(bb[3],b[1]); } } } }
+  const M=0.004;   // ~400 m de margen para ver los bloques vecinos (fugas)
+  for(const b of B){
+    const lat=b[0],lon=b[1],bi=b[2],ds=b[3],np_=b[4], mine=bi===ei;
+    if(bb){ if(lat<bb[0]-M||lat>bb[1]+M||lon<bb[2]-M||lon>bb[3]+M) continue; } else if(!mine) continue;
+    const col = mine ? (ds>0?"#34E1C4":"#f87171") : "#64748b";
+    const r = mine ? 2.4+3.6*Math.sqrt(np_/maxP) : 2, op = mine?0.9:0.32;
+    const cm=L.circleMarker([lat,lon],{radius:r,color:col,weight:mine?1:0.4,fillColor:col,fillOpacity:op,stroke:mine})
+      .bindTooltip(`${EJEDIAG.ejes[bi]}${mine?(ds>0?" · sentido +":" · sentido −"):" · (otro eje)"} · ${np_.toLocaleString()} pulsos`,{sticky:true});
+    cm.addTo(imap); ejeDiagLayers.push(cm);
+  }
+}
 function iPoly(segs,color,weight,dash,onClick,tip,opacity){
   // segs = lista de segmentos [[[lon,lat],...],...] → multi-polilínea (no conecta tramos disjuntos)
   const latlngs=segs.map(seg=>seg.map(c=>[c[1],c[0]]));
@@ -1072,6 +1096,17 @@ function renderInfra(){
   $("infra-sub-hint").textContent="infraestructura declarada";
   iClear();
   renderInfraPlan();
+  _ediagClear();
+  if(state.ejeDiag){ _renderEjeDiag();
+    const selN=state.infraSel&&state.infraSel.kind==="plangrp"?state.infraSel.name:null;
+    const lg=$("infra-legend");
+    if(lg) lg.innerHTML = `<span style="font-size:11.5px;color:var(--text-mid);font-weight:600">🔍 Eslabones${selN?" · "+selN:""}:</span>`+
+      `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:#34E1C4"></i>sentido +</span>`+
+      `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:#f87171"></i>sentido −</span>`+
+      `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:#64748b"></i>otro eje</span>`+
+      `<span style="font-size:11px;color:var(--text-lo)">tamaño ∝ pulsos de bus</span>`;
+    if(!selN){ const nr=$("infra-narr"); if(nr) nr.innerHTML=`<b>Diagnóstico de eslabones activo</b>: seleccioná un eje (lista o mapa) para ver los bloques que alimentan su conteo — sentido y pulsos reales de bus. Los bloques grises son de ejes vecinos (revela fugas entre corredores colineales).`; }
+  }
   if(!imap._ifit){ const bb=INFRAE.bbox; imap.fitBounds([[bb[1],bb[0]],[bb[3],bb[2]]]); imap._ifit=1; }
   setTimeout(()=>{ if(imap) imap.invalidateSize(); },90);
   renderInfraDetail(state.infraSel);
@@ -2905,6 +2940,9 @@ function renderEvolucion(){
     J("infraestructura.json").then(d=>{ INFRAE=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // observatorio de infraestructura
     J("flujo_ejes.json").then(d=>{ FLUJOEJES=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // flujo buses/h por eje×sentido
     J("vel_eje.json").then(d=>{ VELEJE=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // velocidad física + excesos por eje (v_1km)
+    const _dtg=$("infra-diag-toggle"); if(_dtg) _dtg.onclick=()=>{ state.ejeDiag=!state.ejeDiag; _dtg.classList.toggle("on",state.ejeDiag);
+      _dtg.style.background=state.ejeDiag?"var(--live)":"transparent"; _dtg.style.color=state.ejeDiag?"#04211d":"var(--text-mid)";
+      if(!EJEDIAG){ J("eje_diag.json").then(d=>{ EJEDIAG=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{}); } else if(state.modo==="infra") renderInfra(); };
     document.querySelectorAll("#modo-switch button").forEach(b=>b.onclick=()=>{
       state.modo=b.dataset.modo;
       document.querySelectorAll("#modo-switch button").forEach(x=>x.classList.toggle("on",x===b));

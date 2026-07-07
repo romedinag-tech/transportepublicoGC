@@ -580,6 +580,7 @@
             <div class="widget-h">
               <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></span>
               <div class="min-w-0"><h3 id="infra-map-title">Red de corredores</h3><span class="sub" id="infra-map-sub">plan de infraestructura vs operación real de buses</span></div>
+              <button id="infra-diag-toggle" title="Muestra los bloques (eslabones) que alimentan el conteo del eje seleccionado, coloreados por sentido y ponderados por pulsos de bus" style="margin-left:auto;flex:none;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-mid);cursor:pointer">🔍 Eslabones</button>
             </div>
             <div class="widget-b !p-2.5 flex-1">
               <div class="map-hero h-[58vh] xl:h-[560px]"><span class="corner c-tl"></span><span class="corner c-tr"></span><span class="corner c-bl"></span><span class="corner c-br"></span><div id="imap" class="w-full h-full"></div></div>
@@ -896,7 +897,7 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=150"></script>
+<script defer src="assets/app_shell.js?v=152"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
