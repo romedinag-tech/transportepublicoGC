@@ -678,10 +678,10 @@ function renderLiveExtras(){
   const cont = $("kpis2"); if(!cont) return;
   // 10º KPI: Eventos de excesos de velocidad (línea / comuna / sistema). Se agrega SIEMPRE al final.
   const _exc=(DIA&&DIA.excesos_lin)||{};
-  let _en, _esub="&gt; 80 km/h · hoy";
-  if(L){ _en=_exc[L]||0; _esub=`&gt; 80 km/h · línea ${L}`; }
-  else if(C){ const _s=new Set(CLIN[C]||[]); _en=Object.entries(_exc).filter(([l])=>_s.has(l)).reduce((a,[,v])=>a+v,0); _esub=`&gt; 80 km/h · ${C}`; }
-  else { _en=Object.values(_exc).reduce((a,v)=>a+v,0); _esub="&gt; 80 km/h · sistema"; }
+  let _en, _esub="≥70 km/h sostenidos · hoy";
+  if(L){ _en=_exc[L]||0; _esub=`≥70 km/h sostenidos · línea ${L}`; }
+  else if(C){ const _s=new Set(CLIN[C]||[]); _en=Object.entries(_exc).filter(([l])=>_s.has(l)).reduce((a,[,v])=>a+v,0); _esub=`≥70 km/h sostenidos · ${C}`; }
+  else { _en=Object.values(_exc).reduce((a,v)=>a+v,0); _esub="≥70 km/h sostenidos · sistema"; }
   const _pushExc=()=>{ const e=cont.querySelector('.klive[data-k="excesos"]'); const h=liveBoxExcesos(_en,_esub); if(e) e.outerHTML=h; else cont.insertAdjacentHTML("beforeend",h); };
   // Block 3b — el KPI de excesos SOLO va en vista LÍNEA; en vista ciudad (Gran Concepción / comuna) se quita
   const _removeExc=()=>{ const e=cont.querySelector('.klive[data-k="excesos"]'); if(e) e.remove(); };
@@ -1261,7 +1261,7 @@ function renderExcesos(){
   const sorted = Object.entries(exc).filter(e=>e[1]>0 && (!comLines || comLines.has(e[0]))).sort((a,b)=>b[1]-a[1]);
   if(!sorted.length){ el.innerHTML='<div style="text-align:center;padding:18px 0;color:var(--mut)">Sin episodios registrados hoy</div>'; return; }
   const total = sorted.reduce((s,e)=>s+e[1],0);
-  $("excesos-sub").textContent = C ? `> 80 km/h · ${total} episodios · ${C}` : `> 80 km/h · ${total} episodios hoy`;
+  $("excesos-sub").textContent = C ? `≥70 km/h sostenidos · ${total} episodios · ${C}` : `≥70 km/h sostenidos · ${total} episodios hoy (velocidad física, no instantánea)`;
   const max = sorted[0][1];
   el.innerHTML = sorted.map(([ln,n])=>{
     const emp = empresaDe(ln);
@@ -1342,7 +1342,7 @@ function drawExcesosMap(){
   if(fC) filtered=filtered.filter(e=>inComuna(e[0],e[1]));
   if(!filtered.length){setCoverLegend("exc");return;}
   for(const e of filtered){
-    const kmh=e[3], col=kmh>=100?"#dc2626":kmh>=90?"#f87171":"#fbbf24";
+    const kmh=e[3], col=kmh>=100?"#dc2626":kmh>=85?"#f87171":"#fbbf24";
     L.circleMarker([e[0],e[1]],{radius:5,color:col,fillColor:col,fillOpacity:0.8,weight:1})
       .bindTooltip(`<b>⚠ ${kmh} km/h</b><br>Línea ${e[2]}`,{direction:"top"})
       .addTo(coverLayer);
@@ -1889,7 +1889,7 @@ function setCoverLegend(mode){
     : mode==="bunch" ? [`Apelotonamiento · ${periodoLbl(state.periodo)} (CV de headways)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(120,75%,50%),hsl(60,75%,50%),hsl(0,75%,50%))"></span>`,"<span class='lbls'><i>regular</i><i></i><i>apelotonado</i></span><span class='par'>CV alto = buses pegados unos a otros</span>"]
     : mode==="det" ? ["Congestión: nodos de demora (sin terminales)",`<span class="grad" style="background:linear-gradient(90deg,hsl(45,85%,52%),hsl(0,85%,52%))"></span>`,"<span class='lbls'><i>menor</i><i>mayor</i></span><span class='par'><b style='color:#22d3ee'>▣</b> terminal · flota por línea al pasar</span>"]
     : mode==="terms" ? ["Terminales (validados manualmente)",`<span class="grad" style="background:linear-gradient(90deg,#22c55e,#22c55e)"></span>`,"<span class='lbls'><i style='color:#22c55e'>● terminal</i><i style='color:#22d3ee'>● punto de retorno</i></span><span class='par'>verde numerado = terminal formal · cyan = fin de ruta con espera breve (no es terminal, pero excluido de detención)</span>"]
-    : mode==="exc" ? ["Excesos de velocidad (> 80 km/h · hoy)",`<span class="grad" style="background:linear-gradient(90deg,#fbbf24,#f87171,#dc2626)"></span>`,"<span class='lbls'><i>80</i><i>90</i><i>100+</i></span><span class='par'>episodios registrados durante la jornada</span>"]
+    : mode==="exc" ? ["Excesos de velocidad (≥70 km/h sostenidos · hoy)",`<span class="grad" style="background:linear-gradient(90deg,#fbbf24,#f87171,#dc2626)"></span>`,"<span class='lbls'><i>70</i><i>85</i><i>100+</i></span><span class='par'>velocidad física sostenida en 1 km (no pico instantáneo)</span>"]
     : ["NSE (avalúo CLP/m²)",`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
   coverLegend = L.control({position:"bottomleft"});
   coverLegend.onAdd = ()=>{ const d=L.DomUtil.create("div","speedleg"); d.innerHTML=`<b>${txt[0]}</b>${txt[1]}${txt[2]}`; return d; };
