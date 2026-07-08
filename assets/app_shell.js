@@ -1133,6 +1133,39 @@ function iSwatch(tipos){   // indicador de tipo en el slot .ln (mismo lugar que 
   if(ts.length===1) return `<span class="ln" style="min-width:26px"><i style="background:${ITIPO[ts[0]]||'#64748b'};width:14px;height:4px;border-radius:2px;display:inline-block;vertical-align:middle"></i></span>`;
   return `<span class="ln" style="min-width:26px;display:inline-flex;gap:2px;justify-content:flex-end;align-items:center">${ts.slice(0,3).map(t=>`<i style="background:${ITIPO[t]||'#64748b'};width:6px;height:6px;border-radius:50%;display:inline-block"></i>`).join("")}</span>`;
 }
+// ---- capas nuevas del mapa de infra: velocidad (verde→rojo) y flujo direccional (cintas offset) ----
+function _ejeVelRep(nm){                 // v50 representativa (mediana horas de servicio) del eje
+  const ve=VELEJE&&VELEJE.ejes&&VELEJE.ejes[nm]; if(!ve||!ve.vel) return null;
+  const xs=ve.vel.filter((v,h)=>v!=null&&h>=6&&h<=22).sort((a,b)=>a-b);
+  return xs.length?xs[Math.floor(xs.length/2)]:null;
+}
+function _velColor(v){                    // verde (rápido) → rojo (lento)
+  if(v==null) return "#64748b";
+  const t=Math.max(0,Math.min(1,(v-8)/20)); return `hsl(${Math.round(t*120)},68%,44%)`;
+}
+function _ejeFlowPk(nm){                   // pico de flujo por sentido del eje
+  const fe=FLUJOEJES&&FLUJOEJES.ejes&&FLUJOEJES.ejes[nm]; if(!fe) return null;
+  const mx=a=>Math.max(0,...(a&&a.L||[0]));
+  return { s1:mx(fe.s1), s2:mx(fe.s2), tot:mx(fe.tot), ow:!!fe.ow };
+}
+const _MXc=111320*Math.cos(-36.83*Math.PI/180), _MYc=110540;
+function _offsetRing(pts, side, innerM, outerM){   // anillo (polígono) offset perpendicular al centerline
+  const n=pts.length; if(n<2) return null;
+  const per=[];
+  for(let i=0;i<n;i++){ const a=pts[Math.max(0,i-1)], b=pts[Math.min(n-1,i+1)];
+    let dx=(b[0]-a[0])*_MXc, dy=(b[1]-a[1])*_MYc; const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
+    per.push([side*dy, -side*dx]); }               // perpendicular unitaria (metros)
+  const off=m=>pts.map((p,i)=>[ p[1]+per[i][1]*m/_MYc, p[0]+per[i][0]*m/_MXc ]);  // [lat,lon]
+  return off(innerM).concat(off(outerM).reverse());
+}
+function _drawFlowRibbon(segs, side, flow, col, onClick, tip){   // cinta de ancho ∝ flujo a un lado del eje
+  if(!(flow>0)) return;
+  const w=Math.min(6+flow*0.55, 170);              // ancho en metros
+  segs.forEach(seg=>{ if(seg.length<2) return;
+    const ring=_offsetRing(seg, side, 4, 4+w); if(!ring) return;
+    const pg=L.polygon(ring,{stroke:false,fillColor:col,fillOpacity:0.6,smoothFactor:1.2}).addTo(imap);
+    if(tip) pg.bindTooltip(tip,{sticky:true}); if(onClick) pg.on("click",onClick); infraLayers.push(pg); });
+}
 function renderInfraPlan(){
   const P=INFRAE.plan, EF=SHOW_EFECTIVOS?(INFRAE.efectivos||[]):[];
   // agrupar los ejes del plan por NOMBRE (Colón, Carrera… aparecen varias veces con distintos tramos/tipos)
@@ -1142,13 +1175,36 @@ function renderInfraPlan(){
   const GA=Object.values(groups).sort((a,b)=>b.km-a.km);
   const selName=state.infraSel&&state.infraSel.kind==="plangrp"?state.infraSel.name:null;
   const selEf=state.infraSel&&state.infraSel.kind==="efec"?state.infraSel.e:null;
-  // MAPA: una línea por tramo, coloreada por TIPO de infraestructura; al seleccionar un eje se resalta todo su grupo.
-  P.forEach(e=>{ const on=selName===e.eje; iPoly(e.segs,ITIPO[e.tipo]||"#64748b",on?7:(e.tipo==="Corredor"?5:4.2),e.estado!=="Operación"?"6 7":null,()=>{state.infraSel={kind:"plangrp",name:e.eje};renderInfra();},`${e.eje} · ${e.tipo} · ${e.km} km · ${e.estado}`); });
-  EF.forEach(e=>{ const on=selEf===e; iPoly(e.segs,IEFECT,on?7.5:5.5,null,()=>{state.infraSel={kind:"efec",e};renderInfra();},`${e.eje} · efectivo · ${e.km} km`,0.95); });
-  // LEYENDA por tipo de infraestructura + proyecto + efectivo
+  // MAPA: modo Tipo (infra) / Velocidad (verde→rojo) / Flujo (cintas direccionales). Selección resalta el eje.
+  const MM=state.infraMapMode||"tipo";
+  const clk=e=>()=>{state.infraSel={kind:"plangrp",name:e.eje};renderInfra();};
+  if(MM==="flujo"){
+    P.forEach(e=>{ const on=selName===e.eje; iPoly(e.segs,"#94a3b8",on?2.2:1.3,null,clk(e),`${e.eje}`,0.55); });
+    P.forEach(e=>{ const pk=_ejeFlowPk(e.eje); if(!pk||pk.tot<=0) return;
+      _drawFlowRibbon(e.segs,+1,pk.s1,iflowCol(pk.s1),clk(e),`${e.eje} · ${Math.round(pk.s1)} b/h (sentido 1)`);
+      if(!pk.ow) _drawFlowRibbon(e.segs,-1,pk.s2,iflowCol(pk.s2),clk(e),`${e.eje} · ${Math.round(pk.s2)} b/h (sentido 2)`); });
+  } else if(MM==="vel"){
+    P.forEach(e=>{ const on=selName===e.eje; const v=_ejeVelRep(e.eje);
+      iPoly(e.segs,_velColor(v),on?7:5,null,clk(e),`${e.eje}${v!=null?" · "+Math.round(v)+" km/h":" · sin dato"}`); });
+  } else {
+    P.forEach(e=>{ const on=selName===e.eje; iPoly(e.segs,ITIPO[e.tipo]||"#64748b",on?7:(e.tipo==="Corredor"?5:4.2),e.estado!=="Operación"?"6 7":null,clk(e),`${e.eje} · ${e.tipo} · ${e.km} km · ${e.estado}`); });
+  }
+  if(MM==="tipo") EF.forEach(e=>{ const on=selEf===e; iPoly(e.segs,IEFECT,on?7.5:5.5,null,()=>{state.infraSel={kind:"efec",e};renderInfra();},`${e.eje} · efectivo · ${e.km} km`,0.95); });
+  // LEYENDA + narrativa según el modo del mapa
   const tAgg=INFRAE.agg_tipo||{};
-  $("infra-legend").innerHTML=Object.entries(ITIPO).filter(([k])=>k!=="—" && (tAgg[k]||0)>0.05).map(([k,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${c}"></i>${k}</span>`).join("")+`<span style="font-size:12px;color:var(--muted)">╌ en proyecto</span>`+(EF.length?`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${IEFECT}"></i>Efectivo (real)</span>`:"");
-  $("infra-narr").innerHTML=`<b>Plan de infraestructura declarada</b>: ${GA.length} ejes (${INFRAE.km_operacion} km en operación · ${(INFRAE.total_km-INFRAE.km_operacion).toFixed(1)} en proyecto). Color por <b>tipo</b> de infraestructura; punteado = proyectado.`+(EF.length?` En <span style="color:${IEFECT}">magenta</span>, los <b>ejes efectivos</b> (dónde circulan los buses), ${INFRAE.km_efectivo||0} km.`:"");
+  const lg=$("infra-legend");
+  if(MM==="vel"){
+    lg.innerHTML=`<span style="font-size:12px;color:var(--muted)">Velocidad operativa (física, laborable):</span>`+
+      `<span class="grad" style="display:inline-block;height:9px;width:150px;border-radius:5px;background:linear-gradient(90deg,hsl(0,68%,44%),hsl(60,68%,44%),hsl(120,68%,44%))"></span>`+
+      `<span style="display:inline-flex;gap:26px;font-size:11px;color:var(--muted)"><i style="font-style:normal">≤8 km/h</i><i style="font-style:normal">28+</i></span>`;
+    $("infra-narr").innerHTML=`<b>Velocidad operativa por eje</b> (v50 física, media de horas de servicio). <span style="color:hsl(120,68%,44%)">Verde</span> = fluido · <span style="color:hsl(0,68%,44%)">rojo</span> = lento/congestionado. Clic en un eje para su curva horaria.`;
+  } else if(MM==="flujo"){
+    lg.innerHTML=[[">=200","#fb7185"],["100–199","#f5a524"],["40–99","#22d3ee"],["<40","#64748b"]].map(([l,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${c}"></i>${l} b/h</span>`).join("")+`<span style="font-size:11px;color:var(--text-lo)">ancho ∝ flujo · una cinta por sentido (2 lados = bidireccional)</span>`;
+    $("infra-narr").innerHTML=`<b>Flujo de buses por eje</b> (pico horario, histórico laborable). El <b>ancho</b> de la cinta es proporcional al flujo; se dibuja <b>a un lado por sentido</b> — un solo lado = una vía, ambos = bidireccional. Clic para el detalle.`;
+  } else {
+    lg.innerHTML=Object.entries(ITIPO).filter(([k])=>k!=="—" && (tAgg[k]||0)>0.05).map(([k,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${c}"></i>${k}</span>`).join("")+`<span style="font-size:12px;color:var(--muted)">╌ en proyecto</span>`+(EF.length?`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${IEFECT}"></i>Efectivo (real)</span>`:"");
+    $("infra-narr").innerHTML=`<b>Plan de infraestructura declarada</b>: ${GA.length} ejes (${INFRAE.km_operacion} km en operación · ${(INFRAE.total_km-INFRAE.km_operacion).toFixed(1)} en proyecto). Color por <b>tipo</b> de infraestructura; punteado = proyectado.`+(EF.length?` En <span style="color:${IEFECT}">magenta</span>, los <b>ejes efectivos</b>, ${INFRAE.km_efectivo||0} km.`:"");
+  }
   $("infra-list-title").textContent="Ejes del plan"; $("infra-list-hint").textContent=`${GA.length} ejes · ${INFRAE.total_km} km`;
   // LISTA: mismo formato que las líneas del modo Operación (.litem/.ln/.nm), agrupada por nombre → cada fila = un link a la ficha del eje.
   const kmR=v=>`<span style="margin-left:auto;font-family:var(--font-data);font-size:11.5px;color:var(--muted);white-space:nowrap;padding-left:8px">${v.toFixed(1)} km</span>`;
@@ -2960,6 +3016,11 @@ function renderEvolucion(){
     const _dtg=$("infra-diag-toggle"); if(_dtg) _dtg.onclick=()=>{ state.ejeDiag=!state.ejeDiag; _dtg.classList.toggle("on",state.ejeDiag);
       _dtg.style.background=state.ejeDiag?"var(--live)":"transparent"; _dtg.style.color=state.ejeDiag?"#04211d":"var(--text-mid)";
       if(!EJEDIAG){ J("eje_diag.json").then(d=>{ EJEDIAG=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{}); } else if(state.modo==="infra") renderInfra(); };
+    if(!state.infraMapMode) state.infraMapMode="tipo";
+    document.querySelectorAll("#infra-map-modes b").forEach(b=>b.onclick=()=>{
+      state.infraMapMode=b.dataset.mm;
+      document.querySelectorAll("#infra-map-modes b").forEach(x=>x.classList.toggle("on",x===b));
+      if(state.modo==="infra") renderInfra(); });
     document.querySelectorAll("#modo-switch button").forEach(b=>b.onclick=()=>{
       state.modo=b.dataset.modo;
       document.querySelectorAll("#modo-switch button").forEach(x=>x.classList.toggle("on",x===b));
