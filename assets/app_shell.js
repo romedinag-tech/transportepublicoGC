@@ -1181,8 +1181,10 @@ function renderInfraPlan(){
   if(MM==="flujo"){
     P.forEach(e=>{ const on=selName===e.eje; iPoly(e.segs,"#94a3b8",on?2.2:1.3,null,clk(e),`${e.eje}`,0.55); });
     P.forEach(e=>{ const pk=_ejeFlowPk(e.eje); if(!pk||pk.tot<=0) return;
-      _drawFlowRibbon(e.segs,+1,pk.s1,iflowCol(pk.s1),clk(e),`${e.eje} · ${Math.round(pk.s1)} b/h (sentido 1)`);
-      if(!pk.ow) _drawFlowRibbon(e.segs,-1,pk.s2,iflowCol(pk.s2),clk(e),`${e.eje} · ${Math.round(pk.s2)} b/h (sentido 2)`); });
+      const fe=FLUJOEJES.ejes[e.eje], lb=fe&&fe.lbl||["",""];
+      // una cinta por CADA sentido con flujo>0: una-vía dibuja una sola (da igual s1 o s2); bidireccional, ambas
+      _drawFlowRibbon(e.segs,+1,pk.s1,iflowCol(pk.s1),clk(e),`${e.eje} · ${Math.round(pk.s1)} b/h ${lb[0]}`);
+      _drawFlowRibbon(e.segs,-1,pk.s2,iflowCol(pk.s2),clk(e),`${e.eje} · ${Math.round(pk.s2)} b/h ${lb[1]}`); });
   } else if(MM==="vel"){
     P.forEach(e=>{ const on=selName===e.eje; const v=_ejeVelRep(e.eje);
       iPoly(e.segs,_velColor(v),on?7:5,null,clk(e),`${e.eje}${v!=null?" · "+Math.round(v)+" km/h":" · sin dato"}`); });
