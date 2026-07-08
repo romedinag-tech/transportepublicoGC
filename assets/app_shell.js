@@ -25,7 +25,7 @@ const fmt = n => NF.format(Math.round(n||0));
 const fmt1 = n => NF.format(Math.round((n||0)*10)/10);
 const HORAS = [...Array(24).keys()].map(h=>String(h).padStart(2,"0")+"h");
 const $ = id => document.getElementById(id);
-const J = n => fetch(`data/${n}?v=100`).then(r=>r.json());
+const J = n => fetch(`data/${n}?v=101`).then(r=>r.json());
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -1208,7 +1208,7 @@ function renderInfraPlan(){
       (hasCrit?`<span class="seg" style="padding:2px"><b data-vc="0" class="${!state.velCrit?'on':''}" style="font-size:11px;padding:4px 9px">media</b><b data-vc="1" class="${state.velCrit?'on':''}" style="font-size:11px;padding:4px 9px">día crítico</b></span>`:"");
     lg.querySelectorAll('[data-vc]').forEach(b=>b.onclick=()=>{ state.velCrit=b.dataset.vc==="1"; renderInfra(); });
     $("infra-narr").innerHTML = state.velCrit
-      ? `<b>Velocidad en día crítico por eje</b> (percentil 15 de los días — un mal día típico). Comparar con <b>media</b> revela la <b>estabilidad</b>: un corredor protegido casi no cambia; uno vulnerable se pone rojo. Clic para su curva.`
+      ? `<b>Velocidad en día crítico · HORA PUNTA</b> por eje (percentil 15 de los días, 7-9 y 17-19 h). Comparar con <b>media</b> revela la <b>robustez</b>: un corredor segregado casi no cae; uno mixto colapsa en punta (rojo). Clic para su curva.`
       : `<b>Velocidad operativa media por eje</b> (v50 física). <span style="color:hsl(120,68%,44%)">Verde</span> = fluido · <span style="color:hsl(0,68%,44%)">rojo</span> = lento.${hasCrit?' Alterná a <b>día crítico</b> para ver estabilidad.':''}`;
   } else if(MM==="flujo"){
     lg.innerHTML=[[">=200","#fb7185"],["100–199","#f5a524"],["40–99","#22d3ee"],["<40","#64748b"]].map(([l,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${c}"></i>${l} b/h</span>`).join("")+`<span style="font-size:11px;color:var(--text-lo)">ancho ∝ flujo · una cinta por sentido (2 lados = bidireccional)</span>`;
