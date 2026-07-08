@@ -1143,6 +1143,11 @@ function _velColor(v){                    // verde (rápido) → rojo (lento)
   if(v==null) return "#64748b";
   const t=Math.max(0,Math.min(1,(v-8)/20)); return `hsl(${Math.round(t*120)},68%,44%)`;
 }
+function _ejeVelVal(nm){                   // velocidad a mapear: media (normal) o día crítico (estabilidad)
+  const ve=VELEJE&&VELEJE.ejes&&VELEJE.ejes[nm];
+  if(state.velCrit && ve && ve.vcrit!=null) return ve.vcrit;
+  return _ejeVelRep(nm);
+}
 function _ejeFlowPk(nm){                   // pico de flujo por sentido del eje
   const fe=FLUJOEJES&&FLUJOEJES.ejes&&FLUJOEJES.ejes[nm]; if(!fe) return null;
   const mx=a=>Math.max(0,...(a&&a.L||[0]));
@@ -1186,7 +1191,7 @@ function renderInfraPlan(){
       _drawFlowRibbon(e.segs,+1,pk.s1,iflowCol(pk.s1),clk(e),`${e.eje} · ${Math.round(pk.s1)} b/h ${lb[0]}`);
       _drawFlowRibbon(e.segs,-1,pk.s2,iflowCol(pk.s2),clk(e),`${e.eje} · ${Math.round(pk.s2)} b/h ${lb[1]}`); });
   } else if(MM==="vel"){
-    P.forEach(e=>{ const on=selName===e.eje; const v=_ejeVelRep(e.eje);
+    P.forEach(e=>{ const on=selName===e.eje; const v=_ejeVelVal(e.eje);
       iPoly(e.segs,_velColor(v),on?7:5,null,clk(e),`${e.eje}${v!=null?" · "+Math.round(v)+" km/h":" · sin dato"}`); });
   } else {
     P.forEach(e=>{ const on=selName===e.eje; iPoly(e.segs,ITIPO[e.tipo]||"#64748b",on?7:(e.tipo==="Corredor"?5:4.2),e.estado!=="Operación"?"6 7":null,clk(e),`${e.eje} · ${e.tipo} · ${e.km} km · ${e.estado}`); });
@@ -1196,10 +1201,15 @@ function renderInfraPlan(){
   const tAgg=INFRAE.agg_tipo||{};
   const lg=$("infra-legend");
   if(MM==="vel"){
-    lg.innerHTML=`<span style="font-size:12px;color:var(--muted)">Velocidad operativa (física, laborable):</span>`+
+    const hasCrit=VELEJE&&Object.values(VELEJE.ejes||{}).some(e=>e.vcrit!=null);
+    lg.innerHTML=`<span style="font-size:12px;color:var(--muted)">Velocidad ${state.velCrit?"día crítico":"media"} (física, laborable):</span>`+
       `<span class="grad" style="display:inline-block;height:9px;width:150px;border-radius:5px;background:linear-gradient(90deg,hsl(0,68%,44%),hsl(60,68%,44%),hsl(120,68%,44%))"></span>`+
-      `<span style="display:inline-flex;gap:26px;font-size:11px;color:var(--muted)"><i style="font-style:normal">≤8 km/h</i><i style="font-style:normal">28+</i></span>`;
-    $("infra-narr").innerHTML=`<b>Velocidad operativa por eje</b> (v50 física, media de horas de servicio). <span style="color:hsl(120,68%,44%)">Verde</span> = fluido · <span style="color:hsl(0,68%,44%)">rojo</span> = lento/congestionado. Clic en un eje para su curva horaria.`;
+      `<span style="display:inline-flex;gap:26px;font-size:11px;color:var(--muted)"><i style="font-style:normal">≤8 km/h</i><i style="font-style:normal">28+</i></span>`+
+      (hasCrit?`<span class="seg" style="padding:2px"><b data-vc="0" class="${!state.velCrit?'on':''}" style="font-size:11px;padding:4px 9px">media</b><b data-vc="1" class="${state.velCrit?'on':''}" style="font-size:11px;padding:4px 9px">día crítico</b></span>`:"");
+    lg.querySelectorAll('[data-vc]').forEach(b=>b.onclick=()=>{ state.velCrit=b.dataset.vc==="1"; renderInfra(); });
+    $("infra-narr").innerHTML = state.velCrit
+      ? `<b>Velocidad en día crítico por eje</b> (percentil 15 de los días — un mal día típico). Comparar con <b>media</b> revela la <b>estabilidad</b>: un corredor protegido casi no cambia; uno vulnerable se pone rojo. Clic para su curva.`
+      : `<b>Velocidad operativa media por eje</b> (v50 física). <span style="color:hsl(120,68%,44%)">Verde</span> = fluido · <span style="color:hsl(0,68%,44%)">rojo</span> = lento.${hasCrit?' Alterná a <b>día crítico</b> para ver estabilidad.':''}`;
   } else if(MM==="flujo"){
     lg.innerHTML=[[">=200","#fb7185"],["100–199","#f5a524"],["40–99","#22d3ee"],["<40","#64748b"]].map(([l,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><i class="ic-dot" style="background:${c}"></i>${l} b/h</span>`).join("")+`<span style="font-size:11px;color:var(--text-lo)">ancho ∝ flujo · una cinta por sentido (2 lados = bidireccional)</span>`;
     $("infra-narr").innerHTML=`<b>Flujo de buses por eje</b> (pico horario, histórico laborable). El <b>ancho</b> de la cinta es proporcional al flujo; se dibuja <b>a un lado por sentido</b> — un solo lado = una vía, ambos = bidireccional. Clic para el detalle.`;
