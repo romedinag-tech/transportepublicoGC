@@ -1258,18 +1258,33 @@ function _renderInfraVel(ejeName){
   const horas=[...Array(24).keys()].filter(h=>h>=5&&h<=23), x=horas.map(h=>h+"h");
   const v50=horas.map(h=>ve.vel[h]), v15=horas.map(h=>ve.v15[h]), v85=horas.map(h=>ve.v85[h]);
   const band=horas.map((h,i)=>(v85[i]!=null&&v15[i]!=null)?Math.round((v85[i]-v15[i])*10)/10:null);
+  // POR SENTIDO (cuerpo central del eje): si hay datos, dos curvas — una por dirección de circulación
+  const sd=ve.sent, lbl=ve.lbl||["sentido +","sentido −"];
+  const hasSent = sd && ["s1","s2"].some(k=>sd[k]&&sd[k].vel&&sd[k].vel.some(v=>v!=null));
   if(!infraVelChart) infraVelChart=echarts.init($("infra-chart-vel"));
-  infraVelChart.setOption({textStyle:{fontFamily:th.font,color:th.tx},grid:{left:8,right:12,top:14,bottom:20,containLabel:true},
-    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},
-      formatter:p=>{const q=p.find(z=>z.seriesName==="v50"); if(!q||q.value==null) return p[0].axisValue;
-        const i=horas.indexOf(parseInt(p[0].axisValue)); return `${p[0].axisValue}<br><b>${Math.round(q.value)}</b> km/h (mediana)<br>p15–p85: ${v15[i]}–${v85[i]} km/h`;}},
-    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
-    yAxis:{type:"value",name:"km/h",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
-    series:[
+  let series, legend={show:false}, tipFmt, top=14;
+  if(hasSent){
+    const S=["s1","s2"], SC=["#34E1C4","#f87171"];
+    series=S.map((k,i)=> (sd[k]&&sd[k].vel) ? {name:lbl[i]||("sentido "+(i?"−":"+")),type:"line",smooth:true,symbol:"none",
+        connectNulls:true,data:horas.map(h=>sd[k].vel[h]),lineStyle:{width:2.6,color:SC[i]},itemStyle:{color:SC[i]}} : null).filter(Boolean);
+    legend={data:series.map(s=>s.name),textStyle:{color:th.mut,fontSize:10},top:0}; top=28;
+    tipFmt=p=>{ if(!p||!p.length) return ""; let s=`${p[0].axisValue} · km/h`;
+      p.forEach(z=>{ if(z.value!=null) s+=`<br><span style="color:${z.color}">●</span> ${z.seriesName}: <b>${Math.round(z.value)}</b>`; }); return s; };
+  } else {
+    series=[
       {name:"_base",type:"line",data:v15,stack:"b",lineStyle:{opacity:0},symbol:"none",silent:true,areaStyle:{opacity:0},tooltip:{show:false}},
       {name:"_band",type:"line",data:band,stack:"b",lineStyle:{opacity:0},symbol:"none",silent:true,areaStyle:{color:col,opacity:0.12},tooltip:{show:false}},
       {name:"v50",type:"line",data:v50,smooth:true,symbol:"none",lineStyle:{width:2.6,color:col},itemStyle:{color:col}}
-    ]},true);
+    ];
+    tipFmt=p=>{const q=p.find(z=>z.seriesName==="v50"); if(!q||q.value==null) return p[0].axisValue;
+      const i=horas.indexOf(parseInt(p[0].axisValue)); return `${p[0].axisValue}<br><b>${Math.round(q.value)}</b> km/h (mediana)<br>p15–p85: ${v15[i]}–${v85[i]} km/h`;};
+  }
+  infraVelChart.setOption({textStyle:{fontFamily:th.font,color:th.tx},grid:{left:8,right:12,top,bottom:20,containLabel:true},
+    legend,
+    tooltip:{trigger:"axis",backgroundColor:th.tip,borderColor:th.tipB,textStyle:{color:th.tx},formatter:tipFmt},
+    xAxis:{type:"category",data:x,axisLabel:{color:th.mut,fontSize:9,interval:1},axisLine:{lineStyle:{color:th.axis}}},
+    yAxis:{type:"value",name:"km/h",nameTextStyle:{color:th.mut,fontSize:10},axisLabel:{color:th.mut},splitLine:{lineStyle:{color:th.grid}}},
+    series},true);
   setTimeout(()=>{if(infraVelChart)infraVelChart.resize();},60);
 }
 // #2 — excesos de velocidad sostenidos por línea × mes (barras apiladas)
