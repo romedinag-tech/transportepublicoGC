@@ -10,5 +10,6 @@ window.CITY = {
   live: true,                           // feed GTFS-RT en vivo
   liveBase: "https://storage.googleapis.com/gccp-transporte-live/",
   repo: "transportepublicoGC",
+  rich: true,                           // tiene EOD + catastro SII → modos Transbordo/Salud/Educación/NSE
   voz: { ejeSing: "corredor", ejePlur: "corredores", EjePlur: "Corredores" },
 };

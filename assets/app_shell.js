@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=206`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=207`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -64,7 +64,15 @@ const IEFECT="#e879f9";   // capa "ejes efectivos" (corredores reales dibujados 
 const SHOW_EFECTIVOS=false;   // Carrera/PAC ya están en el plan → la capa efectivos quedó redundante; se oculta (reversible)
 let csChart, freqChart, linFreqChart, lineFreqHistChart, rankProgChart, lmap, baseLayers, routeLayer, comunaLayer, stopLayer, liveLayer, liveCanvas, coverLayer, coverCanvas, speedLegend, coverLegend;
 const LIVE_URL = _liveUrl("live.json");
-const MAP_MODES = [...(CITY.live?[["live","En vivo"]]:[]),["conges","Congestión"],["cover","Cobertura"],["trans","Transbordo"],["wait","Espera"],["bunch","Bunching"],["det","Detenciones"],["terms","Terminales"],["exc","Excesos vel."],["salud","Salud"],["edu","Educación"],["nse","NSE"]];
+// Modos del mapa gateados por lo que la ciudad TIENE datos: 'live'/'exc' solo con feed; trans/salud/edu/nse
+// requieren EOD + catastro SII (CITY.rich, hoy solo GCCP). Así una ciudad estática no muestra modos vacíos.
+const MAP_MODES = [
+  ...(CITY.live ? [["live","En vivo"]] : []),
+  ["conges","Congestión"], ["cover","Cobertura"], ["wait","Espera"], ["bunch","Bunching"],
+  ["det","Detenciones"], ["terms","Terminales"],
+  ...(CITY.live ? [["exc","Excesos vel."]] : []),
+  ...(CITY.rich ? [["trans","Transbordo"], ["salud","Salud"], ["edu","Educación"], ["nse","NSE"]] : []),
+];
 const PEAK_H = [7,8,9,17,18,19];
 const PERIODOS = [["agg","Agregado"],["am","Punta AM"],["md","Mediodía"],["pm","Punta PM"],["off","Fuera punta"],["noche","Noche"]];
 const PERIODO_H = {agg:[6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22], am:[7,8,9], md:[12,13,14], pm:[17,18,19], off:[10,11,15,16,20,21,22], noche:[21,22,23]};
@@ -105,7 +113,7 @@ function toggleTheme(){
 }
 
 const cellOf = () => (T.cells[`${state.comuna}|${state.linea}`] || {kpi:null, horas:[]});
-const empresaDe = ln => { const x=(T.lineas||[]).find(l=>l.linea===ln); return x?x.empresa:""; };
+const empresaDe = ln => { const x=(T.lineas||[]).find(l=>l.linea===ln); return (x&&x.empresa)?x.empresa:""; };
 
 /* ---------- menús ---------- */
 const COVER_SUBS = [["est","Estática"],["din","Dinámica"],["od","Oferta/demanda"]];   // 'din' reemplaza 'of' (2026-06-28): modelo cápsula 2 min + 300 m, frac=min(1,f/30)
@@ -2197,7 +2205,7 @@ function renderMapa(){
   if(fitScope!==lastFitScope){ lastFitScope=fitScope;
     try{ if(bounds && (bounds.length||bounds.isValid&&bounds.isValid())) lmap.fitBounds(bounds,{padding:[20,20]}); }catch(e){}
   }
-  const ambito = state.comuna==="TODAS" ? "el Antofagasta" : state.comuna;
+  const ambito = state.comuna==="TODAS" ? CITY.nombre : state.comuna;
   const seg = $("map-mode"); if(seg) seg.style.display = "";
   if(state.mapMode!=="live"){
     liveLayer.clearLayers();
@@ -2479,7 +2487,7 @@ function renderNarrative(){
     } else el.innerHTML="";
     return;
   }
-  const M=state.mapMode, amb = state.linea!=="TODAS" ? `manzanas de la línea ${state.linea}` : (state.comuna==="TODAS"?"el Antofagasta":state.comuna);
+  const M=state.mapMode, amb = state.linea!=="TODAS" ? `manzanas de la línea ${state.linea}` : (state.comuna==="TODAS"?CITY.nombre:state.comuna);
   const pu=state.purpose||"all", per=state.periodo, pl=purposeLbl(pu);
   const pe = pu!=="all" ? ` de ${pl}` : "";
   let txt="";
