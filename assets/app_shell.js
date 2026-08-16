@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=205`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=206`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -138,6 +138,7 @@ function initCityChrome(){
   const set=(sel,html,attr)=>{ const el=typeof sel==="string"?document.querySelector(sel):sel; if(el){ if(attr) el.setAttribute(attr,html); else el.innerHTML=html; } };
   set(".hero-logo", CITY.sigla||nom.slice(0,2).toUpperCase());
   set(".hero-content h1", "TRANSPORTE PÚBLICO<br>"+nom.toUpperCase());
+  set("#tb-title", "Transporte · "+nom);
   // indicador de estado: feed en vivo (dot + edad) para ciudades LIVE; análisis histórico para estáticas
   set("#hdr-status", CITY.live
       ? `<span class="dot-live"></span><span>actualizado hace <span id="live-age" class="font-mono text-[var(--tx)]">—</span></span>`
@@ -148,7 +149,15 @@ function initCityChrome(){
   set("#infra-detail-title", `Detalle del ${V.ejeSing}`);
   const isc=$("infra-search"); if(isc) isc.setAttribute("placeholder", `Buscar ${V.ejeSing}…`);
   const ilt=$("infra-list-title"); if(ilt) ilt.textContent = `${V.EjePlur} con transporte público`;
-  // metadatos de la página (canonical/OG) + título
+  // link de GitHub del header → repo de la ciudad
+  if(CITY.repo){ const gh=$("hdr-github"); if(gh) gh.setAttribute("href", `https://github.com/romedinag-tech/${CITY.repo}`); }
+  // metadatos de la página (título, descripción, canonical/OG) desde CITY
+  const tituloPag = `Centro de Mando · Transporte ${nom}`;
+  const desc = `Analítica del transporte público de ${nom}: flota, velocidad, cobertura y cumplimiento sobre registros GPS.`;
+  set('meta[name="description"]', desc, "content");
+  document.querySelectorAll('meta[property="og:title"],meta[name="twitter:title"]').forEach(m=>m.setAttribute("content",tituloPag));
+  document.querySelectorAll('meta[property="og:description"],meta[name="twitter:description"]').forEach(m=>m.setAttribute("content",desc));
+  set('meta[property="og:site_name"]', `Transporte · ${nom}`, "content");
   if(CITY.repo){ const u=`https://romedinag-tech.github.io/${CITY.repo}/`;
     set('link[rel="canonical"]', u, "href");
     document.querySelectorAll('meta[property="og:url"]').forEach(m=>m.setAttribute("content",u));
@@ -2095,7 +2104,7 @@ function setCoverLegend(mode){
   const GYR = `<span class="grad" style="background:linear-gradient(90deg,hsl(0,70%,50%),hsl(60,70%,50%),hsl(120,70%,50%))"></span>`;
   const NEU = `<span class="grad" style="background:#64748b;opacity:.5"></span>`;
   const txt = (mode==="cover" && state.coverSub==="din") ? [`Cobertura dinámica · ${periodoLbl(state.periodo)}`,GYR,`<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>% del tiempo cubierto por algún bus (modelo cápsula 2 min + 300 m) · cambia con el período</span>`]
-    : (mode==="cover" && state.coverSub==="od") ? [`Cobertura oferta/demanda · ${periodoLbl(state.periodo)}`,GYR,`<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>capacidad ÷ viajes generados · 100% = zona residencial mejor cubierta (Talcahuano/San Pedro/Chiguayante), no el centro · reparto por demanda</span>`]
+    : (mode==="cover" && state.coverSub==="od") ? [`Cobertura oferta/demanda · ${periodoLbl(state.periodo)}`,GYR,`<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>capacidad ÷ viajes generados · 100% = zona residencial mejor cubierta (las mejor conectadas), no el centro · reparto por demanda</span>`]
     : (mode==="cover" && state.linea!=="TODAS") ? [`NSE hogares cubiertos · Línea ${state.linea}`,`<span class="grad" style="background:linear-gradient(90deg,#fb923c 33%,#94a3b8 33% 66%,#2dd4bf 66%)"></span>`,"<span class='lbls'><i>bajo</i><i>medio</i><i>alto</i></span><span class='par'>terciles de avalúo fiscal del suelo (CLP/m²) — solo manzanas cubiertas a ≤300 m</span>"]
     : mode==="cover" ? ["Cobertura estática (≤300 m de la red)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>% de la manzana dentro del área de influencia 300 m de los recorridos</span>"]
     : mode==="trans" ? ["Transbordo: viajes-trabajo con UNA línea (Censo 2024)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>verde = llega directo con una línea · rojo = exige transbordo o es inalcanzable</span>"]
@@ -2478,7 +2487,7 @@ function renderNarrative(){
     const v=scopeWavg(p=>p.cob_din&&p.cob_din[per]);
     txt=`<b>Cobertura dinámica</b>: ¿qué tan seguido pasa un bus cerca de mí? Modelo: cada bus cubre una <b>cápsula de 2 min + 300 m</b> al pasar por su trazado, así que <code>frac = min(1, f/30)</code> donde <code>f</code> es la frecuencia observada en bus/h. Por manzana combina todas las líneas que la cubren (P_total = 1 − Π(1−frac_i)). En <b>${periodoLbl(per)}</b>: verde = el bus pasa casi continuamente; rojo = pasa raramente. ${v!=null?`Media en ${amb}: <b>${(v*100).toFixed(0)}%</b> del tiempo. `:""}Compara <b>Punta AM con Noche</b>: aunque el trazado exista, de noche la frecuencia cae y la cobertura efectiva se desploma.`;
   } else if(M==="cover" && state.coverSub==="od"){
-    txt=`<b>Cobertura oferta/demanda</b>: contrasta la <b>capacidad ofrecida</b> con la <b>demanda de viajes-TP</b> que genera cada manzana (hogares × tasa de generación EOD por hora). Para no doble-contar la capacidad compartida del corredor, se <b>reparte por demanda</b>. Se muestra <b>relativo a una zona residencial bien cubierta</b> (Talcahuano/San Pedro/Chiguayante = 100%), <b>no</b> al centro de Concepción — que por ser atractor concentra todas las líneas y distorsionaría la comparación de generación. En <b>${periodoLbl(per)}</b>: verde = bien servida frente a su demanda; rojo = oferta corta. Cruza con la Noche para ver dónde la demanda persiste pero la oferta cae.`;
+    txt=`<b>Cobertura oferta/demanda</b>: contrasta la <b>capacidad ofrecida</b> con la <b>demanda de viajes-TP</b> que genera cada manzana (hogares × tasa de generación EOD por hora). Para no doble-contar la capacidad compartida del corredor, se <b>reparte por demanda</b>. Se muestra <b>relativo a una zona residencial bien cubierta</b> (las zonas mejor conectadas = 100%), <b>no</b> al centro de Concepción — que por ser atractor concentra todas las líneas y distorsionaría la comparación de generación. En <b>${periodoLbl(per)}</b>: verde = bien servida frente a su demanda; rojo = oferta corta. Cruza con la Noche para ver dónde la demanda persiste pero la oferta cae.`;
   } else if(M==="cover"){
     const v=scopeWavg(p=>p.cob_est);
     txt=`<b>Cobertura estática</b> mide qué parte del territorio construido queda dentro del <b>área de influencia de 300 m</b> de los recorridos (buffer sobre el trazado oficial). Verde = la manzana está cubierta por la red; rojo = fuera del alcance peatonal de cualquier recorrido. ${v!=null?`En ${amb}, en promedio el <b>${v.toFixed(0)}%</b> de cada manzana está cubierto. `:""}Es la cobertura geográfica pura: aún no considera con qué frecuencia pasan los buses (eso es la cobertura dinámica – oferta).`;

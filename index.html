@@ -3,39 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Antofagasta · Centro de Mando</title>
-<meta name="description" content="Centro de mando analítico del transporte público de Antofagasta: flota, velocidad, cumplimiento GTFS vs GPS y geometría oficial sobre 11 millones de registros.">
-<!-- F5: SEO / compartibilidad (OG + Twitter + canonical) -->
-<link rel="canonical" href="https://romedinag-tech.github.io/transportepublicoGC/">
+<title>Centro de Mando · Transporte Público</title>
+<meta name="description" content="Centro de mando analítico del transporte público: flota, velocidad, cumplimiento GTFS vs GPS y geometría oficial sobre registros GPS.">
+<!-- F5: SEO / compartibilidad — los específicos de ciudad los completa initCityChrome() desde CITY -->
+<link rel="canonical" href="https://romedinag-tech.github.io/">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="es_CL">
-<meta property="og:site_name" content="Transporte · Antofagasta">
-<meta property="og:title" content="Centro de Mando · Transporte Antofagasta">
-<meta property="og:description" content="Analítica en vivo de las 36 líneas del transporte público de las 7 comunas conurbadas (Antofagasta, Talcahuano, San Pedro de la Paz, Hualpén, Chiguayante, Penco, Hualqui). Buses operando ahora, velocidad, cobertura y cumplimiento contra 302 M registros GPS.">
-<meta property="og:url" content="https://romedinag-tech.github.io/transportepublicoGC/">
-<meta property="og:image" content="https://romedinag-tech.github.io/transportepublicoGC/assets/og.png">
+<meta property="og:site_name" content="Centro de Mando · Transporte">
+<meta property="og:title" content="Centro de Mando · Transporte">
+<meta property="og:description" content="Analítica del transporte público: flota, velocidad, cobertura y cumplimiento sobre registros GPS.">
+<meta property="og:url" content="https://romedinag-tech.github.io/">
+<meta property="og:image" content="assets/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Mapa del transporte público de Antofagasta con buses en vivo y KPIs">
+<meta property="og:image:alt" content="Mapa del transporte público con buses y KPIs">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Centro de Mando · Transporte Antofagasta">
-<meta name="twitter:description" content="Analítica en vivo del transporte público de Antofagasta.">
-<meta name="twitter:image" content="https://romedinag-tech.github.io/transportepublicoGC/assets/og.png">
+<meta name="twitter:title" content="Centro de Mando · Transporte">
+<meta name="twitter:description" content="Analítica del transporte público sobre registros GPS.">
+<meta name="twitter:image" content="assets/og.png">
 <meta name="theme-color" content="#060912">
 <!-- Fonts: Space Grotesk (display), IBM Plex Sans (UI), IBM Plex Mono (data) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Design tokens: single source of truth for color/type/space (loaded FIRST) -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=205">
+<link rel="stylesheet" href="assets/css/tokens.css?v=206">
 <!-- Leaflet self-hosted -->
-<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=205"/>
-<script defer src="assets/vendor/leaflet/leaflet.js?v=205"></script>
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=206"/>
+<script defer src="assets/vendor/leaflet/leaflet.js?v=206"></script>
 <!-- Component styles (consume tokens via legacy bridge vars) -->
-<link rel="stylesheet" href="assets/styles.css?v=205">
-<link rel="stylesheet" href="assets/shell.css?v=205">
+<link rel="stylesheet" href="assets/styles.css?v=206">
+<link rel="stylesheet" href="assets/shell.css?v=206">
 <!-- Tailwind purged utilities (~12 KB static, no runtime recompilation) -->
-<link rel="stylesheet" href="assets/tw.css?v=205">
+<link rel="stylesheet" href="assets/tw.css?v=206">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
@@ -361,10 +361,10 @@
 <!-- F4: respaldo cuando JavaScript está deshabilitado (antes página en blanco) -->
 <noscript>
   <div style="max-width:640px;margin:60px auto;padding:30px;border:1px solid #1f2937;border-radius:14px;background:#0d1424;color:#e8eef8;font-family:Inter,sans-serif;line-height:1.55">
-    <h1 style="font-size:18px;margin-bottom:10px;color:#22d3ee">Centro de Mando · Transporte Antofagasta</h1>
-    <p style="font-size:14px;color:#93a1ba;margin-bottom:14px">Este visor requiere JavaScript activado para mostrar los mapas en vivo, los KPIs y los gráficos interactivos sobre los 11 millones de registros GPS del sistema.</p>
-    <p style="font-size:13px;color:#64718c">Para ver capturas estáticas y la metodología del proyecto, visita el repositorio:<br>
-      <a href="https://github.com/romedinag-tech/transportepublicoAntofagasta" style="color:var(--ref,#6C8FF5)">github.com/romedinag-tech/transportepublicoAntofagasta</a>
+    <h1 style="font-size:18px;margin-bottom:10px;color:#22d3ee">Centro de Mando · Transporte Público</h1>
+    <p style="font-size:14px;color:#93a1ba;margin-bottom:14px">Este visor requiere JavaScript activado para mostrar los mapas, los KPIs y los gráficos interactivos sobre los registros GPS del sistema.</p>
+    <p style="font-size:13px;color:#64718c">Para ver la metodología del proyecto, visita el repositorio en:<br>
+      <a href="https://github.com/romedinag-tech" style="color:var(--ref,#6C8FF5)">github.com/romedinag-tech</a>
     </p>
   </div>
 </noscript>
@@ -373,8 +373,8 @@
 <div id="hero-splash">
   <canvas id="hero-canvas"></canvas>
   <div class="hero-content">
-    <div class="hero-logo">AF</div>
-    <h1>TRANSPORTE PÚBLICO<br>ANTOFAGASTA</h1>
+    <div class="hero-logo"></div>
+    <h1>TRANSPORTE PÚBLICO</h1>
     <p>CENTRO DE MANDO · ANALÍTICA GPS</p>
     <div class="hero-load"><span></span></div>
     <div class="hero-skip">toca para entrar</div>
@@ -437,7 +437,7 @@
     <div class="hdr-center flex items-center gap-3 min-w-0">
       <!-- F5++: logo SVG inline — Campanil de la Universidad de Antofagasta, ícono geográfico
            emblemático de la ciudad. Torre vertical estilizada (base, cuerpo, cabezal con reloj, pico). -->
-      <svg class="tb-logo" viewBox="0 0 32 40" width="38" height="46" aria-label="Transporte Antofagasta · Campanil UdeC" role="img">
+      <svg class="tb-logo" viewBox="0 0 32 40" width="38" height="46" aria-label="Transporte público" role="img">
         <defs>
           <linearGradient id="gcMark" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#22d3ee"/>
@@ -468,7 +468,7 @@
       </svg>
       <div class="leading-tight min-w-0 hidden xs:block sm:block">
         <!-- Block 1: ROL 1 — título/identidad dominante (font-display, tokens). Ancla visual #1. -->
-        <b class="tb-title block truncate">Transporte · Antofagasta</b>
+        <b id="tb-title" class="tb-title block truncate">Transporte Público</b>
         <span class="tb-sub">Centro de Mando · Analítica GPS</span>
       </div>
     </div><!-- /hdr-center -->
@@ -484,7 +484,7 @@
         <span id="hdr-reloj-txt">—</span>
       </span>
       <button id="theme-btn" class="themebtn" onclick="toggleTheme()" title="Tema claro/oscuro" aria-label="Tema">☀</button>
-      <a href="https://github.com/romedinag-tech/transportepublicoGC" target="_blank" rel="noopener" class="grid place-items-center w-8 h-8 rounded-lg border border-[var(--line2)] text-[var(--muted)] hover:text-[var(--acc)] hover:border-[var(--acc)]" title="GitHub" aria-label="GitHub">
+      <a id="hdr-github" href="#" target="_blank" rel="noopener" class="grid place-items-center w-8 h-8 rounded-lg border border-[var(--line2)] text-[var(--muted)] hover:text-[var(--acc)] hover:border-[var(--acc)]" title="GitHub" aria-label="GitHub">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 8.84 21.5c.5.08.66-.22.66-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.57.67.48A10 10 0 0 0 12 2Z"/></svg>
       </a>
     </div>
@@ -630,7 +630,7 @@
         <!-- MAPA HÉROE (2/3) -->
         <section class="widget xl:col-span-2 flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=205" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=206" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -795,7 +795,7 @@
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=205" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=206" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -897,7 +897,7 @@
       </template>
 
       <footer class="vfoot !border-0 !mt-2">
-        <span id="vfoot-build">Visor actualizado: —</span> · <span id="vfoot-data">Datos hasta: —</span> · <span class="vfoot-dim">histórico refrescado semanalmente · 302 M registros GPS</span>
+        <span id="vfoot-build">Visor actualizado: —</span> · <span id="vfoot-data">Datos hasta: —</span> · <span class="vfoot-dim">análisis sobre registros GPS del sistema</span>
       </footer>
     </main>
   </div>
@@ -905,8 +905,8 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script src="config.js?v=205"></script>
-<script defer src="assets/app_shell.js?v=205"></script>
+<script src="config.js?v=206"></script>
+<script defer src="assets/app_shell.js?v=206"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
