@@ -3,23 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GCCP · Centro de Mando · Transporte Gran Concepción</title>
-<meta name="description" content="Centro de mando analítico del transporte público del Gran Concepción: flota, velocidad, cumplimiento GTFS vs GPS y geometría oficial sobre 302 millones de registros.">
+<title>Antofagasta · Centro de Mando</title>
+<meta name="description" content="Centro de mando analítico del transporte público de Antofagasta: flota, velocidad, cumplimiento GTFS vs GPS y geometría oficial sobre 11 millones de registros.">
 <!-- F5: SEO / compartibilidad (OG + Twitter + canonical) -->
 <link rel="canonical" href="https://romedinag-tech.github.io/transportepublicoGC/">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="es_CL">
-<meta property="og:site_name" content="Transporte · Gran Concepción">
-<meta property="og:title" content="Centro de Mando · Transporte Gran Concepción">
-<meta property="og:description" content="Analítica en vivo de las 36 líneas del transporte público de las 7 comunas conurbadas (Concepción, Talcahuano, San Pedro de la Paz, Hualpén, Chiguayante, Penco, Hualqui). Buses operando ahora, velocidad, cobertura y cumplimiento contra 302 M registros GPS.">
+<meta property="og:site_name" content="Transporte · Antofagasta">
+<meta property="og:title" content="Centro de Mando · Transporte Antofagasta">
+<meta property="og:description" content="Analítica en vivo de las 36 líneas del transporte público de las 7 comunas conurbadas (Antofagasta, Talcahuano, San Pedro de la Paz, Hualpén, Chiguayante, Penco, Hualqui). Buses operando ahora, velocidad, cobertura y cumplimiento contra 302 M registros GPS.">
 <meta property="og:url" content="https://romedinag-tech.github.io/transportepublicoGC/">
 <meta property="og:image" content="https://romedinag-tech.github.io/transportepublicoGC/assets/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Mapa del transporte público del Gran Concepción con buses en vivo y KPIs">
+<meta property="og:image:alt" content="Mapa del transporte público de Antofagasta con buses en vivo y KPIs">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Centro de Mando · Transporte Gran Concepción">
-<meta name="twitter:description" content="Analítica en vivo del transporte público del Gran Concepción.">
+<meta name="twitter:title" content="Centro de Mando · Transporte Antofagasta">
+<meta name="twitter:description" content="Analítica en vivo del transporte público de Antofagasta.">
 <meta name="twitter:image" content="https://romedinag-tech.github.io/transportepublicoGC/assets/og.png">
 <meta name="theme-color" content="#060912">
 <!-- Fonts: Space Grotesk (display), IBM Plex Sans (UI), IBM Plex Mono (data) -->
@@ -27,15 +27,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Design tokens: single source of truth for color/type/space (loaded FIRST) -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=94">
+<link rel="stylesheet" href="assets/css/tokens.css?v=204">
 <!-- Leaflet self-hosted -->
-<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=75"/>
-<script defer src="assets/vendor/leaflet/leaflet.js?v=75"></script>
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=204"/>
+<script defer src="assets/vendor/leaflet/leaflet.js?v=204"></script>
 <!-- Component styles (consume tokens via legacy bridge vars) -->
-<link rel="stylesheet" href="assets/styles.css?v=94">
-<link rel="stylesheet" href="assets/shell.css?v=93">
+<link rel="stylesheet" href="assets/styles.css?v=204">
+<link rel="stylesheet" href="assets/shell.css?v=204">
 <!-- Tailwind purged utilities (~12 KB static, no runtime recompilation) -->
-<link rel="stylesheet" href="assets/tw.css?v=92">
+<link rel="stylesheet" href="assets/tw.css?v=204">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
@@ -240,7 +240,7 @@
   .modo-big button svg{opacity:.7}
   .modo-big button:hover{color:var(--tx);background:var(--hover)}
   .modo-big button.on{background:var(--live-tint);color:var(--live);box-shadow:inset 0 -2px 0 var(--live)}
-  /* Block 1c — cabecera de ámbito sobre los KPIs: se oculta el "Gran Concepción · 36 líneas · 12 comunas"
+  /* Block 1c — cabecera de ámbito sobre los KPIs: se oculta el "Antofagasta · 36 líneas · 12 comunas"
      (redundante con la comuna-bar y el menú de líneas). El elemento queda en DOM para el JS. */
   #scope-title,#scope-sub{display:none}
   /* Block 6 — responsive: barras de control anchas (modos del mapa, selectores) no se recortan en
@@ -361,10 +361,10 @@
 <!-- F4: respaldo cuando JavaScript está deshabilitado (antes página en blanco) -->
 <noscript>
   <div style="max-width:640px;margin:60px auto;padding:30px;border:1px solid #1f2937;border-radius:14px;background:#0d1424;color:#e8eef8;font-family:Inter,sans-serif;line-height:1.55">
-    <h1 style="font-size:18px;margin-bottom:10px;color:#22d3ee">Centro de Mando · Transporte Gran Concepción</h1>
-    <p style="font-size:14px;color:#93a1ba;margin-bottom:14px">Este visor requiere JavaScript activado para mostrar los mapas en vivo, los KPIs y los gráficos interactivos sobre los 302 millones de registros GPS del sistema.</p>
+    <h1 style="font-size:18px;margin-bottom:10px;color:#22d3ee">Centro de Mando · Transporte Antofagasta</h1>
+    <p style="font-size:14px;color:#93a1ba;margin-bottom:14px">Este visor requiere JavaScript activado para mostrar los mapas en vivo, los KPIs y los gráficos interactivos sobre los 11 millones de registros GPS del sistema.</p>
     <p style="font-size:13px;color:#64718c">Para ver capturas estáticas y la metodología del proyecto, visita el repositorio:<br>
-      <a href="https://github.com/romedinag-tech/transportepublicoGC" style="color:var(--ref,#6C8FF5)">github.com/romedinag-tech/transportepublicoGC</a>
+      <a href="https://github.com/romedinag-tech/transportepublicoAntofagasta" style="color:var(--ref,#6C8FF5)">github.com/romedinag-tech/transportepublicoAntofagasta</a>
     </p>
   </div>
 </noscript>
@@ -373,8 +373,8 @@
 <div id="hero-splash">
   <canvas id="hero-canvas"></canvas>
   <div class="hero-content">
-    <div class="hero-logo">GC</div>
-    <h1>TRANSPORTE PÚBLICO<br>GRAN CONCEPCIÓN</h1>
+    <div class="hero-logo">AF</div>
+    <h1>TRANSPORTE PÚBLICO<br>ANTOFAGASTA</h1>
     <p>CENTRO DE MANDO · ANALÍTICA GPS</p>
     <div class="hero-load"><span></span></div>
     <div class="hero-skip">toca para entrar</div>
@@ -435,9 +435,9 @@
     </div>
     </div><!-- /hdr-left -->
     <div class="hdr-center flex items-center gap-3 min-w-0">
-      <!-- F5++: logo SVG inline — Campanil de la Universidad de Concepción, ícono geográfico
+      <!-- F5++: logo SVG inline — Campanil de la Universidad de Antofagasta, ícono geográfico
            emblemático de la ciudad. Torre vertical estilizada (base, cuerpo, cabezal con reloj, pico). -->
-      <svg class="tb-logo" viewBox="0 0 32 40" width="38" height="46" aria-label="Transporte Gran Concepción · Campanil UdeC" role="img">
+      <svg class="tb-logo" viewBox="0 0 32 40" width="38" height="46" aria-label="Transporte Antofagasta · Campanil UdeC" role="img">
         <defs>
           <linearGradient id="gcMark" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#22d3ee"/>
@@ -468,17 +468,14 @@
       </svg>
       <div class="leading-tight min-w-0 hidden xs:block sm:block">
         <!-- Block 1: ROL 1 — título/identidad dominante (font-display, tokens). Ancla visual #1. -->
-        <b class="tb-title block truncate">Transporte · Gran Concepción</b>
+        <b class="tb-title block truncate">Transporte · Antofagasta</b>
         <span class="tb-sub">Centro de Mando · Analítica GPS</span>
       </div>
     </div><!-- /hdr-center -->
 
     <div class="hdr-right">
-    <!-- estado vivo: última actualización del feed GTFS-RT -->
-    <span class="status hidden md:inline-flex" title="Última actualización del feed GTFS-RT">
-      <span class="dot-live"></span>
-      <span>actualizado hace <span id="live-age" class="font-mono text-[var(--tx)]">—</span></span>
-    </span>
+    <!-- indicador de estado: lo llena initCityChrome() según CITY.live (feed GTFS-RT vs análisis histórico) -->
+    <span id="hdr-status" class="status hidden md:inline-flex"></span>
     <!-- Block 1b: pill "buses operando" removida del header (dato redundante con los KPIs) -->
 
     <div class="flex items-center gap-2">
@@ -533,9 +530,9 @@
       <div id="infra-sidebar" style="display:none">
         <div class="flex items-center gap-2 px-1 mb-2">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[var(--dim)]"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>
-          <span id="infra-list-title" class="text-[10.5px] font-semibold tracking-[.12em] text-[var(--dim)] uppercase">Ejes · Corredores</span>
+          <span id="infra-list-title" class="text-[10.5px] font-semibold tracking-[.12em] text-[var(--dim)] uppercase">Ejes con transporte público</span>
         </div>
-        <input class="side-search" id="infra-search" placeholder="Buscar corredor…" autocomplete="off">
+        <input class="side-search" id="infra-search" placeholder="Buscar eje…" autocomplete="off">
         <div id="infra-list-hint" class="text-[10px] text-[var(--dim)] px-1 pt-1 pb-0.5"></div>
         <div id="infra-list"></div>
       </div>
@@ -579,7 +576,7 @@
           <section class="widget xl:col-span-2 flex flex-col">
             <div class="widget-h">
               <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></span>
-              <div class="min-w-0"><h3 id="infra-map-title">Red de corredores</h3><span class="sub" id="infra-map-sub">plan de infraestructura vs operación real de buses</span></div>
+              <div class="min-w-0"><h3 id="infra-map-title">Principales ejes con transporte público</h3><span class="sub" id="infra-map-sub">ejes viales por los que circulan los buses · operación real</span></div>
               <div id="infra-map-modes" class="seg" style="margin-left:auto;flex:none">
                 <b data-mm="tipo" class="on">Tipo</b><b data-mm="vel">Velocidad</b><b data-mm="flujo">Flujo</b>
               </div>
@@ -594,14 +591,22 @@
             <section class="widget flex-1" id="infra-detail-card">
               <div class="widget-h">
                 <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l5-6 4 4 5-9 4 6"/></svg></span>
-                <div class="min-w-0"><h3 id="infra-detail-title">Detalle del corredor</h3><span class="sub" id="infra-detail-sub">elegí un eje a la izquierda</span></div>
+                <div class="min-w-0"><h3 id="infra-detail-title">Detalle del eje</h3><span class="sub" id="infra-detail-sub">elegí un eje a la izquierda</span></div>
               </div>
               <div class="widget-b">
-                <div id="infra-detail-empty" class="sub" style="color:var(--muted);padding:24px 4px;text-align:center;line-height:1.6">Seleccioná un corredor en la lista de la izquierda o en el mapa para ver su <b>curva horaria de buses/h</b>, velocidad y cobertura de infraestructura.</div>
+                <div id="infra-detail-empty" class="sub" style="color:var(--muted);padding:24px 4px;text-align:center;line-height:1.6">Seleccioná un eje en la lista de la izquierda o en el mapa para ver su <b>curva horaria de buses/h</b>, velocidad y cobertura de infraestructura.</div>
                 <div id="infra-chart" style="height:300px;display:none"></div>
                 <div id="infra-vel-wrap" style="display:none">
-                  <div class="sub" style="margin:14px 0 2px;font-weight:600;color:var(--text-mid)">Velocidad operativa del corredor <span style="font-weight:400;font-size:10.5px;color:var(--text-lo)">· física (ventana 1&nbsp;km) · laborable · banda p15–p85</span></div>
+                  <div class="sub" style="margin:14px 0 2px;font-weight:600;color:var(--text-mid)">Velocidad operativa del eje <span style="font-weight:400;font-size:10.5px;color:var(--text-lo)">· física (ventana 1&nbsp;km) · laborable · banda p15–p85</span></div>
                   <div id="infra-chart-vel" style="height:230px"></div>
+                </div>
+                <div id="infra-perfil-wrap" style="display:none">
+                  <div class="sub" style="margin:14px 0 2px;font-weight:600;color:var(--text-mid);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span>Velocidad a lo largo del eje <span style="font-weight:400;font-size:10.5px;color:var(--text-lo)">· física (ventana 400&nbsp;m) · laborable · por período del día</span></span>
+                    <span id="infra-perfil-sent" class="seg" style="margin-left:auto;flex:none"></span>
+                  </div>
+                  <div id="infra-perfil-ref" class="sub" style="font-size:10.5px;color:var(--text-lo);margin-bottom:2px"></div>
+                  <div id="infra-chart-perfil" style="height:250px"></div>
                 </div>
                 <div id="infra-exc-wrap" style="display:none">
                   <div class="sub" style="margin:14px 0 2px;font-weight:600;color:var(--text-mid)">Excesos de velocidad sostenidos <span style="font-weight:400;font-size:10.5px;color:var(--text-lo)">· por línea y mes · física (&gt;70 km/h en 1&nbsp;km)</span></div>
@@ -625,7 +630,7 @@
         <!-- MAPA HÉROE (2/3) -->
         <section class="widget xl:col-span-2 flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=75" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=204" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -790,7 +795,7 @@
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=75" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=204" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -900,7 +905,8 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script defer src="assets/app_shell.js?v=171"></script>
+<script src="config.js?v=204"></script>
+<script defer src="assets/app_shell.js?v=204"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
