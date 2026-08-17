@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=207`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=208`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -113,7 +113,7 @@ function toggleTheme(){
 }
 
 const cellOf = () => (T.cells[`${state.comuna}|${state.linea}`] || {kpi:null, horas:[]});
-const empresaDe = ln => { const x=(T.lineas||[]).find(l=>l.linea===ln); return (x&&x.empresa)?x.empresa:""; };
+const empresaDe = ln => { const x=(T.lineas||[]).find(l=>l.linea===ln); return (x&&x.empresa)?x.empresa:(x&&x.nombre)?x.nombre:""; };
 
 /* ---------- menús ---------- */
 const COVER_SUBS = [["est","Estática"],["din","Dinámica"],["od","Oferta/demanda"]];   // 'din' reemplaza 'of' (2026-06-28): modelo cápsula 2 min + 300 m, frac=min(1,f/30)
@@ -247,7 +247,7 @@ function buildLineaList(filter=""){
   const hint = $("linea-hint");
   if(hint) hint.textContent = setC ? `${items.length} líneas operan en ${state.comuna}` : `${items.length} líneas · sistema`;
   $("linea-list").innerHTML = items.map(l =>
-    `<div class="litem" data-l="${l.linea}"><span class="ln">${l.linea}</span><span class="nm">${l.empresa||""}</span></div>`).join("");
+    `<div class="litem" data-l="${l.linea}"><span class="ln">${l.linea}</span><span class="nm">${l.empresa||l.nombre||""}</span></div>`).join("");
   $("linea-list").querySelectorAll(".litem").forEach(el=>{
     el.onclick = ()=>{ state.linea = state.linea===el.dataset.l ? "TODAS" : el.dataset.l;
       state.vista = "normal";

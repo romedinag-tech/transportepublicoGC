@@ -27,15 +27,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Design tokens: single source of truth for color/type/space (loaded FIRST) -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=207">
+<link rel="stylesheet" href="assets/css/tokens.css?v=208">
 <!-- Leaflet self-hosted -->
-<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=207"/>
-<script defer src="assets/vendor/leaflet/leaflet.js?v=207"></script>
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=208"/>
+<script defer src="assets/vendor/leaflet/leaflet.js?v=208"></script>
 <!-- Component styles (consume tokens via legacy bridge vars) -->
-<link rel="stylesheet" href="assets/styles.css?v=207">
-<link rel="stylesheet" href="assets/shell.css?v=207">
+<link rel="stylesheet" href="assets/styles.css?v=208">
+<link rel="stylesheet" href="assets/shell.css?v=208">
 <!-- Tailwind purged utilities (~12 KB static, no runtime recompilation) -->
-<link rel="stylesheet" href="assets/tw.css?v=207">
+<link rel="stylesheet" href="assets/tw.css?v=208">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
@@ -127,6 +127,12 @@
   /* ── Map hero ── */
   .map-hero{position:relative;border-radius:14px;overflow:hidden;
     box-shadow:inset 0 0 0 1px var(--line),inset 0 0 60px -25px rgba(52,225,196,.2)}
+  /* HERO proporcional: mapa = 3 bloques KPI de ancho, columna derecha = 2. Scoped a xl (mismo breakpoint
+     que xl:grid-cols-5). Va como CSS propio porque el tw.css purgado NO incluye col-span-3. */
+  @media(min-width:1280px){
+    .hero-map-col{grid-column:span 3}
+    .hero-side-col{grid-column:span 2}
+  }
   .map-hero .corner{position:absolute;width:18px;height:18px;border-color:rgba(52,225,196,.6);z-index:500;pointer-events:none}
   .map-hero .c-tl{top:9px;left:9px;border-top:2px solid;border-left:2px solid;border-top-left-radius:5px}
   .map-hero .c-tr{top:9px;right:9px;border-top:2px solid;border-right:2px solid;border-top-right-radius:5px}
@@ -624,13 +630,14 @@
       <!-- Tira de KPIs -->
       <div id="kpis2" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3" style="margin-bottom:16px"><div class="skel skel-kpi"></div><div class="skel skel-kpi"></div><div class="skel skel-kpi"></div><div class="skel skel-kpi"></div><div class="skel skel-kpi"></div></div>
 
-      <!-- HERO: mapa + columna de widgets -->
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <!-- HERO: mapa + columna de widgets. Mismo grid (5 col) y gap que la banda KPI (#kpis2) → el mapa
+           calza EXACTO con los 3 primeros bloques KPI y el perfil con los 2 restantes. -->
+      <div class="grid grid-cols-1 xl:grid-cols-5 gap-3">
 
-        <!-- MAPA HÉROE (2/3) -->
-        <section class="widget xl:col-span-2 flex flex-col">
+        <!-- MAPA HÉROE (3/5 = ancho de 3 bloques KPI) -->
+        <section class="widget hero-map-col flex flex-col">
           <div class="widget-h">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=207" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=208" alt="" width="22" height="22"></span>
             <div class="min-w-0">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -641,9 +648,9 @@
             </div>
           </div>
           <div class="widget-b !p-2.5 flex-1">
-            <div id="map-hero" class="map-hero h-[58vh] xl:h-[600px]">
+            <div id="map-hero" class="map-hero w-full">
               <span class="corner c-tl"></span><span class="corner c-tr"></span><span class="corner c-bl"></span><span class="corner c-br"></span>
-              <div id="lmap" class="w-full h-full"></div>
+              <div id="lmap" class="w-full" style="aspect-ratio:1/1"></div>
             </div>
             <!-- Controles del mapa (período/propósito) + relato del KPI, debajo del mapa -->
             <div class="undermap">
@@ -666,8 +673,8 @@
           </div>
         </section>
 
-        <!-- COLUMNA DERECHA: flota/velocidad + ranking (flujo vertical propio, no se aplasta) -->
-        <div class="flex flex-col gap-4 thin-scroll xl:pr-1">
+        <!-- COLUMNA DERECHA (2/5 = ancho de 2 bloques KPI): flota/velocidad + ranking -->
+        <div class="flex flex-col gap-4 thin-scroll xl:pr-1 hero-side-col">
           <section class="widget" id="excesos-card">
             <div class="widget-h">
               <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
@@ -795,7 +802,7 @@
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=207" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=208" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -905,8 +912,8 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script src="config.js?v=207"></script>
-<script defer src="assets/app_shell.js?v=207"></script>
+<script src="config.js?v=208"></script>
+<script defer src="assets/app_shell.js?v=208"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
