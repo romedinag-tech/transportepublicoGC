@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=208`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=209`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -143,6 +143,7 @@ const purposeLbl = p => (PURPOSES.find(x=>x[0]===p)||["","Todos"])[1];
 // para que index.html/assets sean idénticos entre ciudades. Se llama una vez al arrancar.
 function initCityChrome(){
   const nom=CITY.nombre||"la ciudad", V=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
+  if(CITY.demanda){ const _db=document.getElementById("modo-demanda-btn"); if(_db) _db.style.display=""; }   // 3er modo solo si hay medio de pago
   const set=(sel,html,attr)=>{ const el=typeof sel==="string"?document.querySelector(sel):sel; if(el){ if(attr) el.setAttribute(attr,html); else el.innerHTML=html; } };
   set(".hero-logo", CITY.sigla||nom.slice(0,2).toUpperCase());
   set(".hero-content h1", "TRANSPORTE PÚBLICO<br>"+nom.toUpperCase());
@@ -287,6 +288,17 @@ function render(){
   const congsubRel = state.vista==="normal" && state.mapMode==="conges";   // ahora también en vista línea (crit/estab por arco)
   if($("congsub-sel")) $("congsub-sel").style.display = congsubRel ? "flex" : "none";
 
+  // MODO DEMANDA (3er lente): validaciones del medio de pago = abordajes
+  if(state.modo==="demanda"){
+    document.body.classList.add("modo-infra");
+    $("demanda-view").style.display=""; $("infra-view").style.display="none";
+    $("scope-title").textContent="Demanda del transporte"; $("scope-sub").textContent=CITY.nombre+" · abordajes (validaciones del medio de pago)";
+    $("reset-btn").style.display="none";
+    renderDemanda();
+    return;
+  }
+  $("demanda-view").style.display="none";
+
   // MODO INFRAESTRUCTURA (lente de nivel superior): oculta la vista operacional y muestra el observatorio de red
   if(state.modo==="infra"){
     document.body.classList.add("modo-infra");
@@ -376,6 +388,54 @@ function kpiCard(l,v,s,icon,stt){   // stt = good|warning|critical|neutral
 // umbral "más alto es mejor" (velocidad) y "más bajo es mejor" (detenido)
 const semHigh = (v,g,w) => v>=g?"good":v>=w?"warning":"critical";
 const semLow  = (v,g,w) => v<g?"good":v<w?"warning":"critical";
+// ===== MODO DEMANDA: banda de KPIs + curva intradía + ranking + mapa de calor de abordajes =====
+let DEM=null, DEMESL=null, demCurva=null, dmap=null, dmapLayer=null;
+function renderDemanda(){
+  if(!DEM){ $("dem-kpis").innerHTML='<div class="empty">Cargando demanda…</div>'; return; }
+  const di=DEM.diaria||{}, rf=DEM.ratio_finde||{}, per=DEM.periodo||{}, hp=DEM.hora_punta||{};
+  $("dem-kpis").innerHTML=[
+    kpiCard("Demanda diaria · laboral", fmt(di.L||0), "abordajes/día laboral", "🧑‍🤝‍🧑","neutral"),
+    kpiCard("Diaria · sábado", fmt(di.S||0), (rf.S!=null?Math.round(rf.S*100)+"% del laboral":""), "📅","neutral"),
+    kpiCard("Diaria · domingo", fmt(di.D||0), (rf.D!=null?Math.round(rf.D*100)+"% del laboral":""), "🗓️","neutral"),
+    kpiCard("Total del período", fmt(DEM.total||0), (per.desde?per.desde+" → "+per.hasta:""), "📊","neutral"),
+    kpiCard("Hora punta", (hp.h!=null?hp.h+":00":"—"), (hp.pct!=null?Math.round(hp.pct*100)+"% del día":""), "⏰","neutral"),
+    kpiCard("Gratuidad", (DEM.gratuidad!=null?Math.round(DEM.gratuidad*100)+"%":"—"), "viajes liberados (viaje_emergencia)", "🎟️","neutral"),
+  ].join("");
+  renderDemCurva();
+  $("dem-ranking").innerHTML=(DEM.lineas||[]).map(l=>`<div class="litem"><span class="ln">${l.linea}</span><span class="nm">${empresaDe(l.linea)||""}</span><span class="mt" style="margin-left:auto;font-variant-numeric:tabular-nums;color:var(--muted)">${fmt(l.diaria_L)}</span></div>`).join("");
+  renderDemMap();
+}
+function renderDemCurva(){
+  const el=$("dem-curva"); if(!el||!DEM||!DEM.curva) return;
+  if(!demCurva) demCurva=echarts.init(el);
+  const hrs=[]; for(let h=5;h<=23;h++) hrs.push(h);
+  const ser=dt=>hrs.map(h=>(DEM.curva[dt]||[])[h]||0);
+  demCurva.setOption({grid:{left:46,right:12,top:28,bottom:22},tooltip:{trigger:"axis"},
+    legend:{data:["Laboral","Sábado","Domingo"],top:0,textStyle:{color:"#8ea3c2",fontSize:10}},
+    xAxis:{type:"category",data:hrs.map(h=>h+"h"),axisLabel:{color:"#8ea3c2",fontSize:9},axisLine:{lineStyle:{color:"#33415580"}}},
+    yAxis:{type:"value",axisLabel:{color:"#8ea3c2",fontSize:9},splitLine:{lineStyle:{color:"#33415540"}}},
+    series:[
+      {name:"Laboral",type:"line",smooth:true,symbol:"none",areaStyle:{opacity:.12},data:ser("L"),lineStyle:{width:2.5},itemStyle:{color:"#34e1c4"}},
+      {name:"Sábado",type:"line",smooth:true,symbol:"none",data:ser("S"),lineStyle:{width:1.5},itemStyle:{color:"#fbbf24"}},
+      {name:"Domingo",type:"line",smooth:true,symbol:"none",data:ser("D"),lineStyle:{width:1.5},itemStyle:{color:"#8b9bb4"}},
+    ]});
+  setTimeout(()=>{try{demCurva.resize();}catch(e){}},50);
+}
+function demColor(f){const s=[[254,240,150],[253,180,74],[240,90,40],[189,0,38]];const t=Math.min(f*3,3),i=Math.min(Math.floor(t),2),k=t-i,a=s[i],b=s[i+1];return `rgb(${Math.round(a[0]+(b[0]-a[0])*k)},${Math.round(a[1]+(b[1]-a[1])*k)},${Math.round(a[2]+(b[2]-a[2])*k)})`;}
+function renderDemMap(){
+  const el=$("dmap"); if(!el) return;
+  if(!dmap){
+    dmap=L.map("dmap",{center:[CITY.lat0,CITY.lon0],zoom:12,zoomControl:true});
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:20,subdomains:"abcd",attribution:"© OSM © CARTO"}).addTo(dmap);
+  }
+  if(!DEMESL||!DEMESL.length){ setTimeout(()=>{try{dmap.invalidateSize();}catch(e){}},60); return; }
+  if(dmapLayer) dmap.removeLayer(dmapLayer);
+  const mx=Math.max.apply(null,DEMESL.map(b=>b.tot))||1;
+  dmapLayer=L.layerGroup();
+  DEMESL.forEach(b=>{ const f=b.tot/mx; L.circleMarker([b.lat,b.lon],{radius:3+Math.sqrt(f)*11,color:demColor(f),weight:0,fillOpacity:.5}).addTo(dmapLayer); });
+  dmapLayer.addTo(dmap);
+  setTimeout(()=>{try{dmap.invalidateSize();}catch(e){}},60);
+}
 function renderKPIs(cell){
   const home = state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS";
   const lineView = state.vista==="normal" && state.linea!=="TODAS";
@@ -3140,6 +3200,10 @@ function renderEvolucion(){
     J("baseline_30min.json").then(d=>{ BASE30=d; loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
     J("baseline_var.json").then(d=>{ BVAR=d; if(state.vista==="normal"&&state.linea!=="TODAS") renderVarObserved(); }).catch(()=>{});   // baseline por variante (Bloque 3)
     J("infraestructura.json").then(d=>{ INFRAE=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // observatorio de infraestructura
+    if(CITY.demanda){   // 3er lente: validaciones del medio de pago (abordajes)
+      J("demanda.json").then(d=>{ DEM=d; if(state.modo==="demanda") renderDemanda(); }).catch(()=>{});
+      J("demanda_eslabon.json").then(d=>{ DEMESL=d; if(state.modo==="demanda") renderDemMap(); }).catch(()=>{});
+    }
     J("flujo_ejes.json").then(d=>{ FLUJOEJES=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // flujo buses/h por eje×sentido
     J("vel_eje.json").then(d=>{ VELEJE=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // velocidad física + excesos por eje (v_1km)
     const _dtg=$("infra-diag-toggle"); if(_dtg) _dtg.onclick=()=>{ state.ejeDiag=!state.ejeDiag; _dtg.classList.toggle("on",state.ejeDiag);
