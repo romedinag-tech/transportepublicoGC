@@ -27,15 +27,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Design tokens: single source of truth for color/type/space (loaded FIRST) -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=213">
+<link rel="stylesheet" href="assets/css/tokens.css?v=214">
 <!-- Leaflet self-hosted -->
-<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=213"/>
-<script defer src="assets/vendor/leaflet/leaflet.js?v=213"></script>
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=214"/>
+<script defer src="assets/vendor/leaflet/leaflet.js?v=214"></script>
 <!-- Component styles (consume tokens via legacy bridge vars) -->
-<link rel="stylesheet" href="assets/styles.css?v=213">
-<link rel="stylesheet" href="assets/shell.css?v=213">
+<link rel="stylesheet" href="assets/styles.css?v=214">
+<link rel="stylesheet" href="assets/shell.css?v=214">
 <!-- Tailwind purged utilities (~12 KB static, no runtime recompilation) -->
-<link rel="stylesheet" href="assets/tw.css?v=213">
+<link rel="stylesheet" href="assets/tw.css?v=214">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
 <script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
@@ -55,7 +55,10 @@
   .widget::after{content:"";position:absolute;inset:0;background:var(--grad-shine);pointer-events:none;border-radius:inherit}
   .widget:hover{box-shadow:var(--shadow-hover);border-color:var(--line2)}
   .widget:hover::before{opacity:.85}
-  .widget-h{display:flex;align-items:center;gap:var(--s2);padding:var(--s3) var(--s4);border-bottom:1px solid var(--line)}
+  .widget-h{display:flex;align-items:center;gap:var(--s2);padding:var(--s3) var(--s4);border-bottom:1px solid var(--line);flex-wrap:wrap;row-gap:6px}
+  /* Móvil: el título nunca se aplasta (min-w-0 lo dejaba encoger a 0). Al no caber, los controles (segs,
+     selects) con ml-auto envuelven a su propia fila en vez de comprimir el título y reventar el header. */
+  .widget-h>.min-w-0{flex:1 1 auto;min-width:150px}
   .widget-h .ico{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;
     background:var(--ico-bg);color:var(--live);flex:none;font-size:15px}
   .widget-h .ico.ico-png{background:transparent;width:26px;height:26px}
@@ -252,7 +255,7 @@
   /* Block 6 — responsive: barras de control anchas (modos del mapa, selectores) no se recortan en
      móvil/tablet; scrollean horizontal dentro de su contenedor. Tap targets cómodos en móvil. */
   @media(max-width:1024px){
-    .cs-controls{max-width:100%;min-width:0}
+    .cs-controls{max-width:100%;min-width:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
     .seg,#map-mode,#periodo-sel{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
   }
   @media(max-width:640px){
@@ -666,7 +669,7 @@
         <!-- MAPA HÉROE (3/5 = ancho de 3 bloques KPI) -->
         <section class="widget hero-map-col flex flex-col">
           <div class="widget-h" style="flex-wrap:wrap;row-gap:6px">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=213" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=214" alt="" width="22" height="22"></span>
             <div class="min-w-0" style="flex:1 1 auto">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -830,7 +833,7 @@
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=213" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=214" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -940,8 +943,8 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script src="config.js?v=213"></script>
-<script defer src="assets/app_shell.js?v=213"></script>
+<script src="config.js?v=214"></script>
+<script defer src="assets/app_shell.js?v=214"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
