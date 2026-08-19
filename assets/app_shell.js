@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=217`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=218`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -390,14 +390,18 @@ const semHigh = (v,g,w) => v>=g?"good":v>=w?"warning":"critical";
 const semLow  = (v,g,w) => v<g?"good":v<w?"warning":"critical";
 // ===== MODO DEMANDA: banda de KPIs + curva intradía + ranking + mapa de calor de abordajes =====
 let DEM=null, DEMESL=null, DEMEJE=null, demCurva=null, demCurvaTipo=null, dmap=null, dmapLayer=null, demCanvas=null;
-let demPer="tot";   // ventana de la nube de puntos de demanda (día laboral)
+let demPer="tot", demSen="amb";   // ventana horaria + sentido de la nube de puntos de demanda (día laboral)
 // ventanas definidas por el usuario 2026-08-19 (media hora de precisión): pmam 07:00–08:30, fpam 10:00–11:30,
-// pmd 12:00–14:00, pt 16:00–19:00. La demanda es tap-in SIN sentido → sin filtro de sentido.
+// pmd 12:00–14:00, pt 16:00–19:00.
 const DEM_PER=[["tot","Todo el día"],["pmam","Punta mañana"],["fpam","Fuera punta AM"],["pmd","Punta mediodía"],["pt","Punta tarde"]];
+// sentido GEOMÉTRICO del bloque (costado de la calle): útil en calzadas separadas, ambiguo en vía compartida.
+const DEM_SEN=[["amb","Ambos"],["I","Ida"],["R","Regreso"]];
 function demEslVal(b){ return (b&&b[demPer])||0; }   // valor de un bloque (punto) en la ventana activa
 function renderDemCtrls(){
-  const pp=$("dem-per"); if(pp) pp.innerHTML=DEM_PER.map(([k,l])=>`<b data-dp="${k}" class="${demPer===k?"on":""}">${l}</b>`).join("");
-  if(pp) pp.querySelectorAll("b").forEach(b=>b.onclick=()=>{ demPer=b.dataset.dp; renderDemCtrls(); renderDemMap(); });
+  const pp=$("dem-per"); if(pp){ pp.innerHTML=DEM_PER.map(([k,l])=>`<b data-dp="${k}" class="${demPer===k?"on":""}">${l}</b>`).join("");
+    pp.querySelectorAll("b").forEach(b=>b.onclick=()=>{ demPer=b.dataset.dp; renderDemCtrls(); renderDemMap(); }); }
+  const ps=$("dem-sen"); if(ps){ ps.innerHTML=DEM_SEN.map(([k,l])=>`<b data-ds="${k}" class="${demSen===k?"on":""}">${l}</b>`).join("");
+    ps.querySelectorAll("b").forEach(b=>b.onclick=()=>{ demSen=b.dataset.ds; renderDemCtrls(); renderDemMap(); }); }
 }
 function renderDemanda(){
   if(!DEM){ $("dem-kpis").innerHTML='<div class="empty">Cargando demanda…</div>'; return; }
@@ -471,15 +475,16 @@ function renderDemMap(){
   // abordajes en la ventana activa. Escala perceptual por cuantiles (rank) para distinguir la densidad. Paso 1
   // hacia el mapa de calor. (Renderer canvas por volumen: miles de puntos.)
   if(DEMESL&&DEMESL.length){
-    const pts=DEMESL.map(b=>({b,v:demEslVal(b)})).filter(x=>x.v>0);
+    const pts=DEMESL.filter(b=>demSen==="amb"||b.s===demSen).map(b=>({b,v:demEslVal(b)})).filter(x=>x.v>0);
     const vals=pts.map(x=>x.v).sort((a,b)=>a-b);
     const rank=v=>{ if(!vals.length) return 0; let lo=0,hi=vals.length; while(lo<hi){const m=(lo+hi)>>1; if(vals[m]<v)lo=m+1;else hi=m;} return vals.length>1?lo/(vals.length-1):1; };
     pts.forEach(({b,v})=>{ const f=rank(v);
       L.circleMarker([b.lat,b.lon],{renderer:demCanvas,radius:2.5+Math.sqrt(f)*8,color:demColor(f),weight:0,fillOpacity:.6})
-        .bindTooltip(`${fmt(v)} abordajes`,{sticky:true}).addTo(dmapLayer);
+        .bindTooltip(`${fmt(v)} abordajes · ${b.s==="R"?"regreso":"ida"}`,{sticky:true}).addTo(dmapLayer);
     });
     const lbl=(DEM_PER.find(x=>x[0]===demPer)||["","Todo el día"])[1];
-    const ms=$("dem-map-sub"); if(ms) ms.textContent="nube de puntos · abordajes por bloque · "+lbl.toLowerCase()+" · día laboral · "+fmt(pts.length)+" puntos";
+    const sl=demSen==="amb"?"ambos sentidos":(demSen==="I"?"ida":"regreso");
+    const ms=$("dem-map-sub"); if(ms) ms.textContent="nube de puntos · "+lbl.toLowerCase()+" · "+sl+" · día laboral · "+fmt(pts.length)+" puntos";
   }
   dmapLayer.addTo(dmap);
   setTimeout(()=>{try{dmap.invalidateSize();}catch(e){}},60);
