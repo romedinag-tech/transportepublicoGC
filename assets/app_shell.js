@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=220`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=221`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -392,7 +392,7 @@ const semHigh = (v,g,w) => v>=g?"good":v>=w?"warning":"critical";
 const semLow  = (v,g,w) => v<g?"good":v<w?"warning":"critical";
 // ===== MODO DEMANDA: banda de KPIs + curva intradía + ranking + mapa de calor de abordajes =====
 let DEM=null, DEMESL=null, DEMESLP=null, DEMEJE=null, DEMPERF=null, demCurva=null, demCurvaTipo=null, demPerfChart=null, dmap=null, dmapLayer=null, demCanvas=null;
-let demPerfSen="I", demPerfDesc="tot";   // perfil de carga: sentido (I/R) y descomposición (tot/tipo/per)
+let demPerfSen="I", demPerfDesc="tot", demPerfVar=null;   // perfil de carga: sentido (I/R), descomposición, y variante (shape)
 let demPer="tot", demSen="amb", demMet="pat";   // ventana horaria + sentido + método de detección de sentido
 // método de sentido: geométrico (bloque más cercano) vs por patente (sentido REAL del bus vía GPS, Nivel 2)
 const DEM_MET=[["pat","Por patente"],["geom","Geométrico"]];
@@ -448,12 +448,21 @@ const DEM_PSEN=[["I","Ida"],["R","Regreso"]];
 function cumsum(a){ let s=0; return (a||[]).map(x=>s+=(x||0)); }
 function renderDemPerfil(){
   const L=state.linea, root=DEMPERF&&DEMPERF.lineas&&DEMPERF.lineas[L]; if(!root) return;
-  // controles
-  const ss=$("dem-perfil-sen"); if(ss){ ss.innerHTML=DEM_PSEN.map(([k,l])=>{const hay=root[k]&&root[k].km&&root[k].km.length; return `<b data-ps2="${k}" class="${demPerfSen===k?"on":""}"${hay?"":" style='opacity:.4'"}>${l}</b>`;}).join("");
-    ss.querySelectorAll("b").forEach(b=>b.onclick=()=>{ demPerfSen=b.dataset.ps2; renderDemPerfil(); }); }
+  // SENTIDO (existe si tiene variantes)
+  const ss=$("dem-perfil-sen"); if(ss){ ss.innerHTML=DEM_PSEN.map(([k,l])=>{const hay=root[k]&&root[k].variantes&&Object.keys(root[k].variantes).length; return `<b data-ps2="${k}" class="${demPerfSen===k?"on":""}"${hay?"":" style='opacity:.4'"}>${l}</b>`;}).join("");
+    ss.querySelectorAll("b").forEach(b=>b.onclick=()=>{ demPerfSen=b.dataset.ps2; demPerfVar=null; renderDemPerfil(); }); }
+  const node=root[demPerfSen]||root.I||root.R; if(!node||!node.variantes){ if(demPerfChart) demPerfChart.clear(); return; }
+  // VARIANTE (shape): km inequívoco de una traza concreta; default = principal (★). Selector solo si hay >1.
+  const vars=Object.entries(node.variantes).sort((a,b)=>(b[1].tot_abordajes||0)-(a[1].tot_abordajes||0)).map(x=>x[0]);
+  if(!demPerfVar||!node.variantes[demPerfVar]) demPerfVar=node.principal||vars[0];
+  const vc=$("dem-perfil-var"), vl=$("dem-perfil-var-lbl");
+  if(vc){ if(vars.length>1){ if(vl) vl.style.display=""; vc.style.display="";
+      vc.innerHTML=vars.map(v=>`<b data-pv="${v}" class="${demPerfVar===v?"on":""}">${v}${v===node.principal?" ★":""}</b>`).join("");
+      vc.querySelectorAll("b").forEach(b=>b.onclick=()=>{ demPerfVar=b.dataset.pv; renderDemPerfil(); });
+    } else { if(vl) vl.style.display="none"; vc.style.display="none"; } }
   const ds=$("dem-perfil-desc"); if(ds){ ds.innerHTML=DEM_PDESC.map(([k,l])=>`<b data-pd="${k}" class="${demPerfDesc===k?"on":""}">${l}</b>`).join("");
     ds.querySelectorAll("b").forEach(b=>b.onclick=()=>{ demPerfDesc=b.dataset.pd; renderDemPerfil(); }); }
-  const D=root[demPerfSen]||root.I||root.R; if(!D||!D.km){ $("dem-perfil-chart").innerHTML=""; return; }
+  const D=node.variantes[demPerfVar]; if(!D||!D.km){ if(demPerfChart) demPerfChart.clear(); return; }
   const km=D.km;
   if(!demPerfChart) demPerfChart=echarts.init($("dem-perfil-chart"));
   const TIPO=[["adulto","Adultos","#34e1c4"],["estudiante","Estudiantes","#60a5fa"],["mayor","Adultos mayores","#f59e0b"]];
@@ -471,9 +480,10 @@ function renderDemPerfil(){
     yAxis:{type:"value",name:"abordajes acum.",nameTextStyle:{color:"#8ea3c2",fontSize:9},axisLabel:{color:"#8ea3c2",fontSize:9},splitLine:{lineStyle:{color:"#33415540"}}},
     series},true);
   const tot=(D.tot||[]).reduce((a,b)=>a+(b||0),0);
-  $("dem-perfil-sub").textContent=`línea ${L} · ${demPerfSen==="R"?"regreso":"ida"} · día laboral`;
+  const esPr=(root[demPerfSen]||{}).principal===demPerfVar;
+  $("dem-perfil-sub").textContent=`línea ${L} · variante ${demPerfVar}${esPr?" (principal)":""} · ${demPerfSen==="R"?"regreso":"ida"} · día laboral`;
   $("dem-perfil-title").textContent=`Perfil de carga · Línea ${L}`;
-  const ft=$("dem-perfil-foot"); if(ft) ft.textContent=`${fmt(tot)} abordajes acumulados en ${km.length?km[km.length-1].toFixed(1):"—"} km · carga de SUBIDAS (tap-in no detecta bajadas)`;
+  const ft=$("dem-perfil-foot"); if(ft) ft.textContent=`${fmt(tot)} abordajes acumulados en ${km.length?km[km.length-1].toFixed(1):"—"} km (variante ${demPerfVar}) · carga de SUBIDAS (tap-in no detecta bajadas)`;
   setTimeout(()=>{try{demPerfChart.resize();}catch(e){}},50);
 }
 function renderDemCurva(){
