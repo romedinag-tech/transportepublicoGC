@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=210`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=211`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -274,8 +274,8 @@ function render(){
   const periodoVisible = state.vista==="normal" || state.vista==="ranking";
   $("periodo-sel").style.display = periodoVisible ? "flex" : "none";
   $("periodo-sel").dataset.inactive = (periodoVisible && !periodoRelevante) ? "1" : "";
-  const purposeRel = state.vista==="normal" && state.mapMode==="wait";
-  if($("purpose-sel")) $("purpose-sel").style.display = purposeRel ? "flex" : "none";
+  const purposeRel = false;   // Espera ya NO se vincula a destino/propósito (EOD): es la espera al próximo bus por manzana
+  if($("purpose-sel")) $("purpose-sel").style.display = "none";
   // Sub-selector de cobertura: visible en vista normal con mapMode=cover (sistema o línea)
   const coverSubRel = state.vista==="normal" && state.mapMode==="cover";
   if($("cover-sub")) $("cover-sub").style.display = coverSubRel ? "flex" : "none";
@@ -1884,7 +1884,7 @@ function tickLiveAge(){
 
 /* ---------- KPI territorial: cobertura / acceso / espera / NSE (choropleth) ---------- */
 const accColor  = m => `hsl(${120-120*Math.min(m/12,1)},72%,50%)`;        // verde 0min -> rojo 12+
-const waitColor = m => m==null ? "#7f1d1d" : `hsl(${120-120*Math.min(m/6,1)},72%,50%)`;   // verde 0-3min -> amarillo 3-6min -> rojo 6+ (espera hacia destinos)
+const waitColor = m => m==null ? "#7f1d1d" : `hsl(${120-120*Math.min(m/6,1)},72%,50%)`;   // verde 0-3min -> amarillo 3-6min -> rojo 6+ (espera al próximo bus por manzana)
 const daccColor = v => v==null ? "#475569" : `hsl(${1.2*Math.max(0,Math.min(v,100))},70%,50%)`;   // % destinos alcanzables: rojo bajo -> verde alto
 const tbiColor  = v => v==null ? "#475569" : `hsl(${120-1.2*Math.max(0,Math.min(v,100))},75%,50%)`; // intensidad transbordo: verde 0 -> rojo 100
 const labColor  = v => v==null ? "#475569" : `hsl(${1.2*Math.max(0,Math.min(v,100))},70%,50%)`;   // % empleo alcanzable SIN transbordo (Censo): rojo bajo -> verde alto
@@ -2106,14 +2106,14 @@ function drawCoverage(mode){
       ? odColor(p.cob_od ? p.cob_od[state.periodo] : null)
       : lineMode ? (nseColors[nseTercil(p.nse)]||"#64748b") : cobColor(p.cob_est);
     else if(mode==="trans") col = labColor(p.lab ? p.lab.dir : null);    // TRANSBORDO: % de viajes-trabajo con UNA sola línea (Censo); verde=directo, rojo=exige transbordo/inalcanzable
-    else if(mode==="wait") col = waitColor(p.waitd ? p.waitd[pu][state.periodo] : null);
+    else if(mode==="wait") col = waitColor(p.waite ? p.waite[state.periodo] : (p.wait ? p.wait[state.periodo] : null));  // espera efectiva al próximo bus (sin destino), fallback a media simple
     else if(mode==="salud") col = accSColor(p.salud);
     else if(mode==="edu") col = accSColor(p.edu);
     else col = nseColor(p.nse);
     const rings = f.geometry.type==="MultiPolygon" ? f.geometry.coordinates.map(pl=>pl[0]) : [f.geometry.coordinates[0]];
     const tipAcc = `destinos (${purposeLbl(pu)}): <b>${dG("dacc")??"—"}%</b> alcanzable · ${dG("ddir")??"—"}% directo · ${dG("dtr")??0}% con transbordo`;
     const per = state.periodo;
-    const wd = p.waitd ? p.waitd[pu][per] : null, wf = p.wait ? p.wait[per] : null;
+    const we = p.waite ? p.waite[per] : null, wf = p.wait ? p.wait[per] : null;
     const lb = p.lab;
     const tipLab = lb
       ? `viajes-trabajo (TP, Censo 2024)${p.lab_comuna?` · ${p.lab_comuna}`:""}: <b>${lb.dir}%</b> con una línea · ${lb.tr}% con transbordo · <b>${lb.no}% inalcanzable</b>`
@@ -2140,7 +2140,7 @@ function drawCoverage(mode){
       : (mode==="cover")
       ? `${NF.format(p.hog??0)} hogares · acceso ${p.acc} min<br>cobertura estática: <b>${p.cob_est??"—"}%</b> de la manzana a ≤300 m de la red`
       : (mode==="wait")
-      ? `${NF.format(p.n)} viviendas · ${periodoLbl(per)} · ${purposeLbl(pu)}<br>espera hacia destinos: <b>${wd==null?"sin servicio":wd+" min"}</b> · al primer bus ${wf==null?"—":wf+" min"}`
+      ? `${NF.format(p.n)} viviendas · ${periodoLbl(per)}<br>espera al próximo bus: <b>${we==null?"sin servicio":we+" min"}</b> (efectiva, con apelotonamiento) · media teórica ${wf==null?"—":wf+" min"}`
       : `${NF.format(p.n)} viviendas · acceso ${p.acc} min · espera ${wf==null?"sin servicio":wf+" min"}<br>a salud ${p.salud??"—"} min · a educación ${p.edu??"—"} min`;
     const fop = .55;
     rings.forEach(r=>{
@@ -2205,7 +2205,7 @@ function setCoverLegend(mode){
     : (mode==="cover" && state.linea!=="TODAS") ? [`NSE hogares cubiertos · Línea ${state.linea}`,`<span class="grad" style="background:linear-gradient(90deg,#fb923c 33%,#94a3b8 33% 66%,#2dd4bf 66%)"></span>`,"<span class='lbls'><i>bajo</i><i>medio</i><i>alto</i></span><span class='par'>terciles de avalúo fiscal del suelo (CLP/m²) — solo manzanas cubiertas a ≤300 m</span>"]
     : mode==="cover" ? ["Cobertura estática (≤300 m de la red)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>% de la manzana dentro del área de influencia 300 m de los recorridos</span>"]
     : mode==="trans" ? ["Transbordo: viajes-trabajo con UNA línea (Censo 2024)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>verde = llega directo con una línea · rojo = exige transbordo o es inalcanzable</span>"]
-    : mode==="wait" ? [`Espera hacia destinos · ${periodoLbl(state.periodo)} (min)`,RYG,"<span class='lbls'><i>0</i><i>3</i><i>6+</i></span><span class='par'>manzana = espera a destinos · ● paradero = espera ahí (hover)</span>"]
+    : mode==="wait" ? [`Espera al próximo bus · ${periodoLbl(state.periodo)} (min)`,RYG,"<span class='lbls'><i>0</i><i>3</i><i>6+</i></span><span class='par'>manzana = espera efectiva al próximo bus (con apelotonamiento) · ● paradero = espera ahí (hover)</span>"]
     : mode==="salud" ? ["Tiempo a salud en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:#f43f5e'>● centro de salud</span>"]
     : mode==="edu" ? ["Tiempo a educación en transporte (min)",RYG,"<span class='lbls'><i>0</i><i>12</i><i>25+</i></span><span class='par' style='color:var(--violet)'>● colegio</span>"]
     : (mode==="conges" && state.congSub==="estab") ? [`Estabilidad de velocidad · ${periodoLbl(state.periodo)} (CV día a día)`,`<span class="grad" style="background:linear-gradient(90deg,hsl(120,75%,50%),hsl(60,75%,50%),hsl(0,75%,50%))"></span>`,"<span class='lbls'><i>estable</i><i></i><i>variable</i></span><span class='par'>verde = velocidad consistente día a día pese a la congestión (corredor eficiente)</span>"]
@@ -2308,7 +2308,7 @@ function renderMapa(){
     const M=state.mapMode;
     const coverTit = state.coverSub==="din" ? `Cobertura dinámica · ${periodoLbl(state.periodo)}`
       : state.coverSub==="od" ? `Cobertura oferta/demanda · ${periodoLbl(state.periodo)}` : "Cobertura estática";
-    const titulo = {cover:coverTit,trans:"Transbordo",wait:`Espera hacia destinos · ${periodoLbl(state.periodo)}`,
+    const titulo = {cover:coverTit,trans:"Transbordo",wait:`Espera al próximo bus · ${periodoLbl(state.periodo)}`,
       conges:`Velocidad efectiva por arco · ${periodoLbl(state.periodo)}`, bunch:`Apelotonamiento (bunching) · ${periodoLbl(state.periodo)}`, det:"Congestión y terminales",
       salud:"Accesibilidad a salud en transporte",edu:"Accesibilidad a educación en transporte",nse:"Nivel socioeconómico (avalúo)"}[M];
     if(state.linea!=="TODAS"){
@@ -2326,7 +2326,7 @@ function renderMapa(){
           : `${(R.cob_est&&R.cob_est.pct_hogares_cubiertos)??"—"}% de los hogares a ≤300 m de la red (buffer sobre el recorrido oficial)`;
       const badgeSys = {cover: coverBadge,
         trans:`${(R.lab&&R.lab.dir)??"—"}% de los viajes-trabajo se hacen con UNA línea · ${(R.lab&&R.lab.tr)??"—"}% exige transbordo · ${(R.lab&&R.lab.no)??"—"}% inalcanzable (Censo 2024)`,
-        wait:`espera media hacia destinos ${(R.waitd_medio&&R.waitd_medio[state.periodo])??"—"} min · frecuencia real observada · cambia con el período`,
+        wait:`espera efectiva al próximo bus ${(R.waite_medio&&R.waite_medio[state.periodo])??"—"} min · frecuencia real observada + apelotonamiento · por manzana, sin destino · cambia con el período`,
         conges:(state.linea==="TODAS"&&state.congSub==="estab")?`estabilidad de la velocidad en ${periodoLbl(state.periodo)} · CV día a día · verde = eje consistente (corredor eficiente) · rojo = muy variable`
           :(state.linea==="TODAS"&&state.congSub==="crit")?`velocidad en los peores ~10% de días de cada eje en ${periodoLbl(state.periodo)} · rojo = colapsa en sus días malos · hover = % vs su día normal`
           :`velocidad efectiva (incluye detenido en tránsito) en ${periodoLbl(state.periodo)} · rojo = ejes lentos`,
@@ -2592,8 +2592,8 @@ function renderNarrative(){
     const v=scopeWavg(p=>p.lab&&p.lab.dir);
     txt=`<b>Transbordo</b> mide qué proporción de los <b>viajes con propósito trabajo</b> (Censo 2024: comuna de residencia → comuna donde la persona declara trabajar) se pueden hacer en transporte público con <b>una sola línea, sin transbordar</b>. Verde = llegas directo; rojo = dependes de transbordar (hoy = pagar dos pasajes) o tu destino laboral es inalcanzable por la red registrada. ${v!=null?`En ${amb}, en promedio el <b>${v.toFixed(0)}%</b> de los viajes-trabajo es directo. `:""}Las zonas rojas son las que más ganarían con integración modal/tarifaria o nuevas conexiones.`;
   } else if(M==="wait"){
-    const v=scopeWavg(p=>p.waitd&&p.waitd[pu]&&p.waitd[pu][per]);
-    txt=`<b>Espera</b> estima el tiempo efectivo de espera hacia los destinos${pe}: ½·intervalo·(1+CV²), con la <b>frecuencia real en el sentido que va hacia el destino</b> (un bus en dirección contraria no cuenta) y penalizando el <b>apelotonamiento</b>. ${v!=null?`Media en ${amb} (${periodoLbl(per)}): <b>${v.toFixed(1)} min</b>. `:""}Cambia con el período — compara punta y fuera de punta.`;
+    const v=scopeWavg(p=>p.waite&&p.waite[per]);
+    txt=`<b>Espera al próximo bus</b> por manzana${pe}, <b>sin vincular a ningún destino</b>: es el tiempo que espera quien llega al paradero y toma <b>el primer bus que pase</b> por su sector. Se calcula ½·intervalo·(1+CV²) con la <b>frecuencia real combinada</b> de las líneas a ≤500 m y penalizando el <b>apelotonamiento</b> (buses pegados ⇒ huecos largos ⇒ más espera). ${v!=null?`Media en ${amb} (${periodoLbl(per)}): <b>${v.toFixed(1)} min</b>. `:""}Cambia con el período — compara punta y fuera de punta.`;
   } else if(M==="conges" && state.congSub==="estab"){
     const md=SGSTATS&&SGSTATS.meta&&SGSTATS.meta.ndays?SGSTATS.meta.ndays[per]:null;
     txt=`<b>Estabilidad de la velocidad</b>: coeficiente de variación (σ/μ) de la velocidad efectiva <b>día a día</b> por arco, en <b>${periodoLbl(per)}</b>${md?` (sobre ${md} días hábiles)`:""}. <b>Verde = eje consistente</b>: la velocidad casi no cambia entre un día y otro, aunque haya congestión — la firma de un <b>corredor eficiente o vía exclusiva</b>. Rojo = muy variable: depende fuerte del día (un accidente, lluvia o un evento lo colapsan). La hipótesis: la infraestructura exclusiva de buses debería pintarse verde incluso en punta.`;
