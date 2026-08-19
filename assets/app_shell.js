@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=215`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=216`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -389,7 +389,7 @@ function kpiCard(l,v,s,icon,stt){   // stt = good|warning|critical|neutral
 const semHigh = (v,g,w) => v>=g?"good":v>=w?"warning":"critical";
 const semLow  = (v,g,w) => v<g?"good":v<w?"warning":"critical";
 // ===== MODO DEMANDA: banda de KPIs + curva intradía + ranking + mapa de calor de abordajes =====
-let DEM=null, DEMESL=null, DEMEJE=null, demCurva=null, dmap=null, dmapLayer=null;
+let DEM=null, DEMESL=null, DEMEJE=null, demCurva=null, demCurvaTipo=null, dmap=null, dmapLayer=null;
 let demPer="tot", demSen="amb";   // filtros del mapa de demanda por eje: período (tot/am/md/pm/off/noche) y sentido (amb/I/R)
 const DEM_PER=[["tot","Todo el día"],["am","Punta AM"],["md","Mediodía"],["pm","Punta PM"],["off","Fuera punta"],["noche","Noche"]];
 const DEM_SEN=[["amb","Ambos"],["I","Ida"],["R","Regreso"]];
@@ -405,18 +405,22 @@ function renderDemCtrls(){
 function renderDemanda(){
   if(!DEM){ $("dem-kpis").innerHTML='<div class="empty">Cargando demanda…</div>'; return; }
   const di=DEM.diaria||{}, rf=DEM.ratio_finde||{}, per=DEM.periodo||{}, hp=DEM.hora_punta||{};
+  const cd=(DEM.comp_dia&&DEM.comp_dia.L)||{};                    // pasajeros/día por tipo, día laboral
+  const pctL=v=>di.L?Math.round(100*(v||0)/di.L)+"% del día laboral":"";
   $("dem-kpis").innerHTML=[
     kpiCard("Demanda diaria · laboral", fmt(di.L||0), "abordajes/día laboral", "🧑‍🤝‍🧑","neutral"),
     kpiCard("Diaria · sábado", fmt(di.S||0), (rf.S!=null?Math.round(rf.S*100)+"% del laboral":""), "📅","neutral"),
     kpiCard("Diaria · domingo", fmt(di.D||0), (rf.D!=null?Math.round(rf.D*100)+"% del laboral":""), "🗓️","neutral"),
-    kpiCard("Total del período", fmt(DEM.total||0), (per.desde?per.desde+" → "+per.hasta:""), "📊","neutral"),
+    kpiCard("Pasajeros por bus · día", fmt(DEM.pax_bus_dia||0), (DEM.flota_sistema?"día laboral · flota "+fmt(DEM.flota_sistema)+" buses":"abordajes/bus·día laboral"), "🚌","neutral"),
     kpiCard("Hora punta", (hp.h!=null?hp.h+":00":"—"), (hp.pct!=null?Math.round(hp.pct*100)+"% del día":""), "⏰","neutral"),
+    // pasajeros por tipo de usuario en un día laboral normal (no % del período)
+    kpiCard("Adultos · día laboral", fmt(cd.adulto||0), pctL(cd.adulto), "🧑","neutral"),
+    kpiCard("Estudiantes · día laboral", fmt(cd.estudiante||0), pctL(cd.estudiante), "🎓","neutral"),
+    kpiCard("Adultos mayores · día laboral", fmt(cd.mayor||0), pctL(cd.mayor), "🧓","neutral"),
     kpiCard("Gratuidad", (DEM.gratuidad!=null?Math.round(DEM.gratuidad*100)+"%":"—"), "viajes liberados (viaje_emergencia)", "🎟️","neutral"),
-    (()=>{ const cx=DEM.composicion?Object.entries(DEM.composicion).sort((a,b)=>b[1]-a[1]):[];
-      return kpiCard("Usuarios", cx.length?Math.round(cx[0][1]*100)+"% "+cx[0][0]:"—",
-        cx.map(([k,v])=>Math.round(v*100)+"% "+k).join(" · ")+" · por tipo de tarifa", "👥","neutral"); })(),
   ].join("");
   renderDemCurva();
+  renderDemCurvaTipo();
   $("dem-ranking").innerHTML=(DEM.lineas||[]).map(l=>`<div class="litem"><span class="ln">${l.linea}</span><span class="nm">${empresaDe(l.linea)||""}</span><span class="mt" style="margin-left:auto;font-variant-numeric:tabular-nums;color:var(--muted)">${fmt(l.diaria_L)}</span></div>`).join("");
   renderDemCtrls();
   renderDemMap();
@@ -436,6 +440,25 @@ function renderDemCurva(){
       {name:"Domingo",type:"line",smooth:true,symbol:"none",data:ser("D"),lineStyle:{width:1.5},itemStyle:{color:"#8b9bb4"}},
     ]});
   setTimeout(()=>{try{demCurva.resize();}catch(e){}},50);
+}
+// Barra apilada: composición por tipo de usuario a lo largo del día (día laboral) → a qué hora se mueve cada segmento.
+function renderDemCurvaTipo(){
+  const el=$("dem-curva-tipo"); if(!el||!DEM||!DEM.curva_tipo) return;
+  const ct=DEM.curva_tipo.L||{};
+  if(!demCurvaTipo) demCurvaTipo=echarts.init(el);
+  const hrs=[]; for(let h=5;h<=23;h++) hrs.push(h);
+  const TIPOS=[["adulto","Adultos","#34e1c4"],["estudiante","Estudiantes","#60a5fa"],["mayor","Adultos mayores","#f59e0b"]];
+  const series=TIPOS.filter(([k])=>ct[k]).map(([k,nm,col])=>({
+    name:nm,type:"bar",stack:"tipo",data:hrs.map(h=>(ct[k]||[])[h]||0),itemStyle:{color:col},barMaxWidth:22,emphasis:{focus:"series"}
+  }));
+  demCurvaTipo.setOption({grid:{left:54,right:14,top:30,bottom:24},
+    tooltip:{trigger:"axis",axisPointer:{type:"shadow"}},
+    legend:{data:TIPOS.map(t=>t[1]),top:0,textStyle:{color:"#8ea3c2",fontSize:10}},
+    xAxis:{type:"category",data:hrs.map(h=>h+"h"),axisLabel:{color:"#8ea3c2",fontSize:9},axisLine:{lineStyle:{color:"#33415580"}}},
+    yAxis:{type:"value",name:"abordajes/h",nameTextStyle:{color:"#8ea3c2",fontSize:9},axisLabel:{color:"#8ea3c2",fontSize:9},splitLine:{lineStyle:{color:"#33415540"}}},
+    series
+  },true);
+  setTimeout(()=>{try{demCurvaTipo.resize();}catch(e){}},50);
 }
 function demColor(f){const s=[[254,240,150],[253,180,74],[240,90,40],[189,0,38]];const t=Math.min(f*3,3),i=Math.min(Math.floor(t),2),k=t-i,a=s[i],b=s[i+1];return `rgb(${Math.round(a[0]+(b[0]-a[0])*k)},${Math.round(a[1]+(b[1]-a[1])*k)},${Math.round(a[2]+(b[2]-a[2])*k)})`;}
 function renderDemMap(){
