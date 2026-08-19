@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=219`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=220`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -290,13 +290,15 @@ function render(){
 
   // MODO DEMANDA (3er lente): validaciones del medio de pago = abordajes
   if(state.modo==="demanda"){
-    document.body.classList.add("modo-infra");
+    document.body.classList.remove("modo-infra"); document.body.classList.add("modo-demanda");
     $("demanda-view").style.display=""; $("infra-view").style.display="none";
     $("scope-title").textContent="Demanda del transporte"; $("scope-sub").textContent=CITY.nombre+" · abordajes (validaciones del medio de pago)";
     $("reset-btn").style.display="none";
+    buildLineaList($("linea-search")?$("linea-search").value:"");   // sidebar = líneas para elegir y ver su perfil
     renderDemanda();
     return;
   }
+  document.body.classList.remove("modo-demanda");
   $("demanda-view").style.display="none";
 
   // MODO INFRAESTRUCTURA (lente de nivel superior): oculta la vista operacional y muestra el observatorio de red
@@ -389,7 +391,8 @@ function kpiCard(l,v,s,icon,stt){   // stt = good|warning|critical|neutral
 const semHigh = (v,g,w) => v>=g?"good":v>=w?"warning":"critical";
 const semLow  = (v,g,w) => v<g?"good":v<w?"warning":"critical";
 // ===== MODO DEMANDA: banda de KPIs + curva intradía + ranking + mapa de calor de abordajes =====
-let DEM=null, DEMESL=null, DEMESLP=null, DEMEJE=null, demCurva=null, demCurvaTipo=null, dmap=null, dmapLayer=null, demCanvas=null;
+let DEM=null, DEMESL=null, DEMESLP=null, DEMEJE=null, DEMPERF=null, demCurva=null, demCurvaTipo=null, demPerfChart=null, dmap=null, dmapLayer=null, demCanvas=null;
+let demPerfSen="I", demPerfDesc="tot";   // perfil de carga: sentido (I/R) y descomposición (tot/tipo/per)
 let demPer="tot", demSen="amb", demMet="pat";   // ventana horaria + sentido + método de detección de sentido
 // método de sentido: geométrico (bloque más cercano) vs por patente (sentido REAL del bus vía GPS, Nivel 2)
 const DEM_MET=[["pat","Por patente"],["geom","Geométrico"]];
@@ -427,9 +430,51 @@ function renderDemanda(){
   ].join("");
   renderDemCurva();
   renderDemCurvaTipo();
-  $("dem-ranking").innerHTML=(DEM.lineas||[]).map(l=>`<div class="litem"><span class="ln">${l.linea}</span><span class="nm">${empresaDe(l.linea)||""}</span><span class="mt" style="margin-left:auto;font-variant-numeric:tabular-nums;color:var(--muted)">${fmt(l.diaria_L)}</span></div>`).join("");
+  $("dem-ranking").innerHTML=(DEM.lineas||[]).map(l=>`<div class="litem${state.linea===l.linea?" active":""}" data-l="${l.linea}"><span class="ln">${l.linea}</span><span class="nm">${empresaDe(l.linea)||""}</span><span class="mt" style="margin-left:auto;font-variant-numeric:tabular-nums;color:var(--muted)">${fmt(l.diaria_L)}</span></div>`).join("");
+  $("dem-ranking").querySelectorAll(".litem").forEach(el=>el.onclick=()=>{ state.linea = state.linea===el.dataset.l?"TODAS":el.dataset.l; render(); });
   renderDemCtrls();
   renderDemMap();
+  // modo LÍNEA: perfil de carga de la línea elegida; si no hay línea, la curva del sistema
+  const lineMode = state.linea && state.linea!=="TODAS" && DEMPERF && DEMPERF.lineas && DEMPERF.lineas[state.linea];
+  const pc=$("dem-perfil-card"), cc=$("dem-curva-card");
+  if(pc) pc.style.display = lineMode ? "" : "none";
+  if(cc) cc.style.display = lineMode ? "none" : "";
+  if(lineMode) renderDemPerfil();
+}
+// Perfil de carga: abordajes ACUMULADOS a lo largo del recorrido (km) de la línea elegida, por sentido.
+// Descomponible en Total / por Tipo (área apilada) / por Período (líneas). Creciente: tap-in no ve bajadas.
+const DEM_PDESC=[["tot","Total"],["tipo","Por tipo"],["per","Por período"]];
+const DEM_PSEN=[["I","Ida"],["R","Regreso"]];
+function cumsum(a){ let s=0; return (a||[]).map(x=>s+=(x||0)); }
+function renderDemPerfil(){
+  const L=state.linea, root=DEMPERF&&DEMPERF.lineas&&DEMPERF.lineas[L]; if(!root) return;
+  // controles
+  const ss=$("dem-perfil-sen"); if(ss){ ss.innerHTML=DEM_PSEN.map(([k,l])=>{const hay=root[k]&&root[k].km&&root[k].km.length; return `<b data-ps2="${k}" class="${demPerfSen===k?"on":""}"${hay?"":" style='opacity:.4'"}>${l}</b>`;}).join("");
+    ss.querySelectorAll("b").forEach(b=>b.onclick=()=>{ demPerfSen=b.dataset.ps2; renderDemPerfil(); }); }
+  const ds=$("dem-perfil-desc"); if(ds){ ds.innerHTML=DEM_PDESC.map(([k,l])=>`<b data-pd="${k}" class="${demPerfDesc===k?"on":""}">${l}</b>`).join("");
+    ds.querySelectorAll("b").forEach(b=>b.onclick=()=>{ demPerfDesc=b.dataset.pd; renderDemPerfil(); }); }
+  const D=root[demPerfSen]||root.I||root.R; if(!D||!D.km){ $("dem-perfil-chart").innerHTML=""; return; }
+  const km=D.km;
+  if(!demPerfChart) demPerfChart=echarts.init($("dem-perfil-chart"));
+  const TIPO=[["adulto","Adultos","#34e1c4"],["estudiante","Estudiantes","#60a5fa"],["mayor","Adultos mayores","#f59e0b"]];
+  const PER=[["pmam","Punta mañana","#f59e0b"],["fpam","Fuera punta AM","#8b9bb4"],["pmd","Punta mediodía","#34e1c4"],["pt","Punta tarde","#f472b6"]];
+  let series, leg;
+  if(demPerfDesc==="tipo"){ leg=TIPO.map(t=>t[1]);
+    series=TIPO.map(([k,nm,col])=>({name:nm,type:"line",stack:"c",smooth:true,symbol:"none",areaStyle:{opacity:.55},lineStyle:{width:0},itemStyle:{color:col},data:cumsum(D[k])})); }
+  else if(demPerfDesc==="per"){ leg=PER.map(t=>t[1]);
+    series=PER.map(([k,nm,col])=>({name:nm,type:"line",smooth:true,symbol:"none",lineStyle:{width:2,color:col},itemStyle:{color:col},data:cumsum(D[k])})); }
+  else { leg=["Carga acumulada"];
+    series=[{name:"Carga acumulada",type:"line",smooth:true,symbol:"none",areaStyle:{opacity:.18},lineStyle:{width:2.5},itemStyle:{color:"#34e1c4"},data:cumsum(D.tot)}]; }
+  demPerfChart.setOption({grid:{left:52,right:14,top:30,bottom:34},tooltip:{trigger:"axis"},
+    legend:{data:leg,top:0,textStyle:{color:"#8ea3c2",fontSize:10}},
+    xAxis:{type:"category",data:km.map(k=>k.toFixed(1)),name:"km",nameLocation:"middle",nameGap:20,nameTextStyle:{color:"#8ea3c2",fontSize:9},axisLabel:{color:"#8ea3c2",fontSize:9},axisLine:{lineStyle:{color:"#33415580"}}},
+    yAxis:{type:"value",name:"abordajes acum.",nameTextStyle:{color:"#8ea3c2",fontSize:9},axisLabel:{color:"#8ea3c2",fontSize:9},splitLine:{lineStyle:{color:"#33415540"}}},
+    series},true);
+  const tot=(D.tot||[]).reduce((a,b)=>a+(b||0),0);
+  $("dem-perfil-sub").textContent=`línea ${L} · ${demPerfSen==="R"?"regreso":"ida"} · día laboral`;
+  $("dem-perfil-title").textContent=`Perfil de carga · Línea ${L}`;
+  const ft=$("dem-perfil-foot"); if(ft) ft.textContent=`${fmt(tot)} abordajes acumulados en ${km.length?km[km.length-1].toFixed(1):"—"} km · carga de SUBIDAS (tap-in no detecta bajadas)`;
+  setTimeout(()=>{try{demPerfChart.resize();}catch(e){}},50);
 }
 function renderDemCurva(){
   const el=$("dem-curva"); if(!el||!DEM||!DEM.curva) return;
@@ -481,17 +526,23 @@ function renderDemMap(){
   // hacia el mapa de calor. (Renderer canvas por volumen: miles de puntos.)
   const usaPat = demMet==="pat" && DEMESLP && DEMESLP.length;
   const SRC = usaPat ? DEMESLP : DEMESL;
+  const lineMode = state.linea && state.linea!=="TODAS";
+  // recorrido de la línea elegida (debajo de los puntos), para ver DÓNDE sube más gente sobre su traza
+  if(lineMode && GEOM[state.linea]){
+    GEOM[state.linea].forEach(sg=>{ if(sg.p&&sg.p.length>1)
+      L.polyline(sg.p.map(p=>[p[0],p[1]]),{color:"#5b7aa8",weight:2,opacity:.5}).addTo(dmapLayer); });
+  }
   if(SRC&&SRC.length){
-    const pts=SRC.filter(b=>demSen==="amb"||b.s===demSen).map(b=>({b,v:demEslVal(b)})).filter(x=>x.v>0);
+    const pts=SRC.filter(b=>(demSen==="amb"||b.s===demSen) && (!lineMode||b.l===state.linea)).map(b=>({b,v:demEslVal(b)})).filter(x=>x.v>0);
     const vals=pts.map(x=>x.v).sort((a,b)=>a-b);
     const rank=v=>{ if(!vals.length) return 0; let lo=0,hi=vals.length; while(lo<hi){const m=(lo+hi)>>1; if(vals[m]<v)lo=m+1;else hi=m;} return vals.length>1?lo/(vals.length-1):1; };
     pts.forEach(({b,v})=>{ const f=rank(v);
-      L.circleMarker([b.lat,b.lon],{renderer:demCanvas,radius:2.5+Math.sqrt(f)*8,color:demColor(f),weight:0,fillOpacity:.6})
+      L.circleMarker([b.lat,b.lon],{renderer:demCanvas,radius:(lineMode?3:2.5)+Math.sqrt(f)*(lineMode?9:8),color:demColor(f),weight:0,fillOpacity:.65})
         .bindTooltip(`${fmt(v)} abordajes · ${b.s==="R"?"regreso":"ida"}`,{sticky:true}).addTo(dmapLayer);
     });
     const lbl=(DEM_PER.find(x=>x[0]===demPer)||["","Todo el día"])[1];
     const sl=demSen==="amb"?"ambos sentidos":(demSen==="I"?"ida":"regreso");
-    const ms=$("dem-map-sub"); if(ms) ms.textContent="nube de puntos · "+lbl.toLowerCase()+" · "+sl+" · sentido "+(usaPat?"por patente (GPS)":"geométrico")+" · "+fmt(pts.length)+" puntos";
+    const ms=$("dem-map-sub"); if(ms) ms.textContent=(lineMode?"línea "+state.linea+" · ":"")+"abordajes por bloque · "+lbl.toLowerCase()+" · "+sl+" · sentido "+(usaPat?"por patente":"geométrico")+" · "+fmt(pts.length)+" puntos";
   }
   dmapLayer.addTo(dmap);
   setTimeout(()=>{try{dmap.invalidateSize();}catch(e){}},60);
@@ -3264,6 +3315,7 @@ function renderEvolucion(){
       J("demanda.json").then(d=>{ DEM=d; if(state.modo==="demanda") renderDemanda(); }).catch(()=>{});
       J("demanda_eslabon.json").then(d=>{ DEMESL=d; if(state.modo==="demanda") renderDemMap(); }).catch(()=>{});   // nube de puntos (geométrico, Nivel 1)
       J("demanda_eslabon_p.json").then(d=>{ DEMESLP=d; if(state.modo==="demanda"){ renderDemCtrls(); renderDemMap(); } }).catch(()=>{});   // Nivel 2 (sentido real por patente)
+      J("demanda_perfil.json").then(d=>{ DEMPERF=d; if(state.modo==="demanda") renderDemanda(); }).catch(()=>{});   // perfil de carga por línea (km × pax)
       J("demanda_eje.json").then(d=>{ DEMEJE=d; }).catch(()=>{});   // conservado (carga por eje, no lo usa el mapa)
     }
     J("flujo_ejes.json").then(d=>{ FLUJOEJES=d; if(state.modo==="infra") renderInfra(); }).catch(()=>{});   // flujo buses/h por eje×sentido
