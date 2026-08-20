@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=224`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=225`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -391,7 +391,7 @@ function kpiCard(l,v,s,icon,stt){   // stt = good|warning|critical|neutral
 const semHigh = (v,g,w) => v>=g?"good":v>=w?"warning":"critical";
 const semLow  = (v,g,w) => v<g?"good":v<w?"warning":"critical";
 // ===== MODO DEMANDA: banda de KPIs + curva intradía + ranking + mapa de calor de abordajes =====
-let DEM=null, DEMESL=null, DEMESLP=null, DEMEJE=null, DEMPERF=null, demCurva=null, demCurvaTipo=null, demPerfChart=null, dmap=null, dmapLayer=null, demCanvas=null;
+let DEM=null, DEMESL=null, DEMESLP=null, DEMEJE=null, DEMPERF=null, demCurva=null, demCurvaTipo=null, demPerfChart=null, demSemana=null, demMes=null, dmap=null, dmapLayer=null, demCanvas=null;
 let demPerfSen="I", demPerfDesc="tot", demPerfVar=null;   // perfil de carga: sentido (I/R), descomposición, y variante (shape)
 let demPerfPts=null, demCursorMk=null;   // coordenadas del perfil (por km-bin) + marcador-cursor en el mapa
 let demPer="tot", demSen="amb", demMet="pat";   // ventana horaria + sentido + método de detección de sentido
@@ -442,6 +442,8 @@ function renderDemanda(){
   ].join("");
   renderDemCurva();
   renderDemCurvaTipo();
+  renderDemSemana();
+  renderDemMes();
   $("dem-ranking").innerHTML=(DEM.lineas||[]).map(l=>`<div class="litem${state.linea===l.linea?" active":""}" data-l="${l.linea}"><span class="ln">${l.linea}</span><span class="nm">${empresaDe(l.linea)||""}</span><span class="mt" style="margin-left:auto;font-variant-numeric:tabular-nums;color:var(--muted)">${fmt(l.diaria_L)}</span></div>`).join("");
   $("dem-ranking").querySelectorAll(".litem").forEach(el=>el.onclick=()=>{ state.linea = state.linea===el.dataset.l?"TODAS":el.dataset.l; render(); });
   renderDemCtrls();
@@ -548,6 +550,38 @@ function renderDemCurvaTipo(){
     series
   },true);
   setTimeout(()=>{try{demCurvaTipo.resize();}catch(e){}},50);
+}
+// helper: barras apiladas por tipo de usuario sobre un eje categórico (semana o meses)
+const DEM_TIPOS=[["adulto","Adultos","#34e1c4"],["estudiante","Estudiantes","#60a5fa"],["mayor","Adultos mayores","#f59e0b"]];
+function _demStackedBar(chart, cats, dataByCat, subLabel){
+  const series=DEM_TIPOS.map(([k,nm,col])=>({name:nm,type:"bar",stack:"t",barMaxWidth:34,itemStyle:{color:col},emphasis:{focus:"series"},
+    data:cats.map(c=>Math.round((dataByCat[c.lbl]||{})[k]||0))}));
+  chart.setOption({grid:{left:54,right:12,top:30,bottom:24},tooltip:{trigger:"axis",axisPointer:{type:"shadow"}},
+    legend:{data:DEM_TIPOS.map(t=>t[1]),top:0,textStyle:{color:"#8ea3c2",fontSize:10}},
+    xAxis:{type:"category",data:cats.map(c=>c.lbl),axisLabel:{color:"#8ea3c2",fontSize:9},axisLine:{lineStyle:{color:"#33415580"}}},
+    yAxis:{type:"value",name:subLabel,nameTextStyle:{color:"#8ea3c2",fontSize:9},axisLabel:{color:"#8ea3c2",fontSize:9},splitLine:{lineStyle:{color:"#33415540"}}},
+    series},true);
+  setTimeout(()=>{try{chart.resize();}catch(e){}},50);
+}
+// Variabilidad por DÍA DE LA SEMANA (isodow 1=Lun..7=Dom), abordajes prom/día apilados por tipo
+function renderDemSemana(){
+  const el=$("dem-semana"); if(!el||!DEM||!DEM.dow_tipo) return;
+  if(!demSemana) demSemana=echarts.init(el);
+  const NAMES={1:"Lun",2:"Mar",3:"Mié",4:"Jue",5:"Vie",6:"Sáb",7:"Dom"};
+  const dows=[1,2,3,4,5,6,7].filter(d=>DEM.dow_tipo[d]);
+  const cats=dows.map(d=>({lbl:NAMES[d]}));
+  const data={}; dows.forEach(d=>data[NAMES[d]]=DEM.dow_tipo[d]);
+  _demStackedBar(demSemana, cats, data, "abordajes/día");
+}
+// Variabilidad por MES (YYYY-MM ordenado), abordajes prom/día apilados por tipo → estacionalidad
+function renderDemMes(){
+  const el=$("dem-mes"); if(!el||!DEM||!DEM.mes_tipo) return;
+  if(!demMes) demMes=echarts.init(el);
+  const MES=["","ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  const keys=Object.keys(DEM.mes_tipo).sort();
+  const cats=keys.map(k=>{ const m=+k.slice(5,7); return {lbl:MES[m]+" "+k.slice(2,4)}; });
+  const data={}; keys.forEach((k,i)=>data[cats[i].lbl]=DEM.mes_tipo[k]);
+  _demStackedBar(demMes, cats, data, "abordajes/día");
 }
 function demColor(f){const s=[[254,240,150],[253,180,74],[240,90,40],[189,0,38]];const t=Math.min(f*3,3),i=Math.min(Math.floor(t),2),k=t-i,a=s[i],b=s[i+1];return `rgb(${Math.round(a[0]+(b[0]-a[0])*k)},${Math.round(a[1]+(b[1]-a[1])*k)},${Math.round(a[2]+(b[2]-a[2])*k)})`;}
 function renderDemMap(){
