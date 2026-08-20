@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=221`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=222`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -413,20 +413,27 @@ function renderDemCtrls(){
 }
 function renderDemanda(){
   if(!DEM){ $("dem-kpis").innerHTML='<div class="empty">Cargando demanda…</div>'; return; }
-  const di=DEM.diaria||{}, rf=DEM.ratio_finde||{}, per=DEM.periodo||{}, hp=DEM.hora_punta||{};
-  const cd=(DEM.comp_dia&&DEM.comp_dia.L)||{};                    // pasajeros/día por tipo, día laboral
-  const pctL=v=>di.L?Math.round(100*(v||0)/di.L)+"% del día laboral":"";
+  // Banda de 9 KPIs: del SISTEMA, o de la LÍNEA elegida (empresa/recorrido) si hay una seleccionada.
+  const lb = (state.linea && state.linea!=="TODAS") ? (DEM.lineas||[]).find(l=>l.linea===state.linea) : null;
+  let s;
+  if(lb){ const dL=lb.diaria_L||0;
+    s={diaL:dL, diaS:lb.diaria_S||0, diaD:lb.diaria_D||0, rfS:dL?lb.diaria_S/dL:null, rfD:dL?lb.diaria_D/dL:null,
+       pax_bus:lb.pax_bus_dia, flota:lb.flota, hp:lb.hora_punta||{}, comp:lb.comp_dia||{}, grat:lb.gratuidad}; }
+  else { const di=DEM.diaria||{}, rf=DEM.ratio_finde||{};
+    s={diaL:di.L||0, diaS:di.S||0, diaD:di.D||0, rfS:rf.S, rfD:rf.D, pax_bus:DEM.pax_bus_dia, flota:DEM.flota_sistema,
+       hp:DEM.hora_punta||{}, comp:(DEM.comp_dia&&DEM.comp_dia.L)||{}, grat:DEM.gratuidad}; }
+  const pctL=v=>s.diaL?Math.round(100*(v||0)/s.diaL)+"% del día laboral":"";
+  const sc = lb ? " · línea "+state.linea : "";
   $("dem-kpis").innerHTML=[
-    kpiCard("Demanda diaria · laboral", fmt(di.L||0), "abordajes/día laboral", "🧑‍🤝‍🧑","neutral"),
-    kpiCard("Diaria · sábado", fmt(di.S||0), (rf.S!=null?Math.round(rf.S*100)+"% del laboral":""), "📅","neutral"),
-    kpiCard("Diaria · domingo", fmt(di.D||0), (rf.D!=null?Math.round(rf.D*100)+"% del laboral":""), "🗓️","neutral"),
-    kpiCard("Pasajeros por bus · día", fmt(DEM.pax_bus_dia||0), (DEM.flota_sistema?"día laboral · flota "+fmt(DEM.flota_sistema)+" buses":"abordajes/bus·día laboral"), "🚌","neutral"),
-    kpiCard("Hora punta", (hp.h!=null?hp.h+":00":"—"), (hp.pct!=null?Math.round(hp.pct*100)+"% del día":""), "⏰","neutral"),
-    // pasajeros por tipo de usuario en un día laboral normal (no % del período)
-    kpiCard("Adultos · día laboral", fmt(cd.adulto||0), pctL(cd.adulto), "🧑","neutral"),
-    kpiCard("Estudiantes · día laboral", fmt(cd.estudiante||0), pctL(cd.estudiante), "🎓","neutral"),
-    kpiCard("Adultos mayores · día laboral", fmt(cd.mayor||0), pctL(cd.mayor), "🧓","neutral"),
-    kpiCard("Gratuidad", (DEM.gratuidad!=null?Math.round(DEM.gratuidad*100)+"%":"—"), "viajes liberados (viaje_emergencia)", "🎟️","neutral"),
+    kpiCard("Demanda diaria · laboral", fmt(s.diaL), "abordajes/día laboral"+sc, "🧑‍🤝‍🧑","neutral"),
+    kpiCard("Diaria · sábado", fmt(s.diaS), (s.rfS!=null?Math.round(s.rfS*100)+"% del laboral":""), "📅","neutral"),
+    kpiCard("Diaria · domingo", fmt(s.diaD), (s.rfD!=null?Math.round(s.rfD*100)+"% del laboral":""), "🗓️","neutral"),
+    kpiCard("Pasajeros por bus · día", fmt(s.pax_bus||0), (s.flota?"día laboral · flota "+fmt(s.flota)+" buses"+sc:"abordajes/bus·día laboral"), "🚌","neutral"),
+    kpiCard("Hora punta", (s.hp.h!=null?s.hp.h+":00":"—"), (s.hp.pct!=null?Math.round(s.hp.pct*100)+"% del día":""), "⏰","neutral"),
+    kpiCard("Adultos · día laboral", fmt(s.comp.adulto||0), pctL(s.comp.adulto), "🧑","neutral"),
+    kpiCard("Estudiantes · día laboral", fmt(s.comp.estudiante||0), pctL(s.comp.estudiante), "🎓","neutral"),
+    kpiCard("Adultos mayores · día laboral", fmt(s.comp.mayor||0), pctL(s.comp.mayor), "🧓","neutral"),
+    kpiCard("Gratuidad", (s.grat!=null?Math.round(s.grat*100)+"%":"—"), "viajes liberados"+sc, "🎟️","neutral"),
   ].join("");
   renderDemCurva();
   renderDemCurvaTipo();
