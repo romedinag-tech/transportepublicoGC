@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=223`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=224`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -419,17 +419,21 @@ function renderDemanda(){
   let s;
   if(lb){ const dL=lb.diaria_L||0;
     s={diaL:dL, diaS:lb.diaria_S||0, diaD:lb.diaria_D||0, rfS:dL?lb.diaria_S/dL:null, rfD:dL?lb.diaria_D/dL:null,
-       pax_bus:lb.pax_bus_dia, flota:lb.flota, hp:lb.hora_punta||{}, comp:lb.comp_dia||{}, grat:lb.gratuidad}; }
+       pax_bus:lb.pax_bus_dia, flota:lb.flota, hp:lb.hora_punta||{}, comp:lb.comp_dia||{}, grat:lb.gratuidad,
+       rec:lb.recaudacion_L, recBus:lb.recaudacion_bus_dia}; }
   else { const di=DEM.diaria||{}, rf=DEM.ratio_finde||{};
     s={diaL:di.L||0, diaS:di.S||0, diaD:di.D||0, rfS:rf.S, rfD:rf.D, pax_bus:DEM.pax_bus_dia, flota:DEM.flota_sistema,
-       hp:DEM.hora_punta||{}, comp:(DEM.comp_dia&&DEM.comp_dia.L)||{}, grat:DEM.gratuidad}; }
+       hp:DEM.hora_punta||{}, comp:(DEM.comp_dia&&DEM.comp_dia.L)||{}, grat:DEM.gratuidad,
+       rec:DEM.recaudacion_L, recBus:DEM.recaudacion_bus_dia}; }
   const pctL=v=>s.diaL?Math.round(100*(v||0)/s.diaL)+"% del día laboral":"";
   const sc = lb ? " · línea "+state.linea : "";
+  const $M=n=>{ n=Math.round(n||0); if(Math.abs(n)>=1e6) return "$"+(n/1e6).toLocaleString("es-CL",{minimumFractionDigits:1,maximumFractionDigits:1})+" M"; if(Math.abs(n)>=1e4) return "$"+Math.round(n/1e3)+" mil"; return "$"+fmt(n); };
   $("dem-kpis").innerHTML=[
     kpiCard("Demanda diaria · laboral", fmt(s.diaL), "abordajes/día laboral"+sc, "🧑‍🤝‍🧑","neutral"),
     kpiCard("Diaria · sábado", fmt(s.diaS), (s.rfS!=null?Math.round(s.rfS*100)+"% del laboral":""), "📅","neutral"),
     kpiCard("Diaria · domingo", fmt(s.diaD), (s.rfD!=null?Math.round(s.rfD*100)+"% del laboral":""), "🗓️","neutral"),
     kpiCard("Pasajeros por bus · día", fmt(s.pax_bus||0), (s.flota?"día laboral · flota "+fmt(s.flota)+" buses"+sc:"abordajes/bus·día laboral"), "🚌","neutral"),
+    kpiCard("Recaudación · día laboral", $M(s.rec), (s.recBus!=null?$M(s.recBus)+"/bus·día"+sc:"medio de pago"), "💰","neutral"),
     kpiCard("Hora punta", (s.hp.h!=null?s.hp.h+":00":"—"), (s.hp.pct!=null?Math.round(s.hp.pct*100)+"% del día":""), "⏰","neutral"),
     kpiCard("Adultos · día laboral", fmt(s.comp.adulto||0), pctL(s.comp.adulto), "🧑","neutral"),
     kpiCard("Estudiantes · día laboral", fmt(s.comp.estudiante||0), pctL(s.comp.estudiante), "🎓","neutral"),
