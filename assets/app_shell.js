@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=222`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=223`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -393,6 +393,7 @@ const semLow  = (v,g,w) => v<g?"good":v<w?"warning":"critical";
 // ===== MODO DEMANDA: banda de KPIs + curva intradía + ranking + mapa de calor de abordajes =====
 let DEM=null, DEMESL=null, DEMESLP=null, DEMEJE=null, DEMPERF=null, demCurva=null, demCurvaTipo=null, demPerfChart=null, dmap=null, dmapLayer=null, demCanvas=null;
 let demPerfSen="I", demPerfDesc="tot", demPerfVar=null;   // perfil de carga: sentido (I/R), descomposición, y variante (shape)
+let demPerfPts=null, demCursorMk=null;   // coordenadas del perfil (por km-bin) + marcador-cursor en el mapa
 let demPer="tot", demSen="amb", demMet="pat";   // ventana horaria + sentido + método de detección de sentido
 // método de sentido: geométrico (bloque más cercano) vs por patente (sentido REAL del bus vía GPS, Nivel 2)
 const DEM_MET=[["pat","Por patente"],["geom","Geométrico"]];
@@ -486,12 +487,28 @@ function renderDemPerfil(){
     xAxis:{type:"category",data:km.map(k=>k.toFixed(1)),name:"km",nameLocation:"middle",nameGap:20,nameTextStyle:{color:"#8ea3c2",fontSize:9},axisLabel:{color:"#8ea3c2",fontSize:9},axisLine:{lineStyle:{color:"#33415580"}}},
     yAxis:{type:"value",name:"abordajes acum.",nameTextStyle:{color:"#8ea3c2",fontSize:9},axisLabel:{color:"#8ea3c2",fontSize:9},splitLine:{lineStyle:{color:"#33415540"}}},
     series},true);
+  // CURSOR sincronizado mapa↔perfil: al pasar el mouse por el gráfico, mueve un marcador en el mapa a la
+  // posición along-track de ese km (así se ve dónde la carga sube, se aplana o nadie sube).
+  demPerfPts = D.pts || null; showDemCursor(null);
+  demPerfChart.off("updateAxisPointer");
+  demPerfChart.on("updateAxisPointer", ev=>{ const ai=ev&&ev.axesInfo&&ev.axesInfo[0]; showDemCursor((ai!=null&&ai.value!=null)?Math.round(+ai.value):null); });
+  try{ const zr=demPerfChart.getZr(); zr.off("globalout"); zr.on("globalout", ()=>showDemCursor(null)); }catch(e){}
   const tot=(D.tot||[]).reduce((a,b)=>a+(b||0),0);
   const esPr=(root[demPerfSen]||{}).principal===demPerfVar;
   $("dem-perfil-sub").textContent=`línea ${L} · variante ${demPerfVar}${esPr?" (principal)":""} · ${demPerfSen==="R"?"regreso":"ida"} · día laboral`;
   $("dem-perfil-title").textContent=`Perfil de carga · Línea ${L}`;
   const ft=$("dem-perfil-foot"); if(ft) ft.textContent=`${fmt(tot)} abordajes acumulados en ${km.length?km[km.length-1].toFixed(1):"—"} km (variante ${demPerfVar}) · carga de SUBIDAS (tap-in no detecta bajadas)`;
   setTimeout(()=>{try{demPerfChart.resize();}catch(e){}},50);
+}
+// marcador-cursor en el mapa de demanda en la posición del km-bin sobre el que está el mouse en el perfil
+function showDemCursor(idx){
+  if(!dmap) return;
+  const p=(idx!=null && demPerfPts && demPerfPts[idx]) ? demPerfPts[idx] : null;
+  if(!p){ if(demCursorMk){ dmap.removeLayer(demCursorMk); demCursorMk=null; } return; }
+  const ll=[p[0],p[1]];
+  if(!demCursorMk){
+    demCursorMk=L.marker(ll,{icon:L.divIcon({className:"dem-cursor",html:"",iconSize:[18,18],iconAnchor:[9,9]}),interactive:false,keyboard:false,zIndexOffset:1000}).addTo(dmap);
+  } else demCursorMk.setLatLng(ll);
 }
 function renderDemCurva(){
   const el=$("dem-curva"); if(!el||!DEM||!DEM.curva) return;
