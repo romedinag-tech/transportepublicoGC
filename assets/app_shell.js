@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=225`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=226`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -588,7 +588,7 @@ function renderDemMap(){
   const el=$("dmap"); if(!el) return;
   if(!dmap){
     dmap=L.map("dmap",{center:[CITY.lat0,CITY.lon0],zoom:12,zoomControl:true,preferCanvas:true});
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:20,subdomains:"abcd",attribution:"© OSM © CARTO"}).addTo(dmap);
+    L.layerGroup([L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:16,maxZoom:20,attribution:"Tiles © Esri"}),L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:16,maxZoom:20})]).addTo(dmap);
     demCanvas=L.canvas({padding:0.5});
   }
   if(dmapLayer){ dmap.removeLayer(dmapLayer); dmapLayer=null; }
@@ -1326,7 +1326,7 @@ function ikpi(l,v,u,c){ return `<div class="kpi" style="border-color:${c}30"><di
 function iInitMap(){
   if(imap) return;
   imap=L.map("imap",{center:[CITY.lat0,CITY.lon0],zoom:12,zoomControl:true});
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:20,subdomains:"abcd",attribution:"© OSM © CARTO"}).addTo(imap);
+  L.layerGroup([L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:16,maxZoom:20,attribution:"Tiles © Esri"}),L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:16,maxZoom:20})]).addTo(imap);
 }
 function iClear(){ infraLayers.forEach(l=>{try{imap.removeLayer(l);}catch(e){}}); infraLayers=[]; }
 function _ediagClear(){ ejeDiagLayers.forEach(l=>{try{imap.removeLayer(l);}catch(e){}}); ejeDiagLayers=[]; }
@@ -1834,9 +1834,9 @@ function ensureMap(){
   lmap = L.map("lmap",{center:[CITY.lat0,CITY.lon0],zoom:11,zoomControl:true});
   // Base OSCURA (centro de mando) por defecto: CARTO Dark Matter. Sobre ella resaltan
   // el recorrido coloreado por velocidad y los paraderos (datos "neón").
-  const oscuro = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:20,subdomains:"abcd",attribution:"© OSM © CARTO"}).addTo(lmap);
+  const oscuro = L.layerGroup([L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:16,maxZoom:20,attribution:"Tiles © Esri"}),L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:16,maxZoom:20})]).addTo(lmap);
   const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"Imagery © Esri"});
-  const calles = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{maxZoom:20,subdomains:"abcd",attribution:"© OSM © CARTO"});
+  const calles = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:19,maxZoom:20,attribution:"Tiles © Esri"});
   const etiquetas = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",{maxZoom:19});
   L.control.layers({"Oscuro":oscuro,"Satélite":sat,"Calles":calles},{"Vías y etiquetas":etiquetas},{collapsed:true,position:"topright"}).addTo(lmap);
   comunaLayer = L.layerGroup().addTo(lmap);
