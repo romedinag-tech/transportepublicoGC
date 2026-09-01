@@ -25,19 +25,25 @@
 <!-- Fonts: Space Grotesk (display), IBM Plex Sans (UI), IBM Plex Mono (data) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+<!-- Fuentes de reloj digital segmentado tipo CASIO (solo las usan los temas de cliente vía tokens; prod las ignora).
+     DSEG14 (14-seg, alfabeto completo) para el texto; DSEG7 (7-seg) para los números. Itálicas (inclinadas). -->
+<style>
+@font-face{font-family:'DSEG14';src:url('https://cdn.jsdelivr.net/npm/dseg@0.46.0/fonts/DSEG14-Classic/DSEG14Classic-BoldItalic.woff2') format('woff2');font-weight:400 700;font-display:swap}
+@font-face{font-family:'DSEG7';src:url('https://cdn.jsdelivr.net/npm/dseg@0.46.0/fonts/DSEG7-Classic/DSEG7Classic-BoldItalic.woff2') format('woff2');font-weight:400 700;font-display:swap}
+</style>
 <!-- Design tokens: single source of truth for color/type/space (loaded FIRST) -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=226">
+<link rel="stylesheet" href="assets/css/tokens.css?v=227">
 <!-- Leaflet self-hosted -->
-<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=226"/>
-<script defer src="assets/vendor/leaflet/leaflet.js?v=226"></script>
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?v=227"/>
+<script defer src="assets/vendor/leaflet/leaflet.js?v=227"></script>
 <!-- Component styles (consume tokens via legacy bridge vars) -->
-<link rel="stylesheet" href="assets/styles.css?v=226">
-<link rel="stylesheet" href="assets/shell.css?v=226">
+<link rel="stylesheet" href="assets/styles.css?v=227">
+<link rel="stylesheet" href="assets/shell.css?v=227">
 <!-- Tailwind purged utilities (~12 KB static, no runtime recompilation) -->
-<link rel="stylesheet" href="assets/tw.css?v=226">
+<link rel="stylesheet" href="assets/tw.css?v=227">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
-<script>try{var t=localStorage.getItem("gccp-theme")||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
+<script>try{var q=new URLSearchParams(location.search).get('theme');var t=q?(q==='gore'?'cliente-gore':q):(localStorage.getItem("gccp-theme")||"dark");document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
   /* ===== Chrome del centro de mando ===== */
   html,body{height:100%}
@@ -400,6 +406,9 @@
 <script>
 (function(){
   var sp=document.getElementById('hero-splash'), cv=document.getElementById('hero-canvas');
+  // Temas de cliente (white-label): sin intro animado (evita el parecido con el modo original). El
+  // data-theme lo fija la head-init ANTES de este script; el tablero vive detrás del splash, así que ocultarlo no rompe nada.
+  if(sp && /^cliente/.test(document.documentElement.dataset.theme||'')){ sp.style.display='none'; return; }
   if(!cv||!cv.getContext){ if(sp) sp.style.display='none'; return; }
   var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   var ctx=cv.getContext('2d'), DPR=Math.min(window.devicePixelRatio||1,2);
@@ -723,7 +732,7 @@
         <!-- MAPA HÉROE (3/5 = ancho de 3 bloques KPI) -->
         <section class="widget hero-map-col flex flex-col">
           <div class="widget-h" style="flex-wrap:wrap;row-gap:6px">
-            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=226" alt="" width="22" height="22"></span>
+            <span class="ico ico-png"><img src="assets/brand/ic_bus.png?v=227" alt="" width="22" height="22"></span>
             <div class="min-w-0" style="flex:1 1 auto">
               <h3 id="map-title" class="truncate">Mapa del sistema</h3>
               <span class="sub">recorrido oficial · velocidad map-matched · paraderos</span>
@@ -887,7 +896,7 @@
       <!-- Cumplimiento semanal por variable (solo con línea elegida) -->
       <section class="widget cump-sem" id="cump-sem-card" style="display:none">
         <div class="widget-h">
-          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=226" alt="" width="22" height="22"></span>
+          <span class="ico ico-png"><img src="assets/brand/ic_shield.png?v=227" alt="" width="22" height="22"></span>
           <div class="min-w-0"><h3>Cumplimiento semanal por variable exigida</h3><span class="sub">evolución semana a semana</span></div>
           <div class="cs-controls ml-auto">
             <div class="seg" id="cs-dia"></div>
@@ -997,8 +1006,8 @@
 
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
-<script src="config.js?v=226"></script>
-<script defer src="assets/app_shell.js?v=226"></script>
+<script src="config.js?v=227"></script>
+<script defer src="assets/app_shell.js?v=227"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){

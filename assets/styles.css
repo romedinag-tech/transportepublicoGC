@@ -124,3 +124,176 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 /* punto "en vivo": estático con anillo azul suave (institucional = calmo, sin pulso neón) */
 :root[data-theme="light"] .livedot{animation:none;box-shadow:0 0 0 3px var(--live-tint)}
 :root[data-theme="light"] .pill .dot{box-shadow:0 0 0 3px var(--live-tint)}
+
+/* ═══ ETAPA 2 · VISTA DE LÍNEA compuesta (motor-wide): oferta + demanda apiladas, cada una con encabezado.
+   Los encabezados van como hermanos SOBRE cada vista → no entran al flex interno de la cara de cliente. ═══ */
+.linea-sec-h{display:flex;align-items:center;gap:12px;margin:6px 2px 2px;padding-bottom:10px;
+  border-bottom:1px solid var(--line)}
+.linea-sec-h .lsh-n{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  background:var(--live-tint);color:var(--live);font-weight:800;font-size:13px;font-variant-numeric:tabular-nums}
+.linea-sec-h .lsh-txt{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.linea-sec-h .lsh-t{font-weight:800;font-size:15px;color:var(--tx);letter-spacing:-.01em}
+.linea-sec-h .lsh-s{font-size:11.5px;color:var(--muted)}
+.linea-page #demanda-view{margin-top:18px}
+/* en la vista de línea el ranking "Líneas por demanda" es redundante (la línea ya está elegida) */
+.linea-page section.widget:has(#dem-ranking){display:none}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   RE-LAYOUT "cliente-a" (PULSO) — Fase 2. Distribución + lenguaje visual PROPIOS.
+   TODO cuelga de [data-theme^="cliente-"] → el default (prod/dark/light) NO se toca.
+   Misma data, mismos widgets: solo cambia la disposición y el estilo de las piezas.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Orientación invertida: el panel de contexto va a la DERECHA ── */
+:root[data-theme^="cliente-"] #sidebar{order:2;width:324px;
+  border-right:none;border-left:1px solid var(--line)}
+
+/* ── Header: más alto, marca prominente, franja de acento de marca abajo ── */
+:root[data-theme^="cliente-"] header{height:auto;min-height:66px;padding:13px 24px;
+  border-bottom:none;position:relative}
+:root[data-theme^="cliente-"] header::after{content:"";position:absolute;left:0;right:0;bottom:0;
+  height:3px;background:var(--grad-brand)}
+:root[data-theme^="cliente-"] #tb-title{font-family:var(--font-display);font-size:19px;
+  font-weight:800;letter-spacing:-.02em}
+
+/* ── Comuna-bar: separador claro bajo el header ── */
+:root[data-theme^="cliente-"] .comuna-bar{border-bottom:1px solid var(--line);
+  background:var(--surface-1)}
+
+/* ── KPI: lenguaje PLANO — esquina recta, barra de acento a la IZQUIERDA, sin brillo ── */
+:root[data-theme^="cliente-"] .kpi{background:var(--surface-1);border:1px solid var(--line);
+  border-left:4px solid var(--live);border-radius:7px;box-shadow:none;padding:16px 18px}
+:root[data-theme^="cliente-"] .kpi::before,
+:root[data-theme^="cliente-"] .kpi::after{display:none}
+:root[data-theme^="cliente-"] .kpi:hover{transform:none;border-color:var(--line);
+  border-left-color:var(--ref);box-shadow:0 6px 18px -10px rgba(0,0,0,.55)}
+:root[data-theme^="cliente-"] .kpi .lab{letter-spacing:.12em;color:var(--text-mid)}
+:root[data-theme^="cliente-"] .kpi .val{font-size:29px}
+:root[data-theme^="cliente-"] .kpi.k-critical{border-left-color:var(--alert)}
+:root[data-theme^="cliente-"] .kpi.k-warning{border-left-color:var(--warn)}
+:root[data-theme^="cliente-"] .kpi.k-good{border-left-color:var(--good)}
+/* KPIs vivos (.klive) traen el borde INLINE (border-color:col+alpha) → hay que forzar la barra sólida.
+   Los otros bordes van neutros; el estado se sigue leyendo en el color del NÚMERO (.val.is-*). */
+:root[data-theme^="cliente-"] .kpi.klive{border-color:var(--line) !important;
+  border-left:4px solid var(--live) !important}
+
+/* ── Widgets (cards de gráfico): esquina más recta, sin borde redondo suave ── */
+:root[data-theme^="cliente-"] .widget{border-radius:9px}
+
+/* ── Estructura tipo BI (ref. Paneltik): KPIs en RIEL vertical izquierdo + charts al centro.
+   Aplicado a las 3 vistas (operación / infraestructura / demanda). ── */
+/* Layout de vista: FLEX [riel de KPIs | contenido]. El contenido no-KPI lo envuelve initCityChrome en
+   .view-content → evita el gotcha de grid-row:1/-1 en grilla implícita (inflaba fila 1 y rompía infra). */
+:root[data-theme^="cliente-"] #normal-view,
+:root[data-theme^="cliente-"] #infra-view,
+:root[data-theme^="cliente-"] #demanda-view{display:flex;gap:16px;align-items:flex-start}
+:root[data-theme^="cliente-"] .view-content{flex:1 1 auto;min-width:0;
+  display:flex;flex-direction:column;gap:16px}
+:root[data-theme^="cliente-"] .view-content > *{margin:0 !important}
+:root[data-theme^="cliente-"] #kpis2,
+:root[data-theme^="cliente-"] #infra-kpis,
+:root[data-theme^="cliente-"] #dem-kpis{flex:0 0 352px;display:grid !important;
+  grid-template-columns:1fr 1fr;gap:10px;align-content:start}
+:root[data-theme^="cliente-"] #kpis2 .kpi,
+:root[data-theme^="cliente-"] #infra-kpis .kpi,
+:root[data-theme^="cliente-"] #dem-kpis .kpi{padding:15px 16px;min-height:158px;
+  display:flex;flex-direction:column;justify-content:center}
+:root[data-theme^="cliente-"] #kpis2 .kpi .val,
+:root[data-theme^="cliente-"] #infra-kpis .kpi .val,
+:root[data-theme^="cliente-"] #dem-kpis .kpi .val{font-size:26px}
+/* ── Vista INFRA: el strip de KPIs va HORIZONTAL bajo el mapa (no como riel de 2 columnas). #infra-view pasa a
+   columna → primero el contenido (mapa+detalle), luego el strip auto-fit a lo ancho. En ciudades sin plan de
+   corredores (Temuco) queda un resumen fino, no un riel casi vacío. ── */
+:root[data-theme^="cliente-"] #infra-view{flex-direction:column}
+:root[data-theme^="cliente-"] #infra-view .view-content{order:1}
+:root[data-theme^="cliente-"] #infra-kpis{order:2;flex:0 0 auto;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+
+/* ── Cara de cliente: campanil (Conce) fuera + toggle claro/oscuro fuera (white-label = 1 marca fija;
+   togglear rompe el re-layout, cuyo CSS está scopeado al tema). ── */
+:root[data-theme^="cliente-"] .tb-logo{display:none}
+/* Toggle claro/oscuro de la MARCA: alterna cliente-a (ámbar/dark) ↔ cliente-a-light (celeste/claro).
+   Ahora es seguro (ambas variantes comparten el re-layout; el toggle recarga). Pill temático. */
+:root[data-theme^="cliente-"] #theme-btn{display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border-radius:8px;background:var(--live-tint);color:var(--live);
+  border:1px solid var(--live-border);cursor:pointer;font-size:14px;line-height:1}
+/* ── Título como panel retro (fuente de reloj DSEG + neón ámbar): identidad PULSO → SOLO familia cliente-a
+   (cliente-a dark + cliente-a-light). Otras caras de cliente (p.ej. cliente-gore, gobierno) usan el título
+   limpio de la regla base. ── */
+:root[data-theme^="cliente-a"] #tb-title{font-family:'DSEG14','VT323',ui-monospace,monospace;
+  font-size:clamp(12px,1.05vw,17px);line-height:1.2;letter-spacing:.02em;
+  color:var(--live);text-shadow:0 0 10px rgba(224,168,54,.45)}
+/* ── Dos ondas de pulsos ANIMADAS en el header (reemplazan los 3 LEDs). El TAMAÑO y el COLOR (tokens) son
+   compartidos por todas las caras; el GLOW neón ámbar es solo PULSO (cliente-a). ── */
+:root[data-theme^="cliente-"] .tb-router{width:clamp(90px,11vw,210px);height:22px;overflow:hidden;padding:0;gap:0;align-items:center}
+:root[data-theme^="cliente-"] .tb-router svg{width:100%;height:100%;display:block}
+:root[data-theme^="cliente-"] .tb-router .wv{stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+:root[data-theme^="cliente-"] .tb-router .wv1{stroke:var(--live)}
+:root[data-theme^="cliente-"] .tb-router .wv2{stroke:var(--alert);opacity:.9}
+:root[data-theme^="cliente-a"] .tb-router .wv1{filter:drop-shadow(0 0 2.5px rgba(224,168,54,.6))}
+:root[data-theme^="cliente-a"] .tb-router .wv2{filter:drop-shadow(0 0 2.5px rgba(229,96,77,.5))}
+/* ── Cara GORE: ondas azul (marca) + verde (marca), título institucional en azul, emblema en el header. ── */
+:root[data-theme="cliente-gore"] .tb-router .wv2{stroke:var(--infra-efectivo);opacity:1}
+:root[data-theme="cliente-gore"] #tb-title{color:var(--live);font-weight:800}
+:root[data-theme="cliente-gore"] .tb-logo{display:none}
+:root[data-theme="cliente-gore"] .gore-emblem{display:block;height:40px;width:auto;flex:none}
+/* ── Variante CLARA (cliente-a-light): el neón es lenguaje del dark → en claro título y ondas van NÍTIDOS,
+   sin glow, sobre el fondo celeste/pastel. Los colores ya vienen de los tokens del tema claro. ── */
+:root[data-theme="cliente-a-light"] #tb-title{text-shadow:none}
+:root[data-theme="cliente-a-light"] .tb-router .wv1{filter:none}
+:root[data-theme="cliente-a-light"] .tb-router .wv2{filter:none;opacity:1}
+:root[data-theme="cliente-a-light"] .kpi:hover{box-shadow:var(--shadow-hover)}
+/* en angosto: el riel vuelve a banda superior (columna) */
+@media(max-width:1100px){
+  :root[data-theme^="cliente-"] #normal-view,
+  :root[data-theme^="cliente-"] #infra-view,
+  :root[data-theme^="cliente-"] #demanda-view{flex-direction:column}
+  :root[data-theme^="cliente-"] #kpis2,
+  :root[data-theme^="cliente-"] #infra-kpis,
+  :root[data-theme^="cliente-"] #dem-kpis{flex:0 0 auto;grid-template-columns:repeat(2,1fr)}
+}
+
+/* ── Selector de modo (Operación/Infra/Demanda) como RIEL VERTICAL a la IZQUIERDA.
+   initCityChrome mueve `.modo-bar` dentro del flex-row para temas de cliente. ── */
+:root[data-theme^="cliente-"] .modo-bar{flex:0 0 232px;width:232px;flex-direction:column;
+  justify-content:flex-start;align-items:stretch;border-bottom:none;
+  border-right:1px solid var(--line);padding:14px 12px;background:var(--surface-1);overflow-y:auto}
+:root[data-theme^="cliente-"] #modo-switch{flex-direction:column;width:100%;gap:6px;
+  background:none;border:none;border-radius:0;padding:0}
+:root[data-theme^="cliente-"] #modo-switch button{justify-content:flex-start;padding:11px 13px;
+  border-radius:9px;font-size:13.5px}
+:root[data-theme^="cliente-"] #modo-switch button.on{background:var(--live-tint);
+  box-shadow:inset 3px 0 0 var(--live)}
+
+/* ── Navegación consolidada: Ciudad + Línea como acordeones bajo los modos ── */
+:root[data-theme^="cliente-"] .nav-accordions{margin-top:14px;padding-top:12px;
+  border-top:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
+:root[data-theme^="cliente-"] .nav-sec-h{width:100%;display:flex;align-items:center;
+  justify-content:space-between;background:none;border:none;color:var(--text-mid);
+  font-family:var(--font-ui);font-weight:700;font-size:11px;letter-spacing:.11em;
+  text-transform:uppercase;padding:9px 7px;cursor:pointer}
+:root[data-theme^="cliente-"] .nav-sec-h:hover{color:var(--tx)}
+:root[data-theme^="cliente-"] .nav-sec-h .chev{color:var(--text-lo);font-size:10px}
+:root[data-theme^="cliente-"] .nav-sec.open > .nav-sec-h .chev{color:var(--live)}
+:root[data-theme^="cliente-"] .nav-sec-b{display:none;padding:0 2px 8px}
+:root[data-theme^="cliente-"] .nav-sec.open > .nav-sec-b{display:block}
+/* Ciudad: comunas en columna */
+:root[data-theme^="cliente-"] #nav-ciudad #comuna-tabs{display:flex;flex-direction:column;gap:3px}
+:root[data-theme^="cliente-"] #nav-ciudad .ctab{display:block;text-align:left;padding:7px 10px;border-radius:7px;font-size:12.5px}
+:root[data-theme^="cliente-"] #nav-ciudad .vsep{display:none}
+/* Línea: bloque de búsqueda+lista siempre visible dentro del acordeón */
+:root[data-theme^="cliente-"] #oper-sidebar{display:block !important}
+:root[data-theme^="cliente-"] #nav-linea #linea-list{max-height:44vh;overflow-y:auto}
+/* Ocultar la barra de comunas de arriba (movida) y el panel derecho salvo en infra (lista de ejes) */
+:root[data-theme^="cliente-"] .comuna-bar{display:none}
+:root[data-theme^="cliente-"] body:not(.modo-infra) #sidebar{display:none}
+
+/* ── Pills / dot en vivo: oro cálido, anillo sutil (sin pulso neón) ── */
+:root[data-theme^="cliente-"] .livedot,:root[data-theme^="cliente-"] .pill .dot{
+  animation:none;box-shadow:0 0 0 3px var(--live-tint)}
+
+/* Responsive: en pantallas chicas el panel vuelve arriba (no forzar la inversión) */
+@media(max-width:900px){
+  :root[data-theme^="cliente-"] #sidebar{order:0;width:auto;
+    border-left:none;border-right:1px solid var(--line)}
+}
