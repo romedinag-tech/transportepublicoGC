@@ -237,6 +237,8 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 :root[data-theme="cliente-gore"] #tb-title{color:var(--live);font-weight:800}
 :root[data-theme="cliente-gore"] .tb-logo{display:none}
 :root[data-theme="cliente-gore"] .gore-emblem{display:block;height:40px;width:auto;flex:none}
+/* GORE es marca de UN solo tema (claro institucional) → sin toggle dark/light (evita cliente-gore-light inexistente). */
+:root[data-theme="cliente-gore"] #theme-btn{display:none}
 /* ── Variante CLARA (cliente-a-light): el neón es lenguaje del dark → en claro título y ondas van NÍTIDOS,
    sin glow, sobre el fondo celeste/pastel. Los colores ya vienen de los tokens del tema claro. ── */
 :root[data-theme="cliente-a-light"] #tb-title{text-shadow:none}
