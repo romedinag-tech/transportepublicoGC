@@ -232,13 +232,13 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 :root[data-theme^="cliente-"] .tb-router .wv2{stroke:var(--alert);opacity:.9}
 :root[data-theme^="cliente-a"] .tb-router .wv1{filter:drop-shadow(0 0 2.5px rgba(224,168,54,.6))}
 :root[data-theme^="cliente-a"] .tb-router .wv2{filter:drop-shadow(0 0 2.5px rgba(229,96,77,.5))}
-/* ── Cara GORE: ondas azul (marca) + verde (marca), título institucional en azul, emblema en el header. ── */
-:root[data-theme="cliente-gore"] .tb-router .wv2{stroke:var(--infra-efectivo);opacity:1}
-:root[data-theme="cliente-gore"] #tb-title{color:var(--live);font-weight:800}
-:root[data-theme="cliente-gore"] .tb-logo{display:none}
-:root[data-theme="cliente-gore"] .gore-emblem{display:block;height:40px;width:auto;flex:none}
-/* GORE es marca de UN solo tema (claro institucional) → sin toggle dark/light (evita cliente-gore-light inexistente). */
-:root[data-theme="cliente-gore"] #theme-btn{display:none}
+/* ── Cara GORE (data-theme="gore"): SOLO re-color de la versión clara + logo, sobre el LAYOUT ORIGINAL
+   (NO es cliente-* → no lleva nav consolidado, ni fuente retro, ni ondas). Emblema oficial en el header,
+   campanil heredado fuera, título en azul institucional. Sin toggle (marca de un tema; escape: ?theme=dark). ── */
+:root[data-theme="gore"] #tb-title{color:var(--live)}
+:root[data-theme="gore"] .tb-logo{display:none}
+:root[data-theme="gore"] .gore-emblem{display:block;height:40px;width:auto;flex:none;align-self:center}
+:root[data-theme="gore"] #theme-btn{display:none}
 /* ── Variante CLARA (cliente-a-light): el neón es lenguaje del dark → en claro título y ondas van NÍTIDOS,
    sin glow, sobre el fondo celeste/pastel. Los colores ya vienen de los tokens del tema claro. ── */
 :root[data-theme="cliente-a-light"] #tb-title{text-shadow:none}

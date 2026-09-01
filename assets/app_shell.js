@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=228`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=229`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -103,9 +103,13 @@ function speedColor(v){
 
 /* tema (claro/oscuro): TH() para que los charts ECharts sigan el tema (cssv se define arriba) */
 const TH = () => ({tx:cssv("--tx"), mut:cssv("--muted"), axis:cssv("--ch-axis"), grid:cssv("--ch-grid"), tip:cssv("--ch-tip"), tipB:cssv("--line2"), font:cssv("--font-ui")||"IBM Plex Sans,system-ui,sans-serif"});
+// Clave de tema por-RUTA: los sitios de GitHub Pages comparten origen (romedinag-tech.github.io) → una clave
+// única "gccp-theme" filtraba el tema de un dashboard (p.ej. la cara PULSO del lab) a los demás (GCCP prod).
+// Con la ruta en la clave, cada tablero persiste su tema por separado.
+const THEME_KEY = "tp-theme:"+((typeof location!=="undefined" && location.pathname.split('/')[1])||'root');
 function applyTheme(t){
   document.documentElement.dataset.theme = t;
-  try{ localStorage.setItem("gccp-theme", t); }catch(e){}
+  try{ localStorage.setItem(THEME_KEY, t); }catch(e){}
   const btn=$("theme-btn"); if(btn) btn.textContent = (t==="light"||/-light$/.test(t)) ? "☾" : "☀";
 }
 function toggleTheme(){
@@ -115,7 +119,7 @@ function toggleTheme(){
   // TODO limpio en el tema nuevo (la head-init honra la variante cliente-* persistida en localStorage).
   if(/^cliente/.test(t)){
     const nx = t.endsWith("-light") ? t.replace(/-light$/,"") : t+"-light";
-    try{ localStorage.setItem("gccp-theme", nx); }catch(e){}
+    try{ localStorage.setItem(THEME_KEY, nx); }catch(e){}
     location.reload(); return;
   }
   applyTheme(t==="light" ? "dark" : "light");
@@ -226,8 +230,9 @@ function initCityChrome(){
       '<path class="wv wv2" fill="none" d="M0 10 H7 L9 17 L11 10 H40 M40 10 H47 L49 17 L51 10 H80"><animateTransform attributeName="transform" type="translate" from="0 0" to="-40 0" dur="2.1s" repeatCount="indefinite"/></path>'+
       '</svg>';
   }
-  // Cara GORE Biobío (cliente-gore): emblema oficial del Gobierno Regional en el header + co-marca institucional.
-  if(document.documentElement.dataset.theme==="cliente-gore"){
+  // Cara GORE Biobío (data-theme="gore"): SOLO re-color claro + logo, sobre el layout ORIGINAL (no cliente-*).
+  // Emblema oficial del Gobierno Regional en el header + co-marca institucional en el subtítulo.
+  if(document.documentElement.dataset.theme==="gore"){
     const hc=document.querySelector(".hdr-center");
     if(hc && !hc.querySelector(".gore-emblem")){
       const img=document.createElement("img");

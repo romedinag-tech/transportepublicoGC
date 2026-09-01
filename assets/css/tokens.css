@@ -267,12 +267,13 @@
   --ch-grid: rgba(20,33,46,.08);  --ch-axis: #6B7B8C;  --ch-tip: #FFFFFF;  --ch-line: #1D6FB8;
 }
 
-/* ─── Cara CLIENTE "GORE Biobío" — modo CLARO institucional (data-theme="cliente-gore", alias ?theme=gore).
+/* ─── Cara "GORE Biobío" — SOLO re-color de la versión CLARA + logo (data-theme="gore", ?theme=gore).
+   NO es una cara "cliente-*": conserva el LAYOUT ORIGINAL del tablero (sin nav consolidado, sin fuente retro
+   ni ondas de PULSO) — es el pedido de Rodrigo: "solo la versión clara con los colores GORE y el logo".
    Identidad del Gobierno Regional del Biobío MEDIDA de gorebiobio.cl: azul institucional #002A5A (primario,
-   14.2:1 sobre blanco) + verde de marca #6DAB24 (acento/marcas; #4E7D1A su versión de texto AA). Fondos blanco/
-   gris muy claro. Paleta completa + AA verificada por agente de diseño. NO lleva la fuente retro ni el neón de
-   PULSO (esos son [data-theme^="cliente-a"]); título limpio y serio. ─── */
-:root[data-theme="cliente-gore"] {
+   14.2:1 sobre blanco) + verde de marca #6DAB24 (marcas; #4E7D1A su versión de texto AA). Fondos blanco/gris
+   muy claro. Paleta completa + AA verificada por agente de diseño. ─── */
+:root[data-theme="gore"] {
   /* Superficies (claras, institucionales) */
   --bg-void:    #E9ECF0;  --bg-base:    #F5F5F5;
   --surface-1:  #FFFFFF;  --surface-2:  #F0F2F5;
