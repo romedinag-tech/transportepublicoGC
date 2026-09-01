@@ -187,9 +187,11 @@
   --ch-line: rgba(124,138,160,.35);
 }
 
-/* ─── Tema de cliente DEMO — "Ámbar / Grafito" (dark cálido, acento oro): prueba de que la
-   misma data+scripts rinde con una cara completamente distinta. Se activa con data-theme="cliente-a". ─── */
-:root[data-theme="cliente-a"] {
+/* ─── Tema "Ámbar / Grafito" (dark cálido, acento oro). Lo usan DOS temas: la cara PULSO (cliente-a, con
+   re-layout) y la VISTA OSCURA de la cara GORE (gore-dark, sobre el layout ORIGINAL del GCCP — Rodrigo pidió
+   "la oscura ámbar tipo Temuco tal cual"). Comparten SOLO estos tokens; el re-layout/DSEG es solo cliente-a. ─── */
+:root[data-theme="cliente-a"],
+:root[data-theme="gore-dark"] {
   /* Superficies — grafito cálido (café tostado), no negro-azulado */
   --bg-void:   #12100E;  --bg-base:   #1A1714;
   --surface-1: #221E19;  --surface-2: #2B2620;

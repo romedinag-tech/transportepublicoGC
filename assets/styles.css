@@ -232,13 +232,33 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 :root[data-theme^="cliente-"] .tb-router .wv2{stroke:var(--alert);opacity:.9}
 :root[data-theme^="cliente-a"] .tb-router .wv1{filter:drop-shadow(0 0 2.5px rgba(224,168,54,.6))}
 :root[data-theme^="cliente-a"] .tb-router .wv2{filter:drop-shadow(0 0 2.5px rgba(229,96,77,.5))}
-/* ── Cara GORE (data-theme="gore"): SOLO re-color de la versión clara + logo, sobre el LAYOUT ORIGINAL
-   (NO es cliente-* → no lleva nav consolidado, ni fuente retro, ni ondas). Emblema oficial en el header,
-   campanil heredado fuera, título en azul institucional. Sin toggle (marca de un tema; escape: ?theme=dark). ── */
-:root[data-theme="gore"] #tb-title{color:var(--live)}
-:root[data-theme="gore"] .tb-logo{display:none}
-:root[data-theme="gore"] .gore-emblem{display:block;height:40px;width:auto;flex:none;align-self:center}
-:root[data-theme="gore"] #theme-btn{display:none}
+/* ═══ Cara GORE (gore = claro institucional · gore-dark = ámbar/grafito tipo Temuco). LAYOUT ORIGINAL del GCCP
+   (NO cliente-* → sin nav consolidado, sin fuente retro, sin ondas). dashboard-pro: los colores de MARCA llegan
+   al CUERPO — bordes de tarjetas, mapa, tabs y nombres de línea — con intensidad. Basado en tokens: azul/verde
+   GORE en claro, ámbar en oscuro. El toggle alterna claro↔oscuro. ═══ */
+:root[data-theme^="gore"] .tb-logo{display:none}
+:root[data-theme^="gore"] .gore-emblem{display:block;height:40px;width:auto;flex:none;align-self:center}
+:root[data-theme^="gore"] #tb-title{color:var(--live)}
+/* Tarjetas / widgets: borde de acento de marca + franja superior azul→verde (grad-brand) */
+:root[data-theme^="gore"] .widget{border-color:var(--live-border)}
+:root[data-theme^="gore"] .widget::before{background:var(--grad-brand);height:2px;opacity:.95}
+:root[data-theme^="gore"] .widget-h{border-bottom-color:var(--live-border)}
+:root[data-theme^="gore"] .widget-h .ico{background:var(--live-tint);color:var(--live)}
+/* Mapa: esquinas y borde en marca (reemplaza el teal #34E1C4 heredado del GCCP) */
+:root[data-theme^="gore"] .map-hero{box-shadow:inset 0 0 0 1.5px var(--live-border)}
+:root[data-theme^="gore"] .map-hero .corner{border-color:var(--good) !important}
+:root[data-theme^="gore"] .widget-h .ico-png img{filter:drop-shadow(0 0 5px var(--live))}
+/* Tabs de comuna activas → azul de marca (no ámbar) */
+:root[data-theme^="gore"] .comuna-bar .ctab.active{background:var(--live-tint);color:var(--live);border-color:var(--live-border);box-shadow:inset 0 -2px 0 var(--live)}
+/* Nombres de línea: activo con barra de acento; código de línea en color de marca */
+:root[data-theme^="gore"] .litem.active{background:var(--live-tint);box-shadow:inset 3px 0 0 var(--live)}
+:root[data-theme^="gore"] .litem.active .ln,:root[data-theme^="gore"] .litem .ln{color:var(--live);font-weight:700}
+/* KPI: barra de acento de marca a la izquierda */
+:root[data-theme^="gore"] .kpi{border-left:3px solid var(--live)}
+/* Intensidad NEÓN en la vista OSCURA (ámbar): glow en bordes de tarjeta y mapa (dashboard-pro) */
+:root[data-theme="gore-dark"] .widget:hover{box-shadow:var(--shadow-hover),0 0 16px -6px var(--live)}
+:root[data-theme="gore-dark"] .map-hero{box-shadow:inset 0 0 0 1.5px var(--live-border),0 0 22px -10px var(--live)}
+:root[data-theme="gore-dark"] .widget::before{opacity:1}
 /* ── Variante CLARA (cliente-a-light): el neón es lenguaje del dark → en claro título y ondas van NÍTIDOS,
    sin glow, sobre el fondo celeste/pastel. Los colores ya vienen de los tokens del tema claro. ── */
 :root[data-theme="cliente-a-light"] #tb-title{text-shadow:none}

@@ -32,7 +32,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=229`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=230`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -110,10 +110,13 @@ const THEME_KEY = "tp-theme:"+((typeof location!=="undefined" && location.pathna
 function applyTheme(t){
   document.documentElement.dataset.theme = t;
   try{ localStorage.setItem(THEME_KEY, t); }catch(e){}
-  const btn=$("theme-btn"); if(btn) btn.textContent = (t==="light"||/-light$/.test(t)) ? "☾" : "☀";
+  const btn=$("theme-btn"); if(btn) btn.textContent = (t==="light"||/-light$/.test(t)||t==="gore") ? "☾" : "☀";
 }
 function toggleTheme(){
   const t=document.documentElement.dataset.theme||"";
+  // Cara GORE: alternar claro (gore) ↔ oscuro ámbar (gore-dark) SIN recargar — es el layout ORIGINAL (no
+  // cliente → no hay re-layout que reconstruir); render() re-colorea los charts con los tokens nuevos.
+  if(/^gore/.test(t)){ applyTheme(t==="gore-dark"?"gore":"gore-dark"); if(typeof render==="function") render(); return; }
   // Cara de cliente: alternar entre la variante oscura y su gemela "-light" RECARGANDO. El re-layout
   // (nav/acordeones/.view-content) y ECharts/Leaflet cachean estado al construirse; un reload reconstruye
   // TODO limpio en el tema nuevo (la head-init honra la variante cliente-* persistida en localStorage).
@@ -232,7 +235,7 @@ function initCityChrome(){
   }
   // Cara GORE Biobío (data-theme="gore"): SOLO re-color claro + logo, sobre el layout ORIGINAL (no cliente-*).
   // Emblema oficial del Gobierno Regional en el header + co-marca institucional en el subtítulo.
-  if(document.documentElement.dataset.theme==="gore"){
+  if(/^gore/.test(document.documentElement.dataset.theme||"")){
     const hc=document.querySelector(".hdr-center");
     if(hc && !hc.querySelector(".gore-emblem")){
       const img=document.createElement("img");
