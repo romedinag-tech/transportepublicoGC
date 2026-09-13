@@ -14,3 +14,6 @@ __pycache__/
 
 # F4: Tailwind CLI binario y workfile (la salida assets/tw.css SÍ se commitea)
 .tw/
+
+# Backups de corrección de terminal y config local del kit (no publicar)
+*.bak_terminal

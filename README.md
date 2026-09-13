@@ -6,8 +6,11 @@ Plataforma analítica del sistema de transporte público regulado del **Gran Con
 
 > **🛰️ Visor en vivo:** https://romedinag-tech.github.io/transportepublicoGC/
 
-![Período](https://img.shields.io/badge/per%C3%ADodo-abr%202025%20%E2%80%93%20abr%202026-22d3ee)
-![Registros](https://img.shields.io/badge/registros-302.3M-34d399)
+> ℹ️ *README de vitrina pública (marketing). La documentación técnica y fuente de verdad del proyecto es
+> [`../GUIA_MAESTRA.md`](../GUIA_MAESTRA.md); las cifras/stack de aquí pueden ir por detrás.*
+
+![Período](https://img.shields.io/badge/per%C3%ADodo-abr%202025%20%E2%80%93%20ago%202026-22d3ee)
+![Registros](https://img.shields.io/badge/registros-395.0M-34d399)
 ![Líneas](https://img.shields.io/badge/l%C3%ADneas-36-a78bfa)
 ![GTFS](https://img.shields.io/badge/GTFS-oficial-fb923c)
 ![Stack](https://img.shields.io/badge/stack-BigQuery%20%2B%20DuckDB%20%2B%20ECharts%20%2B%20Leaflet-0ea5e9)
