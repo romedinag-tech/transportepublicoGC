@@ -43,7 +43,7 @@
 <!-- Tailwind purged utilities (~12 KB static, no runtime recompilation) -->
 <link rel="stylesheet" href="assets/tw.css?v=230">
 <!-- Aplica el tema guardado antes del paint (evita parpadeo) -->
-<script>try{var K="tp-theme:"+(location.pathname.split('/')[1]||'root');var q=new URLSearchParams(location.search).get('theme');var t=q||localStorage.getItem(K)||"dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
+<script>try{var K="tp-theme:"+(location.pathname.split('/')[1]||'root');var q=new URLSearchParams(location.search).get('theme');var t=q||localStorage.getItem(K)||"dark";if(!q&&/^gore/.test(t))t="dark";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
   /* ===== Chrome del centro de mando ===== */
   html,body{height:100%}
@@ -1007,7 +1007,7 @@
 <!-- F4: defer en ambos (orden de declaración se respeta) → no bloquean parse; leaflet con defer en <head> ya cargó antes -->
 <script defer src="assets/echarts.min.js"></script>
 <script src="config.js?v=230"></script>
-<script defer src="assets/app_shell.js?v=232"></script>
+<script defer src="assets/app_shell.js?v=233"></script>
 <script>
   /* Sidebar colapsable + recálculo de mapa/charts al cambiar el ancho */
   (function(){
