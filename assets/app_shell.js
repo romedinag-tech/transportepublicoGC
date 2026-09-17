@@ -3343,7 +3343,12 @@ function renderHeat(){
     yCats=meses.map(mesLab); data=MESH.map(x=>[x.hora, meses.indexOf(x.mes), Math.round(x.prom)]);
     maxv=Math.max(...MESH.map(x=>x.prom));
   } else {
-    const lab=["","Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+    // `dow` viene en convención BigQuery: 1=DOMINGO … 7=sábado. Las etiquetas eran
+    // ["","Lun","Mar",…] y con y=dow-1 rotulaban el domingo como "Lun": TODOS los días salían
+    // corridos uno. Medido en dow_hora.json: dow=1 suma 7.382 de actividad (el día más bajo de
+    // la semana, o sea domingo) y estaba rotulado "Lun"; dow=7 suma 10.789 (sábado).
+    // No cambiar sin volver a medir cuál es el día de menos actividad.
+    const lab={1:"Dom",2:"Lun",3:"Mar",4:"Mié",5:"Jue",6:"Vie",7:"Sáb"};
     yCats=[1,2,3,4,5,6,7].map(d=>lab[d]); data=DOWH.map(x=>[x.hora, x.dow-1, Math.round(x.prom)]);
     maxv=Math.max(...DOWH.map(x=>x.prom));
   }
