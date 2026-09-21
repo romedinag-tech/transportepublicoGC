@@ -1,4 +1,5 @@
-/* Visor Transporte Antofagasta — navegación por comuna (territorio) y línea (operador) */
+/* Shell ÚNICO y city-agnóstico del tablero de transporte público — navegación por comuna (territorio) y
+   línea (operador). Todo lo propio de la ciudad entra por window.CITY (config.js) y por data/. */
 const IC={
   bus:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="14" rx="3"/><path d="M6 10h12"/><circle cx="9" cy="20" r="1"/><circle cx="15" cy="20" r="1"/><path d="M6 17v4M18 17v4"/></svg>',
   zap:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
@@ -32,7 +33,7 @@ CITY.comunas=CITY.comunas||[]; CITY.comunasGeojson=CITY.comunasGeojson||"comunas
 CITY.live=!!CITY.live; CITY.liveBase=CITY.liveBase||""; CITY.voz=CITY.voz||{ejeSing:"eje",ejePlur:"ejes",EjePlur:"Ejes"};
 const _cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
 const _liveUrl=n=> (CITY.live&&CITY.liveBase?CITY.liveBase:"data/")+n;
-const J = n => fetch(`data/${n}?v=234`).then(r=>{if(!r.ok)throw 0;return r.json();});
+const J = n => fetch(`data/${n}?v=236`).then(r=>{if(!r.ok)throw 0;return r.json();});
 // reloj en vivo (fecha + hora Chile) en el header — útil para las capturas
 function tickReloj(){
   const el = document.getElementById("hdr-reloj-txt"); if(!el) return;
@@ -43,7 +44,7 @@ function tickReloj(){
   el.textContent = `${f} · ${h}`;
 }
 try{ tickReloj(); setInterval(tickReloj, 30000); }catch(e){}
-const BUILD = "2026-09-15 12:00";
+const BUILD = "2026-07-06 02:30";
 
 let T, GEOM, GEO, CUMP, PAR={}, CSEM={lineas:{}}, LIVE=null, COB=null, EQ={lineas:{}}, GRID=null, OP={lineas:{}}, EMPL={}, CLIN={}, CONGRED=null, RFREQ=null, SGSTATS=null, TERMCONF=null, AYERFREQ=null;
 let DIA=null, BASE30=null;   // vivo (dia.json) y baseline histórico 30min — recuadros del inicio
@@ -68,13 +69,54 @@ let csChart, freqChart, linFreqChart, lineFreqHistChart, rankProgChart, lmap, ba
 const LIVE_URL = _liveUrl("live.json");
 // Modos del mapa gateados por lo que la ciudad TIENE datos: 'live'/'exc' solo con feed; trans/salud/edu/nse
 // requieren EOD + catastro SII (CITY.rich, hoy solo GCCP). Así una ciudad estática no muestra modos vacíos.
-const MAP_MODES = [
-  ...(CITY.live ? [["live","En vivo"]] : []),
-  ["conges","Congestión"], ["cover","Cobertura"], ["wait","Espera"], ["bunch","Bunching"],
-  ["det","Detenciones"], ["terms","Terminales"],
-  ...(CITY.live ? [["exc","Excesos vel."]] : []),
-  ...(CITY.rich ? [["trans","Transbordo"], ["salud","Salud"], ["edu","Educación"], ["nse","NSE"]] : []),
-];
+// Los modos temáticos se gateaban EN BLOQUE por `CITY.rich`, así que una ciudad no-rich perdía
+// los 4 aunque tuviera el dato. Medido: Antofagasta, Temuco y Punta Arenas tienen `nse` en el
+// 100% de sus manzanas (3.260/3.260, 3.878/3.878, 1.865/1.865) y aun así el modo NSE estaba
+// oculto; `salud` y `edu`, en cambio, vienen NULOS en las tres (falta materializar los
+// establecimientos). Un flag único no puede decidir por cuatro capas distintas.
+// Ahora cada modo se gatea POR SU PROPIO DATO, medido sobre las manzanas ya cargadas.
+// `trans` también, desde 2026-09-17: estaba amarrado a `CITY.rich` porque el transbordo dependía de
+// la demanda EOD, pero hoy `kpi_censo_od_laboral.py` + `kpi_censo_acceso_laboral.py` derivan el
+// campo `lab` de cada manzana desde la OD laboral del Censo 2024, que existe para cualquier ciudad
+// de Chile. Medido: 3.260/3.260 manzanas en Antofagasta, 3.878/3.878 en Temuco y 1.865/1.865 en
+// Punta Arenas ya traen `lab`, y el modo seguía oculto por el flag.
+function cobTiene(campo){
+  try{
+    const fs = (COB && (COB.features || COB)) || [];
+    for(const f of fs){ const p = f.properties || f; if(p && p[campo] != null) return true; }
+  }catch(e){}
+  return false;
+}
+function cobDiscrimina(get, minDistintos){
+  /* Un modo temático no se habilita porque el campo EXISTA, sino porque el dato DISCRIMINE.
+     Medido: en una ciudad de UNA comuna el transbordo laboral se degenera — Antofagasta toma 2
+     valores (0 y 94,6) con `tr`=0 en el 100% de las manzanas, y Punta Arenas igual, porque la
+     única distinción posible es "hay o no una línea que sirva la comuna": la misma información
+     que la cobertura estática. El mapa saldría casi uniforme y se leería como un análisis de
+     transbordo que no existe. Temuco sí discrimina (dir 0..92, tr 0..7,2 en 3.269 manzanas). */
+  try{
+    const fs = (COB && (COB.features || COB)) || [];
+    const vis = new Set();
+    for(const f of fs){
+      const v = get(f.properties || f);
+      if(v != null) vis.add(Math.round(v*10));
+      if(vis.size >= (minDistintos||4)) return true;
+    }
+  }catch(e){}
+  return false;
+}
+function mapModes(){
+  return [
+    ...(CITY.live ? [["live","En vivo"]] : []),
+    ["conges","Congestión"], ["cover","Cobertura"], ["wait","Espera"], ["bunch","Bunching"],
+    ["det","Detenciones"], ["terms","Terminales"],
+    ...(CITY.live ? [["exc","Excesos vel."]] : []),        // capa viva: se alimenta de live.json
+    ...(cobDiscrimina(p => p.lab && p.lab.dir, 4) ? [["trans","Transbordo"]] : []),
+    ...(cobTiene("salud") ? [["salud","Salud"]] : []),
+    ...(cobTiene("edu")   ? [["edu","Educación"]] : []),
+    ...(cobTiene("nse")   ? [["nse","NSE"]] : []),
+  ];
+}
 const PEAK_H = [7,8,9,17,18,19];
 const PERIODOS = [["agg","Agregado"],["am","Punta AM"],["md","Mediodía"],["pm","Punta PM"],["off","Fuera punta"],["noche","Noche"]];
 const PERIODO_H = {agg:[6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22], am:[7,8,9], md:[12,13,14], pm:[17,18,19], off:[10,11,15,16,20,21,22], noche:[21,22,23]};
@@ -109,8 +151,7 @@ const TH = () => ({tx:cssv("--tx"), mut:cssv("--muted"), axis:cssv("--ch-axis"),
 const THEME_KEY = "tp-theme:"+((typeof location!=="undefined" && location.pathname.split('/')[1])||'root');
 function applyTheme(t){
   document.documentElement.dataset.theme = t;
-  // GORE es efímero: solo se usa vía ?theme=gore (benchmarking on-demand), nunca se persiste ni queda por defecto.
-  try{ if(!/^gore/.test(t)) localStorage.setItem(THEME_KEY, t); }catch(e){}
+  try{ localStorage.setItem(THEME_KEY, t); }catch(e){}
   const btn=$("theme-btn"); if(btn) btn.textContent = (t==="light"||/-light$/.test(t)||t==="gore") ? "☾" : "☀";
 }
 function toggleTheme(){
@@ -131,6 +172,78 @@ function toggleTheme(){
 }
 
 const cellOf = () => (T.cells[`${state.comuna}|${state.linea}`] || {kpi:null, horas:[]});
+
+/* ═══ UNIDAD DEL PADRÓN DE LA CAPA DE MANZANAS: `hog` con fallback a `n` ═══════════════════════════
+   Dos generadores distintos alimentan cobertura.json y NO escriben el mismo campo:
+     · cobertura RICA (censo + catastro SII; hoy solo GCCP) → `hog` = HOGARES por manzana.
+     · cobertura PORTABLE (kpi_cobertura_censo.py, ciudades sin SII) → `n` = PERSONAS (n_per del Censo);
+       `hog` puede venir ausente, o en CERO cuando la fuente no publica n_hog (el script hace
+       `int(round(n_hog or 0))`, así que un NULL aguas arriba llega como 0, no como ausente).
+   Leer `p.hog` a secas dejaba la ciudad en 0/—/null. Medido en Antofagasta: Σhog = 0 contra
+   Σn = 388.478 en 3.260 manzanas (0 manzanas con hog>0); Temuco 3.876/3.878 con hog>0.
+
+   DOS REGLAS que importan:
+   1) La decisión es por CAPA, UNA sola vez — no por manzana. Mezclar hogares en unas y personas en
+      otras daría un total sin significado. Por eso `hog` se acepta solo si la capa TIENE hogares
+      utilizables (algún valor finito > 0); si no, toda la capa se lee por `n`.
+   2) El RÓTULO sigue al campo efectivamente usado. Si se están contando personas, no se dice
+      "hogares": no existe conversión población→hogares y no se inventa ninguna.
+   `cobertura_din_lineas.json` (DINL) se deriva de esta MISMA capa con el mismo campo — verificado
+   midiendo: DINL.lineas["102"].hog = 168.579 = Σn exacta de las manzanas de la 102 en Antofagasta, y
+   DINL.lineas["1"].hog = 45.301 = Σhog exacta en Temuco. Por eso su rótulo usa este mismo flag. */
+let _COB_UNIT = null;
+const _COB_UNIT_HOG = {campo:"hog", esHog:true,  plural:"hogares",    Cap:"Hogares",    corto:"hog"};
+const _COB_UNIT_POB = {campo:"n",   esHog:false, plural:"habitantes", Cap:"Habitantes", corto:"hab"};
+function cobUnit(){
+  if(_COB_UNIT) return _COB_UNIT;
+  const fs = (COB && COB.features) || null;
+  if(!fs || !fs.length) return _COB_UNIT_HOG;            // aún sin cargar: no se cachea (se re-evalúa)
+  const hayHog = fs.some(f => { const v = f.properties && f.properties.hog;
+                                return typeof v === "number" && isFinite(v) && v > 0; });
+  return (_COB_UNIT = hayHog ? _COB_UNIT_HOG : _COB_UNIT_POB);
+}
+/* valor del padrón de UNA manzana, ya resuelto al campo de la capa (con `n` como último recurso) */
+function mzHog(p){
+  if(!p) return 0;
+  const v = p[cobUnit().campo];
+  if(typeof v === "number" && isFinite(v)) return v;
+  return (typeof p.n === "number" && isFinite(p.n)) ? p.n : 0;
+}
+const HOGL = () => cobUnit().plural;   // "hogares" | "habitantes"
+const HOGC = () => cobUnit().Cap;      // "Hogares" | "Habitantes"
+const HOGS = () => cobUnit().corto;    // "hog"     | "hab"
+/* ¿la capa trae avalúo (NSE) en alguna manzana? Sin SII viene null en TODAS (Antofagasta: 3.260/3.260),
+   y entonces los desgloses por tercil deben decir "sin dato", no afirmar un 0 medido. */
+let _COB_HAS_NSE = null;
+function cobHasNSE(){
+  if(_COB_HAS_NSE !== null) return _COB_HAS_NSE;
+  const fs = (COB && COB.features) || null;
+  if(!fs || !fs.length) return false;                    // sin cargar: no se cachea
+  return (_COB_HAS_NSE = fs.some(f => { const v = f.properties && f.properties.nse;
+                                        return typeof v === "number" && isFinite(v) && v > 0; }));
+}
+/* % del padrón a ≤300 m de la red. Lo normal es leerlo de `resumen.cob_est.pct_hogares_cubiertos`, pero
+   la cobertura portable lo deja en null (Antofagasta) y el resumen quedaba en "—".
+   Se reconstruye ponderando el `cob_est` de cada manzana (% de la manzana a ≤300 m) por su padrón:
+        pct = Σ(padrón_i × cob_est_i/100) / Σ padrón_i
+   VALIDADO contra la cifra oficial de las dos ciudades que sí la publican, antes de usarlo:
+     Temuco       94,6 % reconstruido vs 94,6 % publicado   (y 91,4 % vs 91,4 % en el corte ≥80 %)
+     Punta Arenas 92,7 % reconstruido vs 92,7 % publicado   (y 89,7 % vs 89,7 %)
+   4 de 4 exactos ⇒ es la MISMA definición del generador, no una variante. `derivado` queda en true para
+   poder decirlo en pantalla. */
+function cobEstPct(){
+  const pub = COB && COB.resumen && COB.resumen.cob_est && COB.resumen.cob_est.pct_hogares_cubiertos;
+  if(typeof pub === "number" && isFinite(pub)) return {pct:pub, derivado:false};
+  const fs = (COB && COB.features) || null;
+  if(!fs || !fs.length) return {pct:null, derivado:false};
+  let num = 0, den = 0;
+  for(const f of fs){
+    const p = f.properties, ce = p && p.cob_est;
+    if(typeof ce !== "number" || !isFinite(ce)) continue;
+    const v = mzHog(p); den += v; num += v * ce / 100;
+  }
+  return den > 0 ? {pct: Math.round(1000*num/den)/10, derivado:true} : {pct:null, derivado:false};
+}
 const empresaDe = ln => { const x=(T.lineas||[]).find(l=>l.linea===ln); return (x&&x.empresa)?x.empresa:(x&&x.nombre)?x.nombre:""; };
 
 /* ---------- menús ---------- */
@@ -172,7 +285,7 @@ function initCityChrome(){
   // indicador de estado: feed en vivo (dot + edad) para ciudades LIVE; análisis histórico para estáticas
   set("#hdr-status", CITY.live
       ? `<span class="dot-live"></span><span>actualizado hace <span id="live-age" class="font-mono text-[var(--tx)]">—</span></span>`
-      : `<span>análisis histórico · GPS</span>`);
+      : `<span>GPS · <span id="hdr-ventana">—</span></span>`);
   set("#hdr-status", CITY.live ? "Última actualización del feed GTFS-RT" : "Análisis sobre registros GPS históricos (sin feed en vivo)", "title");
   // encabezados del lente de infraestructura (voz: ejes / corredores)
   set("#infra-map-title", `Principales ${V.ejePlur} con transporte público`);
@@ -331,6 +444,7 @@ function buildLineaList(filter=""){
 
 /* ---------- render ---------- */
 function render(){
+  try{ setHdrVentana(); }catch(e){}   // el período del dato en el encabezado (ciudad estática)
   // ETAPA 2: por defecto NO estamos en la vista de línea compuesta (oferta+demanda apiladas); el hook al
   // final del bloque de operación la reactiva si corresponde. Esto limpia el estado al cambiar de modo/vista
   // (p.ej. al entrar al modo demanda independiente, donde el ranking de líneas SÍ debe verse).
@@ -517,6 +631,26 @@ function renderDemCtrls(){
     pm.querySelectorAll("b").forEach(b=>b.onclick=()=>{ demMet=b.dataset.dm2; renderDemCtrls(); renderDemMap(); }); }
 }
 function renderDemanda(){
+  /* PERÍODO DE LA DEMANDA — y el aviso cuando NO es el mismo que el de la oferta.
+     En Antofagasta la demanda es de jul-2026 y el GPS de jun-2025: indicadores como
+     "pasajeros por bus" cruzan un numerador de un año con un denominador de otro. La cifra sirve
+     igual (la flota se mantuvo: 88,3% de las patentes calzan), pero quien la lee tiene que saberlo. */
+  try{
+    const n = $("dem-note");
+    if(n && DEM && DEM.periodo){
+      const dd = (DEM.periodo.desde||"").slice(0,7), hh = (DEM.periodo.hasta||"").slice(0,7);
+      const per = (dd===hh||!hh) ? dd : `${dd} a ${hh}`;
+      const of0 = (typeof T!=="undefined" && T && T.desde) ? T.desde.slice(0,7) : null;
+      const of1 = (typeof T!=="undefined" && T && T.hasta) ? T.hasta.slice(0,7) : null;
+      const cruza = of0 && (hh < of0 || dd > (of1||of0));   // sin solape entre demanda y oferta
+      n.innerHTML = `<span class="dot"></span><span>Validaciones del medio de pago de <b>${per}</b>`
+        + (cruza ? ` — la <b>oferta</b> (flota, velocidad, frecuencia) es de <b>${of0===of1?of0:of0+" a "+of1}</b>:
+             los indicadores que cruzan ambas, como <b>pasajeros por bus</b>, comparan períodos distintos.` : "")
+        + `</span>`;
+      n.hidden = false;
+    }
+  }catch(e){}
+
   if(!DEM){ $("dem-kpis").innerHTML='<div class="empty">Cargando demanda…</div>'; return; }
   // Banda de 9 KPIs: del SISTEMA, o de la LÍNEA elegida (empresa/recorrido) si hay una seleccionada.
   const lb = (state.linea && state.linea!=="TODAS") ? (DEM.lineas||[]).find(l=>l.linea===state.linea) : null;
@@ -723,13 +857,102 @@ function renderDemMap(){
   dmapLayer.addTo(dmap);
   setTimeout(()=>{try{dmap.invalidateSize();}catch(e){}},60);
 }
+/* nota de procedencia bajo la banda de KPIs; _kpiNote(null) la oculta */
+/* Tarjeta de KPI HISTÓRICO (no vivo). La usan la vista por comuna —donde el capturador no
+   desglosa— y la banda de una ciudad ESTÁTICA, que no tiene "ahora" contra el cual comparar.
+   Lleva el sello "histórico" para que nadie lea la cifra como si fuera de este minuto. */
+function histCard(lab,val,sub,icon,stt,tip){
+  const st = stt || "neutral";
+  return `<div class="kpi k-hist ${SEM_CARD[st]}" data-k="hist">`+
+    `<div class="lab">${icon?`<span class="ic">${icon}</span>`:""}<span>${lab}</span>`+
+    `<span class="hist-tag" title="${tip||"Cifra del registro histórico, no del vivo"}">histórico</span></div>`+
+    `<div class="val ${SEM_CLS[st]}">${val}</div><div class="sub">${sub}</div></div>`;
+}
+
+/* Encabezado de una ciudad ESTÁTICA: en vez del rótulo vago "análisis histórico", el PERÍODO REAL
+   del dato. GCCP muestra algo concreto ("actualizado hace 20s") y acá corresponde lo equivalente:
+   de cuándo son las cifras que se están mirando. Se alimenta de `desde/hasta` de territorio.json,
+   que escribe refresh_historico midiendo el agregado. */
+const _MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+function _mesAnio(iso){
+  const m = String(iso||"").match(/^(\d{4})-(\d{2})/);
+  return m ? `${_MESES[+m[2]-1]}-${m[1]}` : null;
+}
+let _hdrVentanaOk=false;
+function setHdrVentana(){
+  if(_hdrVentanaOk) return;
+  const el = $("hdr-ventana"); if(!el || typeof T==="undefined" || !T) return;
+  _hdrVentanaOk=true;
+  const a = _mesAnio(T.desde), b = _mesAnio(T.hasta);
+  if(!a && !b) return;
+  // `meses` cuenta solo los meses con >=7 días de dato (lo calcula refresh_historico). Con uno
+  // solo se muestra ESE mes: decir "jun-2025 a jul-2025" cuando julio son 2.159 pulsos de una
+  // madrugada implicaría dos meses de operación que no existen.
+  el.textContent = (T.meses === 1 || a === b || !b) ? a : `${a} a ${b}`;
+  const st = $("hdr-status");
+  if(st) st.setAttribute("title",
+    `Registros GPS históricos${T.dias?` · ${T.dias} días con dato`:""} — esta ciudad no tiene feed en vivo`);
+}
+
+function _kpiNote(html){
+  const n = $("kpis2-note"); if(!n) return;
+  if(!html){ n.hidden = true; n.innerHTML = ""; return; }
+  n.innerHTML = `<span class="dot"></span><span>${html}</span>`;
+  n.hidden = false;
+}
 function renderKPIs(cell){
   const home = state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS";
   const lineView = state.vista==="normal" && state.linea!=="TODAS";
   const comView = state.vista==="normal" && state.comuna!=="TODAS" && state.linea==="TODAS";
-  if((home || lineView || comView) && DIA && BASE30){ renderLiveKPIs(); return; }
+  // COMUNA: el vivo NO sirve a esta escala (ver renderComunaKPIs) → banda histórica, nunca la vacía.
+  if(comView){ renderComunaKPIs(); return; }
+  if((home || lineView) && DIA && BASE30){ renderLiveKPIs(); return; }
   const k = cell.kpi;
-  if(!k){ $("kpis2").innerHTML = `<div class="empty">Sin datos para este ámbito.</div>`; return; }
+  if(!k){ $("kpis2").innerHTML = `<div class="empty">Sin datos para este ámbito.</div>`; _kpiNote(null); return; }
+  // CIUDAD ESTÁTICA (o vivo aún sin cargar): antes se mostraban 4 KPIs planos donde GCCP muestra
+  // 8 gauges, y la diferencia salta a la vista. No hay "ahora" que comparar contra "lo normal",
+  // pero `baseline_30min` YA calcula la partición histórica de la flota (en ruta / en terminal /
+  // fuera de servicio / sin operar) por bin de 30 min, más velocidad, detención y frecuencia.
+  // Se muestra el DÍA LABORAL TÍPICO EN SU PUNTA, con el sello "histórico" en cada tarjeta.
+  if(BASE30 && BASE30.L && Array.isArray(BASE30.L.buses_op)){
+    const L = BASE30.L, bins = BASE30.bins || [];
+    // bin de PUNTA = el de mayor flota en ruta. No una hora fija: cada ciudad puntea distinto.
+    let ip = -1, mx = -1;
+    L.buses_op.forEach((v,i)=>{ if(v!=null && v>mx){ mx=v; ip=i; } });
+    if(ip >= 0){
+      // VENTANA DE OPERACIÓN = bins con al menos 10% de la flota punta. El promedio del día se
+      // calcula SOLO ahí: incluir la madrugada (0 buses, 90% "detenido") hundiría el promedio de
+      // flota e inflaría el de detención, y el arco compararía contra un día que no existe.
+      const act = [];
+      L.buses_op.forEach((v,i)=>{ if(v!=null && v >= mx*0.10) act.push(i); });
+      const prom = k => {
+        const a = L[k]; if(!Array.isArray(a)) return null;
+        const v = act.map(i=>a[i]).filter(x=>x!=null);
+        return v.length ? v.reduce((s,x)=>s+x,0)/v.length : null;
+      };
+      const hh = bins[ip] || "";
+      const tip = `Día laboral típico a las ${hh} · registro GPS histórico`;
+      const opts = {hist:true, normLbl:"día", tip};
+      const cards = LIVE_KPIS.map(sp=>{
+        const a = L[sp.k];
+        const val = (Array.isArray(a) && a[ip]!=null) ? a[ip] : null;
+        const nrm = prom(sp.k);
+        const pct = (val!=null && nrm) ? 100*val/nrm : null;
+        return liveBox(sp, val, nrm, pct, opts);
+      });
+      // 8ª tarjeta: líneas. Sin comparador (no tiene "promedio del día"), mismo formato de arco.
+      cards.push(liveBox({k:"lineas", lab:"Líneas", ic:"🚏", dir:0, unit:"",
+                          f:v=>fmt(Math.round(v))}, k.n_lineas, null, null,
+                         {hist:true, tip:"Líneas con dato en el período"}));
+      $("kpis2").classList.add("kpis-8");
+      $("kpis2").dataset.lin = "";                 // invalida el cache de tarjetas de renderLiveKPIs
+      $("kpis2").innerHTML = cards.join("");
+      _kpiNote(`Cifras del <b>día laboral típico</b> en su punta (<b>${hh}</b>) comparadas con el `
+               + `<b>promedio del día de operación</b>, del registro GPS histórico`
+               + (CITY.live ? "" : " — esta ciudad no tiene feed en vivo") + ".");
+      return;
+    }
+  }
   const ctx = kpiCard("Líneas", k.n_lineas, "operando en el ámbito", IC.bus, "neutral");
   $("kpis2").innerHTML = [
     kpiCard("Flota en punta", fmt(k.flota_pico), "buses activos máx/hora", IC.bus, "neutral"),
@@ -737,6 +960,50 @@ function renderKPIs(cell){
     kpiCard("Tiempo detenido", fmt1(k.pct_det)+" %", "en ruta · excl. terminales", IC.stop, semLow(k.pct_det,18,28)),
     ctx,
   ].join("");
+  _kpiNote(null);
+}
+/* ═══ BANDA DE KPIs EN VISTA DE COMUNA ════════════════════════════════════════════════════════════
+   Antes esta vista pedía KPIs VIVOS y la banda salía vacía: siete tarjetas en 0 y "—" (medido en
+   Temuco: buses_op/term/descanso/inact = 0, vel/det = "—", freq = 0/h). Dos razones, las dos de fondo:
+     · `dia.json` del capturador NO desglosa por comuna — solo trae sistema y línea; y
+     · la agregación de respaldo (sumar las líneas de la comuna) se apoya en CLIN, que viene de
+       `comuna_lineas.json`; ese archivo existe en GCCP pero NO en las ciudades portadas, así que
+       CLIN = {} y toda suma por comuna recorre un conjunto vacío.
+   No se le pide el desglose al capturador: costaría CPU por invocación y el presupuesto es acotado.
+   Se muestran entonces las cifras ESTÁTICAS de la celda `<comuna>|TODAS` de territorio.json, con sello
+   "histórico" por tarjeta y una nota bajo la banda para que nadie las lea como si fueran del vivo.
+   La tarjeta "Cobertura ahora" sí es del vivo y sí es correcta por comuna (se calcula en el navegador
+   sobre live.json + cobertura.json), así que se conserva: la agrega renderLiveExtras() y su propio
+   rótulo dice "ahora". */
+function renderComunaKPIs(){
+  const cont = $("kpis2"); if(!cont) return;
+  const C = state.comuna;
+  const cell = (T && T.cells && T.cells[`${C}|TODAS`]) || null;
+  const k = cell && cell.kpi;
+  if(!k){                                  // degradación limpia: sin celda no hay banda, y sin excepción
+    $("kpis2") && $("kpis2").classList.remove("kpis-8");
+  cont.dataset.lin = "";
+    cont.innerHTML = `<div class="empty">Sin cifras agregadas para ${C} en territorio.json.</div>`;
+    _kpiNote(null);
+    return;
+  }
+  // histCard vive a nivel de módulo (ver arriba): la usan la banda por comuna Y la
+  // banda histórica de ciudad estática.
+
+  const nl = k.n_lineas==null ? "—" : fmt(k.n_lineas);
+  cont.dataset.lin = "";                   // invalida el cache de tarjetas vivas de renderLiveKPIs
+  cont.innerHTML = [
+    histCard("Flota en punta", k.flota_pico==null?"—":fmt(k.flota_pico), "buses activos máx/hora", IC.bus, "neutral"),
+    histCard("Velocidad media", k.vel==null?"—":fmt1(k.vel)+" km/h", "efectiva, en ruta", IC.zap, k.vel==null?"neutral":semHigh(k.vel,22,14)),
+    histCard("Tiempo detenido", k.pct_det==null?"—":fmt1(k.pct_det)+" %", "en ruta · excl. terminales", IC.stop, k.pct_det==null?"neutral":semLow(k.pct_det,18,28)),
+    histCard("Líneas", nl, `operando en ${C}`, IC.bus, "neutral"),
+  ].join("");
+  // "Cobertura ahora" (vivo, correcta por comuna). Silenciosa si la ciudad es estática o el feed no cargó.
+  try{ renderLiveExtras(); }catch(e){}
+  const vivo = !!cont.querySelector('.klive');
+  _kpiNote(`Cifras de <b>${C}</b> tomadas del <b>registro histórico</b> (territorio.json): el seguimiento `+
+           `en vivo se publica por sistema y por línea, no por comuna.`+
+           (vivo ? ` La tarjeta <b>Cobertura ahora</b> sí es del vivo.` : ``));
 }
 
 /* ---------- Recuadros del INICIO: vivo (dia.json) vs baseline histórico del bin actual ----------
@@ -768,7 +1035,11 @@ function gaugeColor(pct,dir){
   const g = dir>0 ? pct : dir<0 ? 200-pct : pct;
   return g>=95 ? _tok('--live') : g>=75 ? _tok('--warn') : _tok('--alert');
 }
-function liveBox(s, live, norm, pct){
+function liveBox(s, live, norm, pct, opts){
+  // opts.normLbl: rotulo del comparador (el vivo dice "normal"; la banda historica de una
+  // ciudad estatica compara la PUNTA contra el promedio del dia de operacion).
+  // opts.hist: agrega el sello "historico" para que la cifra no se lea como de este minuto.
+  opts = opts || {};
   // F1: reloj semicírculo más compacto; valor dentro del arco, aguja, % al final de la aguja.
   // Baseline "normal a esta hora" abajo en mono/--muted + delta semántico (▲/▼/=).
   const col = gaugeColor(pct, s.dir);
@@ -796,14 +1067,20 @@ function liveBox(s, live, norm, pct){
   // baseline "normal a esta hora" (no decorativo). Color del arco = estado (gaugeColor); pista = --line-soft.
   const prog = pct==null ? "" :
     `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${tx} ${ty}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"/>`;
-  return `<div class="kpi klive" data-k="${s.k}" style="border-color:${col}30"><div class="lab"><span class="ic">${s.ic}</span>${s.lab}</div>`+
+  return `<div class="kpi klive${opts.hist?" k-hist":""}" data-k="${s.k}" style="border-color:${col}30"`+
+    (opts.hist?` title="${opts.tip||"Del registro GPS histórico"}"`:"")+`>`+
+    `<div class="lab"><span class="ic">${s.ic}</span>${s.lab}`+
+    // sin sello en la tarjeta: GCCP no lo lleva y la nota bajo la banda ya declara el período.
+    // El `title` conserva la advertencia al pasar el mouse, sin ensuciar el diseño.
+    ""+
+    `</div>`+
     `<svg class="gauge" viewBox="-8 -12 216 118">`+
       `<path class="g-track" d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--line-soft)" stroke-width="8" stroke-linecap="round"/>`+
       prog+
       // NÚMERO PROTAGONISTA: centrado en el arco, limpio, color --text-hi (vía CSS), sin nada encima
       `<text x="${cx}" y="58" text-anchor="middle" dominant-baseline="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2">${s.unit}</tspan></text>`+
     `</svg>`+
-    `<div class="sub">${norm!=null ? `normal: <b class="g-norm">${normTxt}</b>${deltaTxt}` : `<span style="color:var(--muted)">${valTxt}${s.unit}</span>`}</div></div>`;
+    `<div class="sub">${norm!=null ? `${opts.normLbl||"normal"}: <b class="g-norm">${normTxt}</b>${deltaTxt}` : `<span style="color:var(--muted)">${valTxt}${s.unit}</span>`}</div></div>`;
 }
 // F2: animación count-up; respeta prefers-reduced-motion
 const REDUCED_MOTION = matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -947,6 +1224,15 @@ function _baseVal(s, base, b, L){
   return (base[s.k]||[])[b];
 }
 function renderLiveKPIs(){
+  // si la banda histórica de 8 dejó su clase de grilla puesta (el vivo puede cargar después),
+  // se limpia: con vivo la banda vuelve a 5 columnas.
+  $("kpis2") && $("kpis2").classList.remove("kpis-8");
+  // CHOKE POINT: la vista de COMUNA no se sirve del vivo (dia.json no desglosa por comuna). Se redirige
+  // acá y no en cada llamador, porque además de render() entran loadDia() y loadLive() cada refresco —
+  // si uno se olvidaba, volvía a pintar la banda vacía encima de la histórica sin fallar en nada.
+  if(state.vista==="normal" && state.comuna!=="TODAS" && state.linea==="TODAS"){ renderComunaKPIs(); return; }
+  if(!DIA || !BASE30) return;                       // ciudad estática o feed aún sin cargar
+  _kpiNote(null);                                   // sistema/línea SÍ son vivo → sin nota de histórico
   const base = BASE30[DIA.dia_tipo] || {}, b = DIA.bin;
   const L = state.linea!=="TODAS" ? state.linea : null;
   const cont = $("kpis2");
@@ -996,14 +1282,15 @@ function loadDia(){
 
 /* ===== KPIs en vivo EXTRA: cobertura instantánea + déficit por línea =====
    "Foto" en cada refresh de live.json: una manzana está cubierta AHORA si hay ≥1 bus a ≤300 m
-   de su centroide. KPI 1 = % de hogares cubiertos de CCP. KPI 2 = mismo % por comuna.
+   de su centroide. KPI 1 = % del padrón cubierto de la ciudad (hogares, o habitantes donde la capa no
+   trae hogares — ver cobUnit()). KPI 2 = mismo % por comuna.
    KPI 3 = top-5 líneas con menor (buses_ahora / flota_pico).
    Costo: cero en cloud — todo se computa en el navegador sobre live.json + cobertura.json. */
 let MANZ_GRID = null;                     // grid espacial: bucket → [{i, cy, cx, hog, com}]
 const COB_BUCKET = 0.003;                 // ~330 m por bucket (suficiente para BUF=300 m con 9 buckets)
 const COB_BUF = 300, COB_BUF2 = COB_BUF*COB_BUF;   // radio de cápsula instantánea
 let TOT_HOG_GLOBAL = 0;
-const TOT_HOG_COM = {};                   // {comuna: total hogares}
+const TOT_HOG_COM = {};                   // {comuna: total del padrón} — hogares o habitantes, ver cobUnit()
 const FLOTA_PICO_LIN = {};                // {linea: flota_pico}
 const COM_ORDER = CITY.comunas;
 
@@ -1028,9 +1315,9 @@ function buildManzanaIndex(){
       for(const c of comunas){ if(_pipPoly(p.cy, p.cx, c.geom)){ p._com = c.name; break; } }
     }
     const k = `${Math.floor(p.cy/COB_BUCKET)}_${Math.floor(p.cx/COB_BUCKET)}`;
-    (MANZ_GRID[k] = MANZ_GRID[k] || []).push({i, cy:p.cy, cx:p.cx, hog:p.hog||0, com:p._com||null});
-    TOT_HOG_GLOBAL += (p.hog||0);
-    if(p._com) TOT_HOG_COM[p._com] = (TOT_HOG_COM[p._com]||0) + (p.hog||0);
+    (MANZ_GRID[k] = MANZ_GRID[k] || []).push({i, cy:p.cy, cx:p.cx, hog:mzHog(p), com:p._com||null});
+    TOT_HOG_GLOBAL += mzHog(p);
+    if(p._com) TOT_HOG_COM[p._com] = (TOT_HOG_COM[p._com]||0) + mzHog(p);
   });
   if(T && T.cells){
     Object.entries(T.cells).forEach(([k, v]) => {
@@ -1060,7 +1347,7 @@ function computeLiveExtras(filterL){
   }
   let cob_hog = 0; const cob_hog_com = {};
   for(const i of covered){
-    const p = COB.features[i].properties, h = p.hog||0;
+    const p = COB.features[i].properties, h = mzHog(p);
     cob_hog += h;
     if(p._com) cob_hog_com[p._com] = (cob_hog_com[p._com]||0) + h;
   }
@@ -1134,16 +1421,17 @@ function liveBoxCobAhora(hog, tot, pct, nb){
   const lx=(cx+(r+16)*Math.cos(a)).toFixed(1), ly=(cy-(r+16)*Math.sin(a)).toFixed(1);
   const valTxt = NF.format(Math.round(hog));
   const pctTxt = pct==null ? "—" : pct.toFixed(1)+"%";
-  // Block 3 — arco de relleno puro (sin aguja/hub/%). Rango 0–100% = fracción de hogares cubiertos ≤300 m.
+  // Block 3 — arco de relleno puro (sin aguja/hub/%). Rango 0–100% = fracción del padrón cubierto ≤300 m
+  // (hogares donde la capa los trae; habitantes en las ciudades sin catastro SII — ver cobUnit()).
   const prog = pct==null ? "" :
     `<path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${tx} ${ty}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"/>`;
   return `<div class="kpi klive" data-k="cob_now" style="border-color:${col}30"><div class="lab"><span class="ic">${IC.home}</span>Cobertura ahora</div>`+
     `<svg class="gauge" viewBox="-8 -12 216 118">`+
       `<path class="g-track" d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="var(--line-soft)" stroke-width="8" stroke-linecap="round"/>`+
       prog+
-      `<text x="${cx}" y="58" text-anchor="middle" dominant-baseline="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2"> hog</tspan></text>`+
+      `<text x="${cx}" y="58" text-anchor="middle" dominant-baseline="middle" class="g-val">${valTxt}<tspan class="g-unit" dx="2"> ${HOGS()}</tspan></text>`+
     `</svg>`+
-    `<div class="sub">de <b class="g-norm">${NF.format(tot)}</b> hogares · <b>${nb}</b> buses</div></div>`;
+    `<div class="sub">de <b class="g-norm">${NF.format(tot)}</b> ${HOGL()} · <b>${nb}</b> buses</div></div>`;
 }
 function liveBoxCobComuna(byCom){
   const rows = COM_ORDER.map(name => {
@@ -1158,7 +1446,7 @@ function liveBoxCobComuna(byCom){
   }).join("");
   return `<div class="kpi klive" data-k="cob_com"><div class="lab"><span class="ic">${IC.map}</span>Cobertura por comuna</div>`+
     `<div class="kcr-list">${rows}</div>`+
-    `<div class="sub">% hogares con ≥1 bus ≤300 m</div></div>`;
+    `<div class="sub">% ${HOGL()} con ≥1 bus ≤300 m</div></div>`;
 }
 function _linFleetRow(d, top){
   const pct = d.pct;
@@ -1210,12 +1498,18 @@ function renderCobDinLinea(){
   const pill = (ic,lab,val,sub) =>
     `<div class="cdl-pill"><div class="lab">${ic?`<span>${ic}</span>`:""}${lab}</div>`+
     `<div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`;
+  // El NSE viene del avalúo del catastro SII: sin SII, info.nse_* llega en 0 para TODOS los terciles y
+  // un "0" afirmaría una medición que no existe → se declara "sin dato NSE".
+  const _nseOk = cobHasNSE() && ((info.nse_lo||0)+(info.nse_md||0)+(info.nse_hi||0)) > 0;
+  const _pillNSE = (ic,lab,v,base) => _nseOk
+    ? pill(ic, lab, v==null?"—":NF.format(v), `de ${NF.format(base)} ${HOGS()}`)
+    : pill(ic, lab, "—", "sin dato NSE");
   $("cdl-grid").innerHTML = [
-    pill(IC.home,"Hogares cubiertos", hogDin==null?"—":NF.format(hogDin), `${pct==null?"—":pct+"%"} del tiempo · base ${NF.format(info.hog)}`),
-    pill(IC.nseDn,"NSE bajo", nseLoDin==null?"—":NF.format(nseLoDin), `de ${NF.format(info.nse_lo)} hog`),
-    pill(IC.nseMd,"NSE medio", nseMdDin==null?"—":NF.format(nseMdDin), `de ${NF.format(info.nse_md)} hog`),
-    pill(IC.nseUp,"NSE alto", nseHiDin==null?"—":NF.format(nseHiDin), `de ${NF.format(info.nse_hi)} hog`),
-    pill(IC.ruler,"Hogares por km", info.hog_por_km==null?"—":NF.format(info.hog_por_km), `línea ${info.km} km`),
+    pill(IC.home,`${HOGC()} cubiertos`, hogDin==null?"—":NF.format(hogDin), `${pct==null?"—":pct+"%"} del tiempo · base ${NF.format(info.hog)}`),
+    _pillNSE(IC.nseDn,"NSE bajo", nseLoDin, info.nse_lo),
+    _pillNSE(IC.nseMd,"NSE medio", nseMdDin, info.nse_md),
+    _pillNSE(IC.nseUp,"NSE alto", nseHiDin, info.nse_hi),
+    pill(IC.ruler,`${HOGC()} por km`, info.hog_por_km==null?"—":NF.format(info.hog_por_km), `línea ${info.km} km`),
     pill(IC.cycle,"Ciclos/bus/día", info.ciclos_bus_dia==null?"—":info.ciclos_bus_dia.toFixed(1), `flota ${info.buses??"—"} · ${info.despachos_dia_L??"—"} desp/día`),
   ].join("");
   $("cdl-sub").textContent = `línea ${L} · ${periodoLbl(per)} · f=${f==null?"—":f.toFixed(1)} bus/h · headway ${H==null?"—":H.toFixed(1)+" min"}`;
@@ -1223,7 +1517,10 @@ function renderCobDinLinea(){
   if(narr){
     narr.innerHTML = `Modelo <b>cápsula 2 min + 300 m</b>: cada bus cubre su trazado durante ~2 min al pasar. `+
       `Con <b>${f==null?"—":f.toFixed(1)} bus/h</b> el headway es <b>${H==null?"—":H.toFixed(1)} min</b> → cobertura del <b>${pct==null?"—":pct+"%"}</b> del tiempo en ${periodoLbl(per)}. `+
-      `Los hogares cubiertos dinámicamente son los <b>estáticos × frac</b>; los KPIs por NSE muestran cómo se distribuyen entre terciles (bajo &lt; ${NF.format(DINL.nse_terciles?.lo_lt||0)} / medio &lt; ${NF.format(DINL.nse_terciles?.md_lt||0)} / alto ≥ ${NF.format(DINL.nse_terciles?.md_lt||0)} CLP/m²).`;
+      `Los ${HOGL()} cubiertos dinámicamente son los <b>estáticos × frac</b>. `+
+      (_nseOk
+        ? `Los KPIs por NSE muestran cómo se distribuyen entre terciles (bajo &lt; ${NF.format(DINL.nse_terciles?.lo_lt||0)} / medio &lt; ${NF.format(DINL.nse_terciles?.md_lt||0)} / alto ≥ ${NF.format(DINL.nse_terciles?.md_lt||0)} CLP/m²).`
+        : `El desglose por NSE requiere el avalúo del catastro SII, que esta ciudad no tiene cargado: queda <b>sin dato</b>.`);
   }
 }
 function renderFreqChart(){
@@ -2161,6 +2458,23 @@ const ofColor   = b => (b==null||b<=0) ? "#7f1d1d" : `hsl(${120*Math.min(b/30,1)
 const dinColor  = p => (p==null) ? "#475569" : `hsl(${120*Math.max(0,Math.min(p,1))},70%,50%)`;     // Cobertura DINÁMICA: P_total 0..1 (rojo 0% -> verde 100%) — modelo cápsula 2 min
 const odColor   = r => (r==null) ? "#475569" : cobColor(100*r/odMax());                            // Cobertura oferta/demanda: cociente NORMALIZado al máximo (100% = mejor cubierta)
 let NSE_LO=null, NSE_HI=null;
+// El campo `nse` viaja en DOS escalas según la ciudad y el rótulo tiene que decir cuál:
+//  · GCCP (catastro SII): avalúo fiscal del suelo en CLP/m² — medido 1.607 a 1.229.109.
+//  · ciudades portadas (activo nacional): `nse_score` 0-100 — Antofagasta 5,3 a 99,4.
+// Se rotulaba SIEMPRE "avalúo CLP/m²", así que en las regionales un 69,5 se leía como
+// "69,5 CLP/m²". La unidad la declara el productor en `resumen.nse_unidad`; si no viene, se
+// asume CLP/m² para no cambiar lo que GCCP ya mostraba.
+function nseUnidad(){
+  try{ return (COB && COB.resumen && COB.resumen.nse_unidad) || "clp_m2"; }catch(e){ return "clp_m2"; }
+}
+const nseEsScore = () => nseUnidad() === "score_0_100";
+const nseUnidadLbl = () => nseEsScore() ? "índice 0-100" : "avalúo CLP/m²";
+const nseValorLbl = v => nseEsScore()
+  ? `índice <b>${NF.format(Math.round(v*10)/10)}</b>/100`
+  : `avalúo ${NF.format(v)} CLP/m²`;
+const nseFuenteLbl = () => nseEsScore()
+  ? "índice socioeconómico 0-100 del banco nacional de uso de suelo (por zona censal)"
+  : "terciles de avalúo fiscal del suelo (CLP/m²)";
 function nseColor(v){
   if(v==null) return "#475569";
   if(NSE_LO==null){ const a=COB.features.map(f=>f.properties.nse).filter(x=>x>0).sort((x,y)=>x-y);
@@ -2386,30 +2700,32 @@ function drawCoverage(mode){
     const tipLab = lb
       ? `viajes-trabajo (TP, Censo 2024)${p.lab_comuna?` · ${p.lab_comuna}`:""}: <b>${lb.dir}%</b> con una línea · ${lb.tr}% con transbordo · <b>${lb.no}% inalcanzable</b>`
       : "sin dato de viajes-trabajo";
+    const _mzh = `${NF.format(mzHog(p))} ${HOGL()}`;   // padrón de la manzana, ya resuelto hog→n + rótulo
     const tip = (mode==="trans")
-      ? `${NF.format(p.hog??0)} hogares<br>${tipLab}`
+      ? `${_mzh}<br>${tipLab}`
       : (mode==="cover" && state.coverSub==="din")
       ? (()=>{ const v=_dinValueFor(p); const nL=(p.cob_lineas||[]).length;
           if(state.linea!=="TODAS"){
             const fL = (DINL?.lineas?.[state.linea]?.frac?.[per]) ?? null;
             const fObs = (DINL?.lineas?.[state.linea]?.f_obs?.[per]) ?? null;
             const H = (fObs && fObs>0) ? (60/fObs) : null;
-            return `${NF.format(p.hog??0)} hogares · línea ${state.linea} · ${periodoLbl(per)}<br>`+
+            return `${_mzh} · línea ${state.linea} · ${periodoLbl(per)}<br>`+
                    `frecuencia: <b>${fObs==null?"—":fObs.toFixed(1)} bus/h</b> · headway ${H==null?"—":H.toFixed(1)+" min"}<br>`+
                    `cobertura: <b>${fL==null?"—":(fL*100).toFixed(0)+"%"} del tiempo</b>`;
           }
-          return `${NF.format(p.hog??0)} hogares · ${nL} línea${nL===1?"":"s"} · ${periodoLbl(per)}<br>`+
+          return `${_mzh} · ${nL} línea${nL===1?"":"s"} · ${periodoLbl(per)}<br>`+
                  `cobertura dinámica: <b>${v==null?"—":(v*100).toFixed(0)+"% del tiempo</b> (P_total)"}`;
         })()
       : (mode==="cover" && state.coverSub==="od")
-      ? (()=>{ const r=p.cob_od?p.cob_od[per]:null; const pct=r==null?null:Math.round(100*r/odMax()); return `${NF.format(p.hog??0)} hogares · ${periodoLbl(per)}<br>cobertura oferta/demanda: <b>${pct==null?"sin servicio":pct+"%"}</b> del nivel mejor cubierto`; })()
+      ? (()=>{ const r=p.cob_od?p.cob_od[per]:null; const pct=r==null?null:Math.round(100*r/odMax()); return `${_mzh} · ${periodoLbl(per)}<br>cobertura oferta/demanda: <b>${pct==null?"sin servicio":pct+"%"}</b> del nivel mejor cubierto`; })()
       : (mode==="cover" && lineMode)
-      ? `${NF.format(p.hog??0)} hogares · línea ${state.linea}<br>NSE: <b>${nseLabel(nseTercil(p.nse))}</b> · avalúo ${NF.format(p.nse||0)} CLP/m²`
+      ? `${_mzh} · línea ${state.linea}<br>NSE: <b>${nseLabel(nseTercil(p.nse))}</b>${p.nse?` · ${nseValorLbl(p.nse)}`:""}`
       : (mode==="cover")
-      ? `${NF.format(p.hog??0)} hogares · acceso ${p.acc} min<br>cobertura estática: <b>${p.cob_est??"—"}%</b> de la manzana a ≤300 m de la red`
+      ? `${_mzh} · acceso ${p.acc} min<br>cobertura estática: <b>${p.cob_est??"—"}%</b> de la manzana a ≤300 m de la red`
       : (mode==="wait")
-      ? `${NF.format(p.n)} viviendas · ${periodoLbl(per)}<br>espera al próximo bus: <b>${we==null?"sin servicio":we+" min"}</b> (efectiva, con apelotonamiento) · media teórica ${wf==null?"—":wf+" min"}`
-      : `${NF.format(p.n)} viviendas · acceso ${p.acc} min · espera ${wf==null?"sin servicio":wf+" min"}<br>a salud ${p.salud??"—"} min · a educación ${p.edu??"—"} min`;
+      // `n` es POBLACIÓN (n_per del Censo), no viviendas: el rótulo decía "viviendas" y medía personas.
+      ? `${NF.format(p.n??0)} habitantes · ${periodoLbl(per)}<br>espera al próximo bus: <b>${we==null?"sin servicio":we+" min"}</b> (efectiva, con apelotonamiento) · media teórica ${wf==null?"—":wf+" min"}`
+      : `${NF.format(p.n??0)} habitantes · acceso ${p.acc} min · espera ${wf==null?"sin servicio":wf+" min"}<br>a salud ${p.salud??"—"} min · a educación ${p.edu??"—"} min`;
     const fop = .55;
     rings.forEach(r=>{
       L.polygon(r.map(c=>[c[1],c[0]]),{renderer:coverCanvas,stroke:false,fillColor:col,fillOpacity:fop})
@@ -2470,7 +2786,7 @@ function setCoverLegend(mode){
   const NEU = `<span class="grad" style="background:#64748b;opacity:.5"></span>`;
   const txt = (mode==="cover" && state.coverSub==="din") ? [`Cobertura dinámica · ${periodoLbl(state.periodo)}`,GYR,`<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>% del tiempo cubierto por algún bus (modelo cápsula 2 min + 300 m) · cambia con el período</span>`]
     : (mode==="cover" && state.coverSub==="od") ? [`Cobertura oferta/demanda · ${periodoLbl(state.periodo)}`,GYR,`<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>capacidad ÷ viajes generados · 100% = zona residencial mejor cubierta (las mejor conectadas), no el centro · reparto por demanda</span>`]
-    : (mode==="cover" && state.linea!=="TODAS") ? [`NSE hogares cubiertos · Línea ${state.linea}`,`<span class="grad" style="background:linear-gradient(90deg,#fb923c 33%,#94a3b8 33% 66%,#2dd4bf 66%)"></span>`,"<span class='lbls'><i>bajo</i><i>medio</i><i>alto</i></span><span class='par'>terciles de avalúo fiscal del suelo (CLP/m²) — solo manzanas cubiertas a ≤300 m</span>"]
+    : (mode==="cover" && state.linea!=="TODAS") ? [`NSE ${HOGL()} cubiertos · Línea ${state.linea}`,`<span class="grad" style="background:linear-gradient(90deg,#fb923c 33%,#94a3b8 33% 66%,#2dd4bf 66%)"></span>`,"<span class='lbls'><i>bajo</i><i>medio</i><i>alto</i></span><span class='par'>${nseFuenteLbl()} — solo manzanas cubiertas a ≤300 m</span>"]
     : mode==="cover" ? ["Cobertura estática (≤300 m de la red)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>% de la manzana dentro del área de influencia 300 m de los recorridos</span>"]
     : mode==="trans" ? ["Transbordo: viajes-trabajo con UNA línea (Censo 2024)",GYR,"<span class='lbls'><i>0%</i><i>50%</i><i>100%</i></span><span class='par'>verde = llega directo con una línea · rojo = exige transbordo o es inalcanzable</span>"]
     : mode==="wait" ? [`Espera al próximo bus · ${periodoLbl(state.periodo)} (min)`,RYG,"<span class='lbls'><i>0</i><i>3</i><i>6+</i></span><span class='par'>manzana = espera efectiva al próximo bus (con apelotonamiento) · ● paradero = espera ahí (hover)</span>"]
@@ -2483,14 +2799,16 @@ function setCoverLegend(mode){
     : mode==="det" ? ["Congestión: nodos de demora (sin terminales)",`<span class="grad" style="background:linear-gradient(90deg,hsl(45,85%,52%),hsl(0,85%,52%))"></span>`,"<span class='lbls'><i>menor</i><i>mayor</i></span><span class='par'><b style='color:#22d3ee'>▣</b> terminal · flota por línea al pasar</span>"]
     : mode==="terms" ? ["Terminales (validados manualmente)",`<span class="grad" style="background:linear-gradient(90deg,#22c55e,#22c55e)"></span>`,"<span class='lbls'><i style='color:#22c55e'>● terminal</i><i style='color:#22d3ee'>● punto de retorno</i></span><span class='par'>verde numerado = terminal formal · cyan = fin de ruta con espera breve (no es terminal, pero excluido de detención)</span>"]
     : mode==="exc" ? ["Excesos de velocidad (≥70 km/h sostenidos · hoy)",`<span class="grad" style="background:linear-gradient(90deg,#fbbf24,#f87171,#dc2626)"></span>`,"<span class='lbls'><i>70</i><i>85</i><i>100+</i></span><span class='par'>velocidad física sostenida en 1 km (no pico instantáneo)</span>"]
-    : ["NSE (avalúo CLP/m²)",`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
+    : [`NSE (${nseUnidadLbl()})`,`<span class="grad" style="background:linear-gradient(90deg,hsl(205,68%,52%),hsl(118,68%,52%),hsl(30,68%,52%))"></span>`,"<span class='lbls'><i>bajo</i><i></i><i>alto</i></span>"];
   coverLegend = L.control({position:"bottomleft"});
   coverLegend.onAdd = ()=>{ const d=L.DomUtil.create("div","speedleg"); d.innerHTML=`<b>${txt[0]}</b>${txt[1]}${txt[2]}`; return d; };
   coverLegend.addTo(lmap);
 }
 function buildMapModes(){
   const box=$("map-mode"); if(!box) return;
-  box.innerHTML = MAP_MODES.map(([k,l])=>`<b data-m="${k}" class="${state.mapMode===k?"on":""}">${l}</b>`).join("");
+  // mapModes() se evalúa en cada render, no una vez al cargar: la cobertura llega async y recién
+  // entonces se sabe qué capas temáticas tienen dato.
+  box.innerHTML = mapModes().map(([k,l])=>`<b data-m="${k}" class="${state.mapMode===k?"on":""}">${l}</b>`).join("");
   box.querySelectorAll("b").forEach(el=>el.onclick=()=>{ state.mapMode=el.dataset.m;
     box.querySelectorAll("b").forEach(b=>b.classList.toggle("on",b.dataset.m===state.mapMode)); render(); });
 }
@@ -2513,6 +2831,11 @@ function renderMapa(){
   const comActiva = state.comuna!=="TODAS";
   feats.forEach(f=>{
     const sel = f.properties.name===state.comuna;
+    // `es_bbox`: la comuna contiene TODA el área de estudio, así que el polígono recortado es el
+    // rectángulo del bbox y NO un límite comunal — trazarlo sería dibujar una línea inventada
+    // (caso Antofagasta, cuya comuna se extiende 2.560 km al interior). Se sigue usando para
+    // punto-en-polígono y para encuadrar el mapa, pero no se dibuja.
+    if(f.properties.es_bbox) return;
     if(comActiva && !sel){
       L.geoJSON(f,{style:{color:"rgba(148,161,186,.14)",weight:0.6,fill:false}}).addTo(comunaLayer);   // vecina atenuada
     } else {
@@ -2578,7 +2901,7 @@ function renderMapa(){
       : state.coverSub==="od" ? `Cobertura oferta/demanda · ${periodoLbl(state.periodo)}` : "Cobertura estática";
     const titulo = {cover:coverTit,trans:"Transbordo",wait:`Espera al próximo bus · ${periodoLbl(state.periodo)}`,
       conges:`Velocidad efectiva por arco · ${periodoLbl(state.periodo)}`, bunch:`Apelotonamiento (bunching) · ${periodoLbl(state.periodo)}`, det:"Congestión y terminales",
-      salud:"Accesibilidad a salud en transporte",edu:"Accesibilidad a educación en transporte",nse:"Nivel socioeconómico (avalúo)"}[M];
+      salud:"Accesibilidad a salud en transporte",edu:"Accesibilidad a educación en transporte",nse:`Nivel socioeconómico (${nseUnidadLbl()})`}[M];
     if(state.linea!=="TODAS"){
       $("map-title").textContent = `Línea ${state.linea} · ${titulo||"análisis territorial"}`;
       if(b) b.textContent = (M==="conges"||M==="bunch"||M==="det")
@@ -2587,11 +2910,15 @@ function renderMapa(){
     } else {
       const dinp = R.cob_din && R.cob_din.por_periodo && R.cob_din.por_periodo[state.periodo];
       const odp = R.cob_od && R.cob_od.por_periodo && R.cob_od.por_periodo[state.periodo];
+      // `pct_hog_ge_umbral` / `cob_est.pct_hogares_cubiertos` se llaman "hog" en el JSON pero cuentan lo
+      // que la capa tenga: en una ciudad sin SII son PERSONAS (medido en Antofagasta: hog_total = 388.478
+      // = Σn). El rótulo se resuelve con cobUnit(), y si el % no viene se degrada a "—".
+      const _ce = cobEstPct();
       const coverBadge = state.coverSub==="din"
-          ? `${dinp?dinp.pct_hog_ge_umbral:"—"}% de los hogares con cobertura dinámica ≥50% del tiempo en ${periodoLbl(state.periodo)} · media P_total ${dinp?(dinp.media_p_total*100).toFixed(1)+"%":"—"}`
+          ? `${dinp&&dinp.pct_hog_ge_umbral!=null?dinp.pct_hog_ge_umbral:"—"}% de los ${HOGL()} con cobertura dinámica ≥50% del tiempo en ${periodoLbl(state.periodo)} · media P_total ${dinp&&dinp.media_p_total!=null?(dinp.media_p_total*100).toFixed(1)+"%":"—"}`
           : state.coverSub==="od"
           ? `oferta/demanda en ${periodoLbl(state.periodo)} · 100% = zona residencial mejor cubierta (no el centro atractor) · rojo = déficit relativo`
-          : `${(R.cob_est&&R.cob_est.pct_hogares_cubiertos)??"—"}% de los hogares a ≤300 m de la red (buffer sobre el recorrido oficial)`;
+          : `${_ce.pct??"—"}% de los ${HOGL()} a ≤300 m de la red (buffer sobre el recorrido oficial)${_ce.derivado?" · calculado desde las manzanas":""}`;
       const badgeSys = {cover: coverBadge,
         trans:`${(R.lab&&R.lab.dir)??"—"}% de los viajes-trabajo se hacen con UNA línea · ${(R.lab&&R.lab.tr)??"—"}% exige transbordo · ${(R.lab&&R.lab.no)??"—"}% inalcanzable (Censo 2024)`,
         wait:`espera efectiva al próximo bus ${(R.waite_medio&&R.waite_medio[state.periodo])??"—"} min · frecuencia real observada + apelotonamiento · por manzana, sin destino · cambia con el período`,
@@ -2613,7 +2940,7 @@ function renderMapa(){
 }
 
 /* ---------- relato dinámico del mapa (qué busca el KPI + lectura de datos del ámbito) ---------- */
-function scopeWavg(getter){            // promedio ponderado por viviendas sobre las manzanas del ámbito
+function scopeWavg(getter){            // promedio ponderado por POBLACIÓN (p.n) sobre las manzanas del ámbito
   if(!COB||!COB.features) return null;
   let sw=0, n=0;
   for(const f of COB.features){ const p=f.properties; if(!inComuna(p.cy,p.cx)) continue;
@@ -2686,8 +3013,12 @@ function renderLineaKpis(){
     return;
   }
   // COMUNA: DETENCIONES (aggregate lines in that comuna)
-  const comView = state.linea==="TODAS" && state.comuna!=="TODAS" && state.vista==="normal";
-  const comLines = comView && CLIN ? (CLIN[state.comuna]||[]) : [];
+  // Ciudad de UNA comuna (Osorno, Castro, Valdivia, Calama…): su única pestaña es la del sistema
+  // (state.comuna==='TODAS'), así que estos paneles por comuna nunca se mostraban. Ahí el sistema ES la
+  // comuna. Con varias comunas no cambia nada: comSel queda nulo en la vista de sistema. (2026-09-21)
+  const comSel = state.comuna!=="TODAS" ? state.comuna : ((COM_ORDER||[]).length===1 ? COM_ORDER[0] : null);
+  const comView = state.linea==="TODAS" && !!comSel && state.vista==="normal";
+  const comLines = comView && CLIN ? (CLIN[comSel]||[]) : [];
   if(comView && mode==="det" && DETP&&DETP.lineas && comLines.length){
     const sen=state.sentido==="amb"?"amb":state.sentido, per=state.periodo;
     const vals = comLines.map(lb=>{const d=DETP.lineas[lb]; if(!d)return null; const s=d[sen]||d.amb||{}; return (s.L||{})[per];}).filter(v=>v!=null);
@@ -2704,12 +3035,12 @@ function renderLineaKpis(){
     const card=(cls,l,v,s,st="")=>`<div class="lk ${cls}" style="${st}"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
     el.style.display="grid";
     el.innerHTML = [
-      card("b-tot",`${IC.stop} % detenido comuna (${periodoLbl(per)})`, det!=null?det+"%":"—", `promedio ${comLines.length} líneas · ${state.comuna}`, bg(det)),
+      card("b-tot",`${IC.stop} % detenido comuna (${periodoLbl(per)})`, det!=null?det+"%":"—", `promedio ${comLines.length} líneas · ${comSel}`, bg(det)),
       card("b-eff","Vs. sistema", (det!=null&&sis!=null)?((det-sis)>=0?"+":"")+(det-sis).toFixed(1):"—", sis!=null?`sistema ${sis}%`:"—"),
       card("b-bajo","% AM punta", dAm!=null?dAm+"%":"—", lbl(dAm), bg(dAm)),
       card("b-med","% PM punta", dPm!=null?dPm+"%":"—", lbl(dPm), bg(dPm)),
       card("b-alto","% Noche", dNoche!=null?dNoche+"%":"—", lbl(dNoche), bg(dNoche)),
-      card("b-cic","Líneas", comLines.length+"", `que operan en ${state.comuna}`),
+      card("b-cic","Líneas", comLines.length+"", `que operan en ${comSel}`),
     ].join("");
     return;
   }
@@ -2727,7 +3058,7 @@ function renderLineaKpis(){
     el.style.display="grid";
     el.innerHTML = [
       card("b-tot",`${IC.chart} CV comuna (${periodoLbl(per)})`, cv??"—", `${cvLbl(+cv)} · promedio ${vals.length} líneas`, cvBg(+cv)),
-      card("b-eff",`${IC.timer} Headway medio`, hw!=null?hw+" min":"—", `promedio en ${state.comuna}`),
+      card("b-eff",`${IC.timer} Headway medio`, hw!=null?hw+" min":"—", `promedio en ${comSel}`),
       card("b-bajo","Vs. sistema", sisCv!=null?(cv!=null?((cv-sisCv)>=0?"+":"")+(cv-sisCv).toFixed(2):"—"):"—",
         sisCv!=null?`sistema ${sisCv.toFixed(2)}`:"—", ""),
       card("b-med","Líneas evaluadas", vals.length+"", `de ${comLines.length} que operan`),
@@ -2744,7 +3075,7 @@ function renderLineaKpis(){
   COB.features.forEach(f=>{ const p=f.properties;
     if(showCoverLine && !(p.cob_lineas||[]).includes(state.linea)) return;
     if(showCoverCom && !inComuna(p.cy, p.cx)) return;
-    nMz++; const h=p.hog||0; hog+=h;
+    nMz++; const h=mzHog(p); hog+=h;
     const t=nseTercil(p.nse);
     if(t===0) hbaj+=h; else if(t===1) hmed+=h; else if(t===2) halt+=h;
   });
@@ -2767,13 +3098,17 @@ function renderLineaKpis(){
   const t2 = _nseTerciles ? _nseTerciles[1] : null;
   const card=(cls,l,v,s)=>`<div class="lk ${cls}"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
   el.style.display="grid";
-  const scope = showCoverLine ? `buffer 300 m · línea ${state.linea}` : `manzanas en ${state.comuna}`;
+  const scope = showCoverLine ? `buffer 300 m · línea ${state.linea}` : `manzanas en ${comSel}`;
+  // Sin avalúo SII el tercil es -1 en TODAS las manzanas y hbaj/hmed/halt quedan en 0: eso es "sin dato",
+  // no un cero medido (Antofagasta: 3.260/3.260 manzanas con nse = null).
+  const _nseOk = cobHasNSE();
+  const cardNSE = (cls,lab,v,sub) => _nseOk ? card(cls,lab,NF.format(v),sub) : card(cls,lab,"—","sin dato NSE");
   el.innerHTML = [
-    card("b-tot",`${IC.home} Hogares cubiertos`, NF.format(hog), `${nMz} manzanas · ${scope}`),
-    card("b-bajo","NSE bajo", NF.format(hbaj), `${pct(hbaj)}% · ≤ ${t1?NF.format(t1):"—"} CLP/m²`),
-    card("b-med","NSE medio", NF.format(hmed), `${pct(hmed)}% · entre terciles`),
-    card("b-alto","NSE alto", NF.format(halt), `${pct(halt)}% · > ${t2?NF.format(t2):"—"} CLP/m²`),
-    card("b-eff",`${IC.ruler} Hog. por km`, hogkm!=null?NF.format(hogkm):"—", ext?`recorrido ${mainRec} · ${ext} km · desglose por variante abajo`:(showCoverCom?`${comLines.length} líneas en comuna`:"")),
+    card("b-tot",`${IC.home} ${HOGC()} cubiertos`, NF.format(hog), `${nMz} manzanas · ${scope}`),
+    cardNSE("b-bajo","NSE bajo", hbaj, `${pct(hbaj)}% · ≤ ${t1?NF.format(t1):"—"} CLP/m²`),
+    cardNSE("b-med","NSE medio", hmed, `${pct(hmed)}% · entre terciles`),
+    cardNSE("b-alto","NSE alto", halt, `${pct(halt)}% · > ${t2?NF.format(t2):"—"} CLP/m²`),
+    card("b-eff",`${IC.ruler} ${HOGS()==="hog"?"Hog.":"Hab."} por km`, hogkm!=null?NF.format(hogkm):"—", ext?`recorrido ${mainRec} · ${ext} km · desglose por variante abajo`:(showCoverCom?`${comLines.length} líneas en comuna`:"")),
     card("b-cic",`${IC.cycle} Ciclos/bus/día`, ciclos??"—", tc?`tiempo de ciclo ${Math.round(tc)} min · ${flota||"—"} buses`:(showCoverCom?"—":"")),
   ].join("");
 }
@@ -2791,8 +3126,9 @@ function renderCoverTable(){
   const heat=(v,m,rgb)=>`style="background:rgba(${rgb},${(m?Math.min(0.6,(v/m)*0.6):0).toFixed(2)})"`;
   const seg=(v,tot,rgb)=>`style="background:rgba(${rgb},${(tot?Math.min(0.66,(v/tot)*0.66):0).toFixed(2)})"`;
   const velBg=v=>v?`style="background:hsla(${(Math.max(0,Math.min((v-12)/7,1))*120).toFixed(0)},70%,45%,.42)"`:'';
-  let html=`<div class="cap">Cobertura de hogares por recorrido (manzanas Censo a ≤300 m del trazado). <b>Vel</b> = velocidad operacional (rojo lento / verde rápido). <b>Hog/km</b> = hogares ÷ extensión. NSE por avalúo: <b style="color:#fb923c">bajo</b> · <b style="color:#94a3b8">medio</b> · <b style="color:#2dd4bf">alto</b> (terciles).</div>`;
-  html+=`<table><thead><tr><th class="l">Línea</th><th class="l">Rec</th><th>Ext<br>(km)</th><th>Vel<br>(km/h)</th><th>Hogares</th><th>Hog/km</th><th>NSE<br>bajo</th><th>NSE<br>medio</th><th>NSE<br>alto</th></tr></thead><tbody>`;
+  const _u = HOGC(), _ul = HOGL(), _us = HOGS();     // rótulo según lo que la capa mide de verdad
+  let html=`<div class="cap">Cobertura de ${_ul} por recorrido (manzanas Censo a ≤300 m del trazado). <b>Vel</b> = velocidad operacional (rojo lento / verde rápido). <b>${_us}/km</b> = ${_ul} ÷ extensión. NSE por avalúo: <b style="color:#fb923c">bajo</b> · <b style="color:#94a3b8">medio</b> · <b style="color:#2dd4bf">alto</b> (terciles).</div>`;
+  html+=`<table><thead><tr><th class="l">Línea</th><th class="l">Rec</th><th>Ext<br>(km)</th><th>Vel<br>(km/h)</th><th>${_u}</th><th>${_us}/km</th><th>NSE<br>bajo</th><th>NSE<br>medio</th><th>NSE<br>alto</th></tr></thead><tbody>`;
   let prev=null;
   rows.forEach(r=>{
     const tot=(r.hog_baj+r.hog_med+r.hog_alt)||1;
@@ -2852,7 +3188,7 @@ function renderNarrative(){
     const v=scopeWavg(p=>p.cob_din&&p.cob_din[per]);
     txt=`<b>Cobertura dinámica</b>: ¿qué tan seguido pasa un bus cerca de mí? Modelo: cada bus cubre una <b>cápsula de 2 min + 300 m</b> al pasar por su trazado, así que <code>frac = min(1, f/30)</code> donde <code>f</code> es la frecuencia observada en bus/h. Por manzana combina todas las líneas que la cubren (P_total = 1 − Π(1−frac_i)). En <b>${periodoLbl(per)}</b>: verde = el bus pasa casi continuamente; rojo = pasa raramente. ${v!=null?`Media en ${amb}: <b>${(v*100).toFixed(0)}%</b> del tiempo. `:""}Compara <b>Punta AM con Noche</b>: aunque el trazado exista, de noche la frecuencia cae y la cobertura efectiva se desploma.`;
   } else if(M==="cover" && state.coverSub==="od"){
-    txt=`<b>Cobertura oferta/demanda</b>: contrasta la <b>capacidad ofrecida</b> con la <b>demanda de viajes-TP</b> que genera cada manzana (hogares × tasa de generación EOD por hora). Para no doble-contar la capacidad compartida del corredor, se <b>reparte por demanda</b>. Se muestra <b>relativo a una zona residencial bien cubierta</b> (las zonas mejor conectadas = 100%), <b>no</b> al centro de Concepción — que por ser atractor concentra todas las líneas y distorsionaría la comparación de generación. En <b>${periodoLbl(per)}</b>: verde = bien servida frente a su demanda; rojo = oferta corta. Cruza con la Noche para ver dónde la demanda persiste pero la oferta cae.`;
+    txt=`<b>Cobertura oferta/demanda</b>: contrasta la <b>capacidad ofrecida</b> con la <b>demanda de viajes-TP</b> que genera cada manzana (${HOGL()} × tasa de generación EOD por hora). Para no doble-contar la capacidad compartida del corredor, se <b>reparte por demanda</b>. Se muestra <b>relativo a una zona residencial bien cubierta</b> (las zonas mejor conectadas = 100%), <b>no</b> al centro de la ciudad — que por ser atractor concentra todas las líneas y distorsionaría la comparación de generación. En <b>${periodoLbl(per)}</b>: verde = bien servida frente a su demanda; rojo = oferta corta. Cruza con la Noche para ver dónde la demanda persiste pero la oferta cae.`;
   } else if(M==="cover"){
     const v=scopeWavg(p=>p.cob_est);
     txt=`<b>Cobertura estática</b> mide qué parte del territorio construido queda dentro del <b>área de influencia de 300 m</b> de los recorridos (buffer sobre el trazado oficial). Verde = la manzana está cubierta por la red; rojo = fuera del alcance peatonal de cualquier recorrido. ${v!=null?`En ${amb}, en promedio el <b>${v.toFixed(0)}%</b> de cada manzana está cubierto. `:""}Es la cobertura geográfica pura: aún no considera con qué frecuencia pasan los buses (eso es la cobertura dinámica – oferta).`;
@@ -3085,7 +3421,7 @@ function renderNseGap(){
   const card=$("nse-gap-card");
   // territorial: sistema o comuna (no en vista de línea)
   if(state.linea!=="TODAS" || state.vista!=="normal" || !COB){ card.style.display="none"; return; }
-  // quintiles de NSE ponderados por viviendas (filtrando a la comuna si hay una elegida)
+  // quintiles de NSE ponderados por POBLACIÓN (p.n) (filtrando a la comuna si hay una elegida)
   const cells = COB.features.filter(f=>inComuna(f.properties.cy, f.properties.cx))
     .map(f=>f.properties).filter(p=>p.nse>0 && p.n>0).sort((a,b)=>a.nse-b.nse);
   if(cells.length<25){ card.style.display="none"; return; }   // muy pocas celdas para quintiles
@@ -3117,7 +3453,8 @@ function renderNseGap(){
   }, true);
   setTimeout(()=>nseChart.resize(),60);
   const gap = (desierto[0]-desierto[4]).toFixed(1);
-  $("nse-foot").innerHTML = `Quintiles de viviendas por NSE (avalúo m²). Brecha Q1–Q5 en desierto de transporte: <b style="color:${gap>0?'#fb7185':'#34d399'}">${gap>0?'+':''}${gap} pts</b> ${gap>0?'(las zonas vulnerables están peor cubiertas)':'(sin penalización a las vulnerables)'}.`;
+  // Ponderan por `p.n`, que es POBLACIÓN (n_per del Censo): el rótulo decía "viviendas".
+  $("nse-foot").innerHTML = `Quintiles de habitantes por NSE (avalúo m²). Brecha Q1–Q5 en desierto de transporte: <b style="color:${gap>0?'#fb7185':'#34d399'}">${gap>0?'+':''}${gap} pts</b> ${gap>0?'(las zonas vulnerables están peor cubiertas)':'(sin penalización a las vulnerables)'}.`;
 }
 
 /* ---------- KPI línea: operación (ciclo/headway/bunching/regularidad) ---------- */
@@ -3237,7 +3574,7 @@ function renderRankingView(){
   const vsel=RANK_VARS.map(v=>`<b data-rv="${v[0]}" class="${vk===v[0]?"on":""}">${v[1]}</b>`).join("");
   $("special-view").innerHTML=`<section class="widget"><div class="widget-h">
      <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
-     <div class="min-w-0"><h3>Ranking de comunas · ${vdef[1]}</h3><span class="sub">ordena el Antofagasta por la variable elegida${vk==="vel"?` · ${periodoLbl(state.periodo)}`:""}</span></div>
+     <div class="min-w-0"><h3>Ranking de comunas · ${vdef[1]}</h3><span class="sub">ordena ${CITY.nombre} por la variable elegida${vk==="vel"?` · ${periodoLbl(state.periodo)}`:""}</span></div>
      <div class="seg" id="rank-var" style="margin-left:auto;flex-wrap:wrap">${vsel}</div></div>
      <div class="widget-b"><div id="rankview-chart" style="height:440px"></div><div class="hint" id="rankview-foot" style="margin-top:6px"></div></div></section>`;
   $("rank-var").querySelectorAll("b").forEach(el=>el.onclick=()=>{state.rankVar=el.dataset.rv;render();});
@@ -3333,8 +3670,15 @@ function renderHeat(){
   const card=$("heat-card");
   if(!sysScope() || (!MESH.length && !DOWH.length)){ card.style.display="none"; return; }
   card.style.display="";
-  const hm=state.heatMode||"mes";
-  $("heat-mode").innerHTML=[["mes","Mes × hora"],["dow","Semana × hora"]].map(([k,l])=>`<b data-h="${k}" class="${hm===k?"on":""}">${l}</b>`).join("");
+  // el modo por defecto era SIEMPRE "mes", pero `flota_mes_hora.json` no existe en las ciudades
+  // portadas (MESH=[]) -> el heatmap se abría vacío y reventaba en addColorStop con 'undefined'
+  // (Math.max() de un arreglo vacío da -Infinity). Si el modo pedido no tiene datos, se cae al que sí.
+  let hm=state.heatMode||"mes";
+  if(hm==="mes" && !MESH.length) hm="dow";
+  if(hm==="dow" && !DOWH.length) hm="mes";
+  $("heat-mode").innerHTML=[["mes","Mes × hora",MESH.length],["dow","Semana × hora",DOWH.length]]
+    .filter(([,,n])=>n)   // no ofrecer un modo sin datos
+    .map(([k,l])=>`<b data-h="${k}" class="${hm===k?"on":""}">${l}</b>`).join("");
   $("heat-mode").querySelectorAll("b").forEach(el=>el.onclick=()=>{state.heatMode=el.dataset.h;renderHeat();});
   const th=TH(); if(heatChart) heatChart.dispose(); heatChart=echarts.init($("heat-chart"));
   let yCats,data,maxv;
@@ -3343,11 +3687,11 @@ function renderHeat(){
     yCats=meses.map(mesLab); data=MESH.map(x=>[x.hora, meses.indexOf(x.mes), Math.round(x.prom)]);
     maxv=Math.max(...MESH.map(x=>x.prom));
   } else {
-    // `dow` viene en convención BigQuery: 1=DOMINGO … 7=sábado. Las etiquetas eran
-    // ["","Lun","Mar",…] y con y=dow-1 rotulaban el domingo como "Lun": TODOS los días salían
-    // corridos uno. Medido en dow_hora.json: dow=1 suma 7.382 de actividad (el día más bajo de
-    // la semana, o sea domingo) y estaba rotulado "Lun"; dow=7 suma 10.789 (sábado).
-    // No cambiar sin volver a medir cuál es el día de menos actividad.
+    // `dow` viene en convención BigQuery: 1=DOMINGO … 7=sábado (es lo que produce el pipeline de
+    // GCCP y lo que replica kpi_dow_regularidad). Las etiquetas decían ["","Lun","Mar",…] y con
+    // y=dow-1 rotulaban el domingo como "Lun": TODOS los días salían corridos uno. Verificado
+    // midiendo la actividad de GCCP — dow=1 suma 7.382 (el día más bajo, o sea domingo) y estaba
+    // rotulado "Lun". No cambiar sin volver a medir qué día es el de menos actividad.
     const lab={1:"Dom",2:"Lun",3:"Mar",4:"Mié",5:"Jue",6:"Vie",7:"Sáb"};
     yCats=[1,2,3,4,5,6,7].map(d=>lab[d]); data=DOWH.map(x=>[x.hora, x.dow-1, Math.round(x.prom)]);
     maxv=Math.max(...DOWH.map(x=>x.prom));
@@ -3443,8 +3787,23 @@ function renderEvolucion(){
     [T, GEOM, GEO, CUMP, PAR, CSEM] = await Promise.all([
       loadT, J("lineas_geom.json"), J(CITY.comunasGeojson), J("cumplimiento.json"),
       J("paraderos.json").catch(()=>({})), J("cumplimiento_semanal.json").catch(()=>({lineas:{}}))]);
+    try{ setHdrVentana(); }catch(e){}   // el período del dato, ya con territorio.json cargado
     if(T.hasta){ const pe=$("periodo-pill"); if(pe) pe.textContent = "datos hasta "+T.hasta; }
-    const vd=$("vfoot-data"); if(vd) vd.textContent = "Datos hasta: "+(T.hasta||"—");
+    // Declara la VENTANA COMPLETA, no solo la fecha final: "Datos hasta jun-2025" no dice si hay
+    // un mes o un año detrás, y con un solo mes (Antofagasta: junio 2025, 30 días) las cifras se
+    // leen como si fueran la operación actual de la ciudad. `desde/hasta/dias` los escribe
+    // refresh_historico midiendo el agregado.
+    const vd=$("vfoot-data");
+    if(vd){
+      if(T.desde && T.hasta){
+        const dd = T.dias ? ` · ${T.dias} ${T.dias===1?"día":"días"} con dato` : "";
+        vd.textContent = (T.desde===T.hasta) ? `Datos: ${T.hasta}${dd}`
+                                             : `Datos: ${T.desde} a ${T.hasta}${dd}`;
+        if(T.meses===1) vd.textContent += " · un solo mes";
+      } else {
+        vd.textContent = "Datos hasta: "+(T.hasta||"—");
+      }
+    }
     fetch("data/version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.json()).then(v=>{
       const vb=$("vfoot-build"); if(!vb) return;
       vb.textContent = "Visor actualizado: "+BUILD+" (hora Chile)";
@@ -3452,7 +3811,11 @@ function renderEvolucion(){
     }).catch(()=>{ const vb=$("vfoot-build"); if(vb) vb.textContent="Visor actualizado: "+BUILD; });
     applyTheme(document.documentElement.dataset.theme || "dark");   // respeta el tema ya fijado (dark/light o cliente-*), no lo normaliza
     J("comuna_lineas.json").then(d=>{ CLIN=d; buildLineaList($("linea-search")?$("linea-search").value:""); }).catch(()=>{});
-    J("cobertura.json").then(d=>{ COB=d; renderNseGap(); if(state.mapMode!=="live") renderMapa();
+    // buildMapModes() se llama OTRA VEZ acá porque los modos temáticos (NSE, Salud, Educación)
+    // se gatean por el dato de las manzanas, y la cobertura llega async: el selector se dibuja al
+    // arrancar, cuando COB todavía es null, y sin este re-dibujo el modo NSE nunca aparecía aunque
+    // `cobTiene('nse')` diera true (medido en Antofagasta: 3.260/3.260 manzanas con NSE).
+    J("cobertura.json").then(d=>{ COB=d; buildMapModes(); renderNseGap(); if(state.mapMode!=="live") renderMapa();
       if(LIVE && state.vista==="normal" && state.linea==="TODAS" && state.comuna==="TODAS") renderLiveExtras();
     }).catch(()=>{});
     J("ranking_lineas.json").then(d=>{ RANK=d; if(state.vista==="normal"&&state.linea==="TODAS") renderRanking(); }).catch(()=>{});
@@ -3498,8 +3861,16 @@ function renderEvolucion(){
     // spec declarativo de KPIs (opcional, fallback al hardcode si no carga)
     J("kpis_spec.json").then(s=>{
       if(s && Array.isArray(s.kpis)) LIVE_KPIS = s.kpis.map(o=>({...o, f:(_LIVE_FMT[o.fmt]||_LIVE_FMT.int)}));
+      // el spec trae los iconos EMOJI que usa GCCP y pisa los SVG inline: hay que volver a
+      // dibujar la banda, o la histórica (que se pinta una sola vez) queda con los iconos grises.
+      try{ renderKPIs(cellOf()); }catch(e){}
     }).catch(()=>{});
-    J("baseline_30min.json").then(d=>{ BASE30=d; loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
+    J("baseline_30min.json").then(d=>{ BASE30=d;
+      // la banda histórica de 8 tarjetas se arma CON el baseline, y este llega async: sin este
+      // re-dibujo la banda se quedaba en las 4 planas aunque el dato ya estuviera cargado
+      // (mismo patrón que el selector de modos de mapa con la cobertura).
+      try{ renderKPIs(cellOf()); }catch(e){}
+      loadDia(); }).catch(()=>{});   // baseline + vivo del inicio
     J("baseline_var.json").then(d=>{ BVAR=d; if(state.vista==="normal"&&state.linea!=="TODAS") renderVarObserved(); }).catch(()=>{});   // baseline por variante (Bloque 3)
     J("infraestructura.json").then(d=>{ INFRAE=d; if(state.modo==="infra") renderInfra(); else if(state.modo==="demanda") renderDemMap(); }).catch(()=>{});   // observatorio de infraestructura (+ geometría de ejes para el mapa de demanda)
     if(CITY.demanda){   // 3er lente: validaciones del medio de pago (abordajes)
