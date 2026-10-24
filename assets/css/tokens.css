@@ -87,6 +87,7 @@
   /* ── Dominio: tipos de infraestructura ── */
   --infra-corredor:#ec4899; --infra-pistabus:#f5a524; --infra-exclusiva:#34d399;
   --infra-mixto:#94a3b8; --infra-none:#64748b; --infra-efectivo:#e879f9;
+  --infra-sel:#ffffff; --infra-sel-borde:#0b1220;   /* eje elegido: blanco con borde oscuro; ninguna capa (tipos, velocidad, flujo) usa blanco */
 
   /* ── Dominio: terciles NSE ── */
   --nse-bajo:#fb923c; --nse-medio:#94a3b8; --nse-alto:#2dd4bf;
@@ -133,6 +134,7 @@
 
 /* ─── Light theme — INSTITUCIONAL (papel · tinta navy · azul), emula el panel de uso de suelo ─── */
 :root[data-theme="light"] {
+  --infra-sel:#111827; --infra-sel-borde:#ffffff;
   /* Superficies — papel institucional (bg gris muy claro, tarjetas blancas) */
   --bg-void:    #F4F6FA;
   --bg-base:    #FFFFFF;
@@ -209,6 +211,7 @@
   /* Dominio */
   --infra-corredor:#D97CA0; --infra-pistabus:#E8944A; --infra-exclusiva:#9CBF6A;
   --infra-mixto:#9A8F7D; --infra-none:#6E6558; --infra-efectivo:#B58BB0;
+  --infra-sel:#ffffff; --infra-sel-borde:#0b1220;
   --nse-bajo:#E8944A; --nse-medio:#9A8F7D; --nse-alto:#5FB8A8;
   /* Superficies compuestas / bridge (rgba de --live = 224,168,54) */
   --topbar: rgba(26,23,20,.92);  --hover: rgba(255,255,255,.04);  --chip: rgba(34,30,25,.7);
@@ -249,6 +252,7 @@
   /* Dominio */
   --infra-corredor:#C2417F; --infra-pistabus:#D97D1A; --infra-exclusiva:#5A8C2A;
   --infra-mixto:#8C7B63; --infra-none:#A8B0B8; --infra-efectivo:#8E44AD;
+  --infra-sel:#111827; --infra-sel-borde:#ffffff;
   --nse-bajo:#D97D1A; --nse-medio:#8C8072; --nse-alto:#1E8A6E;
   /* Superficies compuestas / bridge (rgba de --live = 29,111,184) */
   --topbar: rgba(244,248,252,.85);  --hover: rgba(29,111,184,.08);  --chip: rgba(29,111,184,.10);
@@ -292,6 +296,7 @@
   /* Dominio */
   --infra-corredor:#002A5A; --infra-pistabus:#146C86; --infra-exclusiva:#4E7D1A;
   --infra-mixto:#C4611A; --infra-none:#9AA3AB; --infra-efectivo:#6DAB24;
+  --infra-sel:#111827; --infra-sel-borde:#ffffff;
   --nse-bajo:#B5651D; --nse-medio:#6DAB24; --nse-alto:#002A5A;
   /* Bridge (rgba de --live = 0,42,90) */
   --topbar: rgba(255,255,255,.92);  --hover: rgba(0,42,90,.06);  --chip: rgba(0,42,90,.08);
