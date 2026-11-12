@@ -17,3 +17,6 @@ __pycache__/
 
 # Backups de corrección de terminal y config local del kit (no publicar)
 *.bak_terminal
+
+# Código del motor: no se publica (vive en el proyecto, fuera del sitio). Licencia 2026-11.
+pipeline/
